@@ -21,6 +21,7 @@ dependencies = [
     "alembic>=1.13.0",
     "flask-migrate>=4.0.0",
     "img2pdf>=0.5.1",
+    "pymupdf>=1.24.0",
 ]
 
 [project.optional-dependencies]

@@ -2,6 +2,7 @@
 Project model
 """
 import uuid
+import json
 from datetime import datetime
 from . import db
 
@@ -17,9 +18,13 @@ class Project(db.Model):
     outline_text = db.Column(db.Text, nullable=True)  # 用户输入的大纲文本（用于outline类型）
     description_text = db.Column(db.Text, nullable=True)  # 用户输入的描述文本（用于description类型）
     extra_requirements = db.Column(db.Text, nullable=True)  # 额外要求，应用到每个页面的AI提示词
-    creation_type = db.Column(db.String(20), nullable=False, default='idea')  # idea|outline|descriptions
+    creation_type = db.Column(db.String(20), nullable=False, default='idea')  # idea|outline|descriptions|restyle
     template_image_path = db.Column(db.String(500), nullable=True)
     template_style = db.Column(db.Text, nullable=True)  # 风格描述文本（无模板图模式）
+    # Restyle 模式专用字段
+    source_file_path = db.Column(db.String(500), nullable=True)  # 上传的原始PPT/PDF路径
+    style_ref_image_paths = db.Column(db.Text, nullable=True)  # JSON: 风格参考图路径列表
+    brand_guidelines = db.Column(db.Text, nullable=True)  # 品牌风格规范文本
     # 导出设置
     export_extractor_method = db.Column(db.String(50), nullable=True, default='hybrid')  # 组件提取方法: mineru, hybrid
     export_inpaint_method = db.Column(db.String(50), nullable=True, default='hybrid')  # 背景图获取方法: generative, baidu, hybrid
@@ -36,6 +41,22 @@ class Project(db.Model):
                            cascade='all, delete-orphan')
     materials = db.relationship('Material', back_populates='project', lazy='select',
                            cascade='all, delete-orphan')
+
+    def get_style_ref_image_paths(self):
+        """Parse style_ref_image_paths from JSON string"""
+        if self.style_ref_image_paths:
+            try:
+                return json.loads(self.style_ref_image_paths)
+            except json.JSONDecodeError:
+                return []
+        return []
+
+    def set_style_ref_image_paths(self, paths: list):
+        """Set style_ref_image_paths as JSON string"""
+        if paths:
+            self.style_ref_image_paths = json.dumps(paths, ensure_ascii=False)
+        else:
+            self.style_ref_image_paths = None
     
     def to_dict(self, include_pages=False):
         """Convert to dictionary"""
@@ -60,6 +81,9 @@ class Project(db.Model):
             'export_extractor_method': self.export_extractor_method or 'hybrid',
             'export_inpaint_method': self.export_inpaint_method or 'hybrid',
             'export_allow_partial': self.export_allow_partial or False,
+            'source_file_path': self.source_file_path,
+            'style_ref_image_paths': self.get_style_ref_image_paths(),
+            'brand_guidelines': self.brand_guidelines,
             'status': self.status,
             'created_at': created_at_str,
             'updated_at': updated_at_str,

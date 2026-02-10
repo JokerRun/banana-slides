@@ -22,6 +22,7 @@ class Page(db.Model):
     description_content = db.Column(db.Text, nullable=True)  # JSON string
     generated_image_path = db.Column(db.String(500), nullable=True)  # Original PNG image path
     cached_image_path = db.Column(db.String(500), nullable=True)  # Compressed JPG thumbnail path
+    original_slide_image_path = db.Column(db.String(500), nullable=True)  # Restyle: 原始slide图片路径
     status = db.Column(db.String(50), nullable=False, default='DRAFT')
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -73,6 +74,12 @@ class Page(db.Model):
             filename = Path(display_image_path).name
             display_image_url = f'/files/{self.project_id}/pages/{filename}'
 
+        # Restyle: 原始slide图片URL
+        original_slide_image_url = None
+        if self.original_slide_image_path:
+            orig_filename = Path(self.original_slide_image_path).name
+            original_slide_image_url = f'/files/{self.project_id}/pages/{orig_filename}'
+
         data = {
             'page_id': self.id,
             'order_index': self.order_index,
@@ -80,6 +87,7 @@ class Page(db.Model):
             'outline_content': self.get_outline_content(),
             'description_content': self.get_description_content(),
             'generated_image_url': display_image_url,
+            'original_slide_image_url': original_slide_image_url,
             'status': self.status,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
