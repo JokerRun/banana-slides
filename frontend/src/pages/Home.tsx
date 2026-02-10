@@ -594,10 +594,13 @@ export const Home: React.FC = () => {
       show({ message: t('home.messages.restyleCreated'), type: 'success' });
 
       // Step 2: Start restyle generation
-      await restyleGenerate(projectId);
+      const restyleResponse = await restyleGenerate(projectId);
+      const restyleTaskId = restyleResponse.data?.task_id;
 
-      // Step 3: Navigate to SlidePreview
-      navigate(`/project/${projectId}/detail`);
+      // Step 3: Navigate to SlidePreview (restyle 跳过 outline/detail，直接预览)
+      navigate(`/project/${projectId}/preview`, {
+        state: { restyleTaskId }
+      });
     } catch (error: any) {
       console.error('Restyle failed:', error);
       show({

@@ -155,6 +155,7 @@ export const SlidePreview: React.FC = () => {
   const t = useT(previewI18n);
   const { projectId } = useParams<{ projectId: string }>();
   const fromHistory = (location.state as any)?.from === 'history';
+  const restyleTaskId = (location.state as any)?.restyleTaskId;
   const {
     currentProject,
     syncProject,
@@ -166,6 +167,7 @@ export const SlidePreview: React.FC = () => {
     taskProgress,
     pageGeneratingTasks,
     warningMessage,
+    pollImageTask,
   } = useProjectStore();
   
   const { addTask, pollTask: pollExportTask, tasks: exportTasks, restoreActiveTasks } = useExportTasksStore();
@@ -277,6 +279,19 @@ export const SlidePreview: React.FC = () => {
     };
     loadTemplates();
   }, [projectId, currentProject, syncProject]);
+
+  // Restyle 项目：从 Home.tsx navigate state 获取 task_id，自动轮询生成进度
+  const restylePolledRef = React.useRef(false);
+  useEffect(() => {
+    if (restyleTaskId && currentProject?.id && !restylePolledRef.current) {
+      restylePolledRef.current = true;
+      const pageIds = currentProject.pages.map(p => p.id).filter(Boolean) as string[];
+      if (pageIds.length > 0) {
+        console.log(`[Restyle] 开始轮询 task ${restyleTaskId}，${pageIds.length} 页`);
+        pollImageTask(restyleTaskId, pageIds);
+      }
+    }
+  }, [restyleTaskId, currentProject?.id, currentProject?.pages, pollImageTask]);
 
   // 监听警告消息
   const lastWarningRef = React.useRef<string | null>(null);

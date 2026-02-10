@@ -17,7 +17,8 @@ from services.ai_service_manager import get_ai_service
 from services.task_manager import (
     task_manager,
     generate_descriptions_task,
-    generate_images_task
+    generate_images_task,
+    restyle_images_task
 )
 from utils import (
     success_response, error_response, not_found, bad_request,
@@ -706,9 +707,16 @@ def generate_images(project_id):
         ref_image_path = None
         if use_template:
             ref_image_path = file_service.get_template_path(project_id)
-        
-        if not ref_image_path and not project.template_style:
-            return bad_request("请先上传模板图片或添加风格描述。")
+
+        if project.creation_type == 'restyle':
+            # Restyle 项目：需要风格参考图
+            style_ref_paths = project.get_style_ref_image_paths()
+            if not style_ref_paths:
+                return bad_request("Restyle 项目必须有风格参考图。")
+        else:
+            # 非 restyle 项目：需要模板图片或风格描述
+            if not ref_image_path and not project.template_style:
+                return bad_request("请先上传模板图片或添加风格描述。")
         
         # Reconstruct outline from pages with part structure
         outline = _reconstruct_outline_from_pages(pages)
@@ -719,9 +727,10 @@ def generate_images(project_id):
         language = data.get('language', current_app.config.get('OUTPUT_LANGUAGE', 'zh'))
         
         # Create task
+        task_type = 'RESTYLE_IMAGES' if project.creation_type == 'restyle' else 'GENERATE_IMAGES'
         task = Task(
             project_id=project_id,
-            task_type='GENERATE_IMAGES',
+            task_type=task_type,
             status='PENDING'
         )
         task.set_progress({
@@ -746,22 +755,38 @@ def generate_images(project_id):
         app = current_app._get_current_object()
         
         # Submit background task
-        task_manager.submit_task(
-            task.id,
-            generate_images_task,
-            project_id,
-            ai_service,
-            file_service,
-            outline,
-            use_template,
-            max_workers,
-            current_app.config['DEFAULT_ASPECT_RATIO'],
-            current_app.config['DEFAULT_RESOLUTION'],
-            app,
-            combined_requirements if combined_requirements.strip() else None,
-            language,
-            selected_page_ids if selected_page_ids else None
-        )
+        if project.creation_type == 'restyle':
+            # Restyle 项目 → restyle_images_task
+            task_manager.submit_task(
+                task.id,
+                restyle_images_task,
+                project_id,
+                ai_service,
+                file_service,
+                page_ids=selected_page_ids if selected_page_ids else None,
+                max_workers=max_workers,
+                aspect_ratio=current_app.config['DEFAULT_ASPECT_RATIO'],
+                resolution=current_app.config['DEFAULT_RESOLUTION'],
+                app=app
+            )
+        else:
+            # 标准项目 → generate_images_task
+            task_manager.submit_task(
+                task.id,
+                generate_images_task,
+                project_id,
+                ai_service,
+                file_service,
+                outline,
+                use_template,
+                max_workers,
+                current_app.config['DEFAULT_ASPECT_RATIO'],
+                current_app.config['DEFAULT_RESOLUTION'],
+                app,
+                combined_requirements if combined_requirements.strip() else None,
+                language,
+                selected_page_ids if selected_page_ids else None
+            )
         
         # Update project status
         project.status = 'GENERATING_IMAGES'
