@@ -184,7 +184,7 @@ def create_project():
         
         creation_type = data.get('creation_type')
         
-        if creation_type not in ['idea', 'outline', 'descriptions']:
+        if creation_type not in ['idea', 'outline', 'descriptions', 'restyle']:
             return bad_request("Invalid creation_type")
         
         # Create project

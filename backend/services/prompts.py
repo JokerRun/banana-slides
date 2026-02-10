@@ -721,6 +721,50 @@ You are a helpful assistant that modifies PPT page descriptions based on user re
     return final_prompt
 
 
+def get_restyle_prompt(brand_guidelines: str,
+                       page_index: int,
+                       total_pages: int) -> str:
+    """
+    生成单页风格转换的 prompt
+
+    Args:
+        brand_guidelines: 品牌规范文本
+        page_index: 当前页码 (1-indexed)
+        total_pages: 总页数
+
+    Returns:
+        格式化后的 prompt 字符串
+    """
+    brand_section = f"\n## 品牌规范\n{brand_guidelines}" if brand_guidelines else ""
+
+    # 首页/尾页特殊提示
+    page_hint = ""
+    if page_index == 1:
+        page_hint = "\n- 当前是**封面页**，请采用封面专属设计（突出标题，简洁大气）"
+    elif page_index == total_pages:
+        page_hint = "\n- 当前是**尾页**，请采用结尾页专属设计（如感谢页、联系方式页）"
+
+    prompt = f"""\
+你是一位专业的PPT设计师。请根据提供的【风格参考图片】重新设计这张PPT页面。
+
+## 任务
+- 第一张/前几张图片是【目标风格参考】，请严格遵循其配色方案、字体风格、排版语言、装饰元素
+- 最后一张图片是【原始PPT页面】，请保留其所有文字内容、数据和信息结构
+- 用目标风格重新设计原始页面，保持内容不变
+
+## 要求
+- 完整保留原页面的所有文字（标题、正文、列表项、数据），不得遗漏或修改任何文字
+- 保留原页面的图表、图片等视觉元素（可以用新风格重绘）
+- 采用风格参考图的：配色、字体风格、背景、装饰元素、版式语言
+- 输出16:9横版PPT页面，4K分辨率
+- 当前是第 {page_index}/{total_pages} 页{page_hint}
+- 文字必须清晰锐利，确保可读性
+{brand_section}
+"""
+    logger.debug(f"[get_restyle_prompt] page {page_index}/{total_pages}")
+    return prompt
+
+
 def get_clean_background_prompt() -> str:
     """
     生成纯背景图的 prompt（去除文字和插画）

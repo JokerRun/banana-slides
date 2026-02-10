@@ -3,6 +3,7 @@ Task Manager - handles background tasks using ThreadPoolExecutor
 No need for Celery or Redis, uses in-memory task tracking
 """
 import logging
+import os
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable, List, Dict, Any, Optional
@@ -1084,6 +1085,191 @@ def export_editable_pptx_with_recursive_analysis_task(
             logger.error(f"✗ 任务 {task_id} 失败: {error_detail}")
             
             # 标记任务失败
+            task = Task.query.get(task_id)
+            if task:
+                task.status = 'FAILED'
+                task.error_message = str(e)
+                task.completed_at = datetime.utcnow()
+                db.session.commit()
+
+
+def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
+                        page_ids: list = None, max_workers: int = 4,
+                        aspect_ratio: str = "16:9", resolution: str = "2K",
+                        app=None):
+    """
+    Background task for restyle — 逐页风格转换
+
+    将原始slide图片 + 风格参考图 → Gemini Image-to-Image → 新风格slide
+
+    Args:
+        task_id: Task ID
+        project_id: Project ID
+        ai_service: AI service instance
+        file_service: File service instance
+        page_ids: Optional list of page IDs to restyle (default: all)
+        max_workers: Max parallel workers
+        aspect_ratio: Output aspect ratio
+        resolution: Output resolution
+        app: Flask app instance
+    """
+    if app is None:
+        raise ValueError("Flask app instance must be provided")
+
+    with app.app_context():
+        try:
+            from models import Project
+            from services.prompts import get_restyle_prompt
+
+            # Update task status
+            task = Task.query.get(task_id)
+            if not task:
+                return
+            task.status = 'PROCESSING'
+            db.session.commit()
+
+            # Get project
+            project = Project.query.get(project_id)
+            if not project:
+                raise ValueError(f"Project {project_id} not found")
+
+            # Get pages
+            pages = get_filtered_pages(project_id, page_ids)
+            if not pages:
+                raise ValueError("No pages found for project")
+
+            total_pages = len(pages)
+
+            # Get style ref images and brand guidelines
+            style_ref_paths = project.get_style_ref_image_paths()
+            brand_guidelines = project.brand_guidelines or ""
+
+            # Load style ref images as PIL Images
+            style_ref_images = []
+            for ref_path in style_ref_paths:
+                abs_path = file_service.get_absolute_path(ref_path)
+                if os.path.exists(abs_path):
+                    style_ref_images.append(Image.open(abs_path))
+                    logger.debug(f"Loaded style ref: {abs_path}")
+
+            if not style_ref_images:
+                raise ValueError("No style reference images found")
+
+            # Initialize progress
+            task.set_progress({
+                "total": total_pages,
+                "completed": 0,
+                "failed": 0
+            })
+            db.session.commit()
+
+            completed = 0
+            failed = 0
+
+            def restyle_single_page(page_id, page_index):
+                """Restyle a single page"""
+                with app.app_context():
+                    try:
+                        from services.ai_service_manager import get_ai_service
+                        ai_svc = get_ai_service()
+
+                        page_obj = Page.query.get(page_id)
+                        if not page_obj:
+                            raise ValueError(f"Page {page_id} not found")
+
+                        page_obj.status = 'GENERATING'
+                        db.session.commit()
+
+                        # Get original slide image
+                        if not page_obj.original_slide_image_path:
+                            raise ValueError(f"Page {page_id} has no original slide image")
+
+                        original_path = file_service.get_absolute_path(page_obj.original_slide_image_path)
+                        if not os.path.exists(original_path):
+                            raise ValueError(f"Original slide image not found: {original_path}")
+
+                        original_image = Image.open(original_path)
+
+                        # Build prompt
+                        prompt = get_restyle_prompt(
+                            brand_guidelines=brand_guidelines,
+                            page_index=page_index,
+                            total_pages=total_pages
+                        )
+
+                        # Build ref_images: style refs first (higher weight), original slide last
+                        ref_images = list(style_ref_images) + [original_image]
+
+                        # Generate restyled image via AIService
+                        logger.info(f"🎨 Restyling page {page_index}/{total_pages} (page_id={page_id})...")
+                        image = ai_svc.image_provider.generate_image(
+                            prompt=prompt,
+                            ref_images=ref_images,
+                            aspect_ratio=aspect_ratio,
+                            resolution=resolution,
+                            enable_thinking=ai_svc.enable_image_reasoning,
+                            thinking_budget=ai_svc._get_image_thinking_budget()
+                        )
+
+                        if not image:
+                            raise ValueError("Failed to generate restyled image")
+
+                        # Save with version management
+                        image_path, version = save_image_with_version(
+                            image, project_id, page_id, file_service, page_obj=page_obj
+                        )
+
+                        logger.info(f"✅ Restyle page {page_index}/{total_pages} completed")
+                        return (page_id, image_path, None)
+
+                    except Exception as e:
+                        import traceback
+                        logger.error(f"Failed to restyle page {page_id}: {traceback.format_exc()}")
+                        return (page_id, None, str(e))
+
+            # Parallel execution
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [
+                    executor.submit(restyle_single_page, page.id, i)
+                    for i, page in enumerate(pages, 1)
+                ]
+
+                for future in as_completed(futures):
+                    page_id, image_path, error = future.result()
+
+                    db.session.expire_all()
+                    page = Page.query.get(page_id)
+                    if page:
+                        if error:
+                            page.status = 'FAILED'
+                            failed += 1
+                            db.session.commit()
+                        else:
+                            completed += 1
+                            db.session.refresh(page)
+
+                    # Update task progress
+                    task = Task.query.get(task_id)
+                    if task:
+                        task.update_progress(completed=completed, failed=failed)
+                        db.session.commit()
+                        logger.info(f"Restyle Progress: {completed}/{total_pages} pages completed")
+
+            # Mark task as completed
+            task = Task.query.get(task_id)
+            if task:
+                task.status = 'COMPLETED'
+                task.completed_at = datetime.utcnow()
+                db.session.commit()
+                logger.info(f"Task {task_id} COMPLETED - {completed} pages restyled, {failed} failed")
+
+            # Update project status
+            project = Project.query.get(project_id)
+            if project and failed == 0:
+                project.status = 'COMPLETED'
+                db.session.commit()
+
+        except Exception as e:
             task = Task.query.get(task_id)
             if task:
                 task.status = 'FAILED'

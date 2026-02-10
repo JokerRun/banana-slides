@@ -24,7 +24,7 @@ from config import Config
 from controllers.material_controller import material_bp, material_global_bp
 from controllers.reference_file_controller import reference_file_bp
 from controllers.settings_controller import settings_bp
-from controllers import project_bp, page_bp, template_bp, user_template_bp, export_bp, file_bp
+from controllers import project_bp, page_bp, template_bp, user_template_bp, export_bp, file_bp, restyle_bp
 
 
 # Enable SQLite WAL mode for all connections
@@ -109,6 +109,7 @@ def create_app():
     app.register_blueprint(material_global_bp)
     app.register_blueprint(reference_file_bp, url_prefix='/api/reference-files')
     app.register_blueprint(settings_bp)
+    app.register_blueprint(restyle_bp)
 
     with app.app_context():
         # Load settings from database and sync to app.config
