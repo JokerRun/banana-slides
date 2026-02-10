@@ -1,18 +1,18 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Sparkles, FileText, FileEdit, ImagePlus, Paperclip, Palette, Lightbulb, Search, Settings, FolderOpen, HelpCircle, Sun, Moon, Globe, Monitor, ChevronDown } from 'lucide-react';
+import { Sparkles, FileText, FileEdit, ImagePlus, Paperclip, Palette, Lightbulb, Search, Settings, FolderOpen, HelpCircle, Sun, Moon, Globe, Monitor, ChevronDown, RefreshCw, Upload } from 'lucide-react';
 import { Button, Textarea, Card, useToast, MaterialGeneratorModal, MaterialCenterModal, ReferenceFileList, ReferenceFileSelector, FilePreviewModal, HelpModal, Footer, GithubRepoCard } from '@/components/shared';
 import { MarkdownTextarea, type MarkdownTextareaRef } from '@/components/shared/MarkdownTextarea';
 import { TemplateSelector, getTemplateFile } from '@/components/shared/TemplateSelector';
-import { listUserTemplates, type UserTemplate, uploadReferenceFile, type ReferenceFile, associateFileToProject, triggerFileParse, associateMaterialsToProject, listProjects } from '@/api/endpoints';
+import { listUserTemplates, type UserTemplate, uploadReferenceFile, type ReferenceFile, associateFileToProject, triggerFileParse, associateMaterialsToProject, listProjects, createRestyleProject, restyleGenerate } from '@/api/endpoints';
 import { useProjectStore } from '@/store/useProjectStore';
 import { useTheme } from '@/hooks/useTheme';
 import { useImagePaste } from '@/hooks/useImagePaste';
 import { useT } from '@/hooks/useT';
 import { PRESET_STYLES } from '@/config/presetStyles';
 
-type CreationType = 'idea' | 'outline' | 'description';
+type CreationType = 'idea' | 'outline' | 'description' | 'restyle';
 
 // 页面特有翻译 - AI 可以直接看到所有文案，保留原始 key 结构
 const homeI18n = {
@@ -73,11 +73,13 @@ const homeI18n = {
         idea: '一句话生成',
         outline: '从大纲生成',
         description: '从描述生成',
+        restyle: '风格转换',
       },
       tabDescriptions: {
         idea: '输入你的想法，AI 将为你生成完整的 PPT',
         outline: '已有大纲？直接粘贴，AI 将自动切分为结构化大纲',
         description: '已有完整描述？AI 将自动解析并直接生成图片，跳过大纲步骤',
+        restyle: '上传已有 PPT/PDF，提供风格参考图，AI 将逐页重绘为新风格',
       },
       placeholders: {
         idea: '例如：生成一份关于 AI 发展史的演讲 PPT',
@@ -99,6 +101,11 @@ const homeI18n = {
         selectFile: '选择参考文件',
         parsing: '解析中...',
         createProject: '创建新项目',
+        uploadSource: '上传 PPT/PDF 源文件',
+        uploadStyleRef: '上传风格参考图',
+        brandGuidelines: '品牌规范（可选）',
+        startRestyle: '开始风格转换',
+        converting: '转换中...',
       },
       messages: {
         enterContent: '请输入内容',
@@ -115,6 +122,10 @@ const homeI18n = {
         filesAdded: '已添加 {{count}} 个参考文件',
         imageRemoved: '已移除图片',
         serviceTestTip: '建议先到设置页底部进行服务测试，避免后续功能异常',
+        restyleSourceRequired: '请上传 PPT/PDF 源文件',
+        restyleStyleRefRequired: '请至少上传一张风格参考图',
+        restyleCreated: '风格转换项目创建成功，正在处理...',
+        restyleFailed: '风格转换创建失败',
       },
     },
   },
@@ -175,11 +186,13 @@ const homeI18n = {
         idea: 'From Idea',
         outline: 'From Outline',
         description: 'From Description',
+        restyle: 'Restyle',
       },
       tabDescriptions: {
         idea: 'Enter your idea, AI will generate a complete PPT for you',
         outline: 'Have an outline? Paste it directly, AI will split it into a structured outline',
         description: 'Have detailed descriptions? AI will parse and generate images directly, skipping the outline step',
+        restyle: 'Upload existing PPT/PDF with style references, AI will restyle each slide',
       },
       placeholders: {
         idea: 'e.g., Generate a presentation about the history of AI',
@@ -201,6 +214,11 @@ const homeI18n = {
         selectFile: 'Select reference file',
         parsing: 'Parsing...',
         createProject: 'Create New Project',
+        uploadSource: 'Upload PPT/PDF Source',
+        uploadStyleRef: 'Upload Style Reference',
+        brandGuidelines: 'Brand Guidelines (optional)',
+        startRestyle: 'Start Restyle',
+        converting: 'Converting...',
       },
       messages: {
         enterContent: 'Please enter content',
@@ -217,6 +235,10 @@ const homeI18n = {
         filesAdded: 'Added {{count}} reference file(s)',
         imageRemoved: 'Image removed',
         serviceTestTip: 'Test services in Settings first to avoid issues',
+        restyleSourceRequired: 'Please upload a PPT/PDF source file',
+        restyleStyleRefRequired: 'At least one style reference image is required',
+        restyleCreated: 'Restyle project created, processing...',
+        restyleFailed: 'Failed to create restyle project',
       },
     },
   },
@@ -248,6 +270,12 @@ export const Home: React.FC = () => {
   const [useTemplateStyle, setUseTemplateStyle] = useState(false);
   const [templateStyle, setTemplateStyle] = useState('');
   const [hoveredPresetId, setHoveredPresetId] = useState<string | null>(null);
+  const [restyleSourceFile, setRestyleSourceFile] = useState<File | null>(null);
+  const [restyleStyleRefs, setRestyleStyleRefs] = useState<File[]>([]);
+  const [restyleBrandGuidelines, setRestyleBrandGuidelines] = useState('');
+  const [isRestyleSubmitting, setIsRestyleSubmitting] = useState(false);
+  const restyleSourceInputRef = useRef<HTMLInputElement>(null);
+  const restyleStyleRefInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const themeMenuRef = useRef<HTMLDivElement>(null);
 
@@ -499,6 +527,13 @@ export const Home: React.FC = () => {
       description: t('home.tabDescriptions.description'),
       example: t('home.examples.description'),
     },
+    restyle: {
+      icon: <RefreshCw size={20} />,
+      label: t('home.tabs.restyle'),
+      placeholder: '',
+      description: t('home.tabDescriptions.restyle'),
+      example: null as string | null,
+    },
   };
 
   const handleTemplateSelect = async (templateFile: File | null, templateId?: string) => {
@@ -526,6 +561,51 @@ export const Home: React.FC = () => {
       // 清空所有选择状态
       setSelectedTemplateId(null);
       setSelectedPresetTemplateId(null);
+    }
+  };
+
+  // === Restyle submit handler ===
+  const handleRestyleSubmit = async () => {
+    if (!restyleSourceFile) {
+      show({ message: t('home.messages.restyleSourceRequired'), type: 'error' });
+      return;
+    }
+    if (restyleStyleRefs.length === 0) {
+      show({ message: t('home.messages.restyleStyleRefRequired'), type: 'error' });
+      return;
+    }
+
+    setIsRestyleSubmitting(true);
+    try {
+      // Step 1: Create restyle project (upload + convert)
+      const response = await createRestyleProject(
+        restyleSourceFile,
+        restyleStyleRefs,
+        restyleBrandGuidelines.trim() || undefined
+      );
+
+      if (!response.data?.project_id) {
+        show({ message: t('home.messages.restyleFailed'), type: 'error' });
+        return;
+      }
+
+      const projectId = response.data.project_id;
+      localStorage.setItem('currentProjectId', projectId);
+      show({ message: t('home.messages.restyleCreated'), type: 'success' });
+
+      // Step 2: Start restyle generation
+      await restyleGenerate(projectId);
+
+      // Step 3: Navigate to SlidePreview
+      navigate(`/project/${projectId}/detail`);
+    } catch (error: any) {
+      console.error('Restyle failed:', error);
+      show({
+        message: `${t('home.messages.restyleFailed')}: ${error?.response?.data?.error?.message || error.message || '未知错误'}`,
+        type: 'error'
+      });
+    } finally {
+      setIsRestyleSubmitting(false);
     }
   };
 
@@ -871,6 +951,122 @@ export const Home: React.FC = () => {
           </div>
 
           {/* 输入区 - 带工具栏 */}
+          {activeTab === 'restyle' ? (
+            /* ===== Restyle 模式 UI ===== */
+            <div className="mb-6 space-y-4">
+              {/* 源文件上传 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-foreground-secondary mb-2">
+                  📄 {t('home.actions.uploadSource')}
+                </label>
+                <div
+                  onClick={() => restyleSourceInputRef.current?.click()}
+                  className={`relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-200
+                    ${restyleSourceFile
+                      ? 'border-banana-400 bg-banana-50/50 dark:bg-banana/5 dark:border-banana/50'
+                      : 'border-gray-300 dark:border-border-primary hover:border-banana-400 hover:bg-banana-50/30 dark:hover:border-banana/50'
+                    }`}
+                >
+                  <input
+                    ref={restyleSourceInputRef}
+                    type="file"
+                    accept=".pptx,.ppt,.pdf"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) setRestyleSourceFile(file);
+                      e.target.value = '';
+                    }}
+                    className="hidden"
+                  />
+                  {restyleSourceFile ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <FileText size={20} className="text-banana-600 dark:text-banana" />
+                      <span className="text-sm font-medium text-gray-800 dark:text-white">{restyleSourceFile.name}</span>
+                      <span className="text-xs text-gray-500 dark:text-foreground-tertiary">({(restyleSourceFile.size / 1024 / 1024).toFixed(1)} MB)</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setRestyleSourceFile(null); }}
+                        className="ml-2 text-gray-400 hover:text-red-500 transition-colors"
+                      >✕</button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1">
+                      <Upload size={24} className="text-gray-400 dark:text-foreground-tertiary" />
+                      <span className="text-sm text-gray-500 dark:text-foreground-tertiary">PPT / PPTX / PDF</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 风格参考图上传 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-foreground-secondary mb-2">
+                  🎨 {t('home.actions.uploadStyleRef')}
+                </label>
+                <div className="flex flex-wrap gap-3">
+                  {restyleStyleRefs.map((ref, i) => (
+                    <div key={i} className="relative w-24 h-16 rounded-lg overflow-hidden border-2 border-banana-300 dark:border-banana/50 group">
+                      <img
+                        src={URL.createObjectURL(ref)}
+                        alt={`style ref ${i + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                      <button
+                        onClick={() => setRestyleStyleRefs(prev => prev.filter((_, idx) => idx !== i))}
+                        className="absolute top-0 right-0 bg-black/50 text-white text-xs px-1 rounded-bl opacity-0 group-hover:opacity-100 transition-opacity"
+                      >✕</button>
+                    </div>
+                  ))}
+                  {restyleStyleRefs.length < 5 && (
+                    <div
+                      onClick={() => restyleStyleRefInputRef.current?.click()}
+                      className="w-24 h-16 border-2 border-dashed border-gray-300 dark:border-border-primary rounded-lg flex items-center justify-center cursor-pointer hover:border-banana-400 dark:hover:border-banana/50 transition-colors"
+                    >
+                      <span className="text-2xl text-gray-400">+</span>
+                    </div>
+                  )}
+                </div>
+                <input
+                  ref={restyleStyleRefInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    setRestyleStyleRefs(prev => [...prev, ...files].slice(0, 5));
+                    e.target.value = '';
+                  }}
+                  className="hidden"
+                />
+              </div>
+
+              {/* 品牌规范 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-foreground-secondary mb-2">
+                  📋 {t('home.actions.brandGuidelines')}
+                </label>
+                <Textarea
+                  placeholder="例如：使用DDI品牌色 #445664 深灰 + #FAA300 金色，标题用 Century Gothic Bold，Logo放右下角..."
+                  value={restyleBrandGuidelines}
+                  onChange={(e) => setRestyleBrandGuidelines(e.target.value)}
+                  rows={3}
+                  className="text-sm border-2 border-gray-200 dark:border-border-primary dark:bg-background-tertiary dark:text-white focus:border-banana-400 dark:focus:border-banana transition-colors"
+                />
+              </div>
+
+              {/* 提交按钮 */}
+              <Button
+                onClick={handleRestyleSubmit}
+                loading={isRestyleSubmitting}
+                disabled={!restyleSourceFile || restyleStyleRefs.length === 0}
+                className="w-full py-3 text-base font-semibold"
+              >
+                <RefreshCw size={18} className="mr-2" />
+                {isRestyleSubmitting ? t('home.actions.converting') : t('home.actions.startRestyle')}
+              </Button>
+            </div>
+          ) : (
+          /* ===== 原有创建模式 UI ===== */
+          <>
           <div className="mb-2">
             <MarkdownTextarea
               ref={textareaRef}
@@ -1036,6 +1232,8 @@ export const Home: React.FC = () => {
               />
             )}
           </div>
+          </>
+          )}
 
         </Card>
       </main>

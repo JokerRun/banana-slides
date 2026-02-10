@@ -1401,6 +1401,12 @@ export const SlidePreview: React.FC = () => {
                           alt={`Slide ${index + 1}`}
                           className="w-full h-full object-cover rounded"
                         />
+                      ) : page.original_slide_image_url ? (
+                        <img
+                          src={getImageUrl(page.original_slide_image_url)}
+                          alt={`Original ${index + 1}`}
+                          className="w-full h-full object-cover rounded opacity-60"
+                        />
                       ) : (
                         <div className="w-full h-full bg-gray-100 dark:bg-background-secondary rounded flex items-center justify-center text-xs text-gray-400">
                           {index + 1}
@@ -1495,12 +1501,57 @@ export const SlidePreview: React.FC = () => {
                 <div className="max-w-5xl w-full">
                   <div className="relative aspect-video bg-white dark:bg-background-secondary rounded-lg shadow-xl overflow-hidden touch-manipulation">
                     {selectedPage?.generated_image_path ? (
+                      <>
                       <img
                         src={imageUrl}
                         alt={`Slide ${selectedIndex + 1}`}
                         className="w-full h-full object-cover select-none"
                         draggable={false}
                       />
+                      {/* Restyle 模式：原始slide悬浮对比缩略图 */}
+                      {currentProject.creation_type === 'restyle' && selectedPage?.original_slide_image_url && (
+                        <div className="absolute bottom-3 left-3 group/orig">
+                          <div className="w-32 md:w-40 rounded-md shadow-lg border-2 border-white/80 dark:border-border-primary overflow-hidden transition-all duration-300 hover:w-60 md:hover:w-72 hover:shadow-2xl cursor-pointer">
+                            <div className="absolute top-0 left-0 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-br z-10">Original</div>
+                            <img
+                              src={getImageUrl(selectedPage.original_slide_image_url)}
+                              alt="Original slide"
+                              className="w-full aspect-video object-cover"
+                            />
+                          </div>
+                        </div>
+                      )}
+                      </>
+                    ) : selectedPage?.original_slide_image_url ? (
+                      /* Restyle 模式：显示原始slide + 转换中/生成按钮 */
+                      <div className="w-full h-full relative">
+                        <img
+                          src={getImageUrl(selectedPage.original_slide_image_url)}
+                          alt={`Original Slide ${selectedIndex + 1}`}
+                          className="w-full h-full object-cover select-none opacity-70"
+                          draggable={false}
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20">
+                          <div className="text-center bg-white/90 dark:bg-background-secondary/90 rounded-xl p-6 shadow-lg">
+                            <p className="text-gray-600 dark:text-foreground-secondary mb-3 text-sm font-medium">
+                              {selectedPage?.id && pageGeneratingTasks[selectedPage.id]
+                                ? t('preview.generating')
+                                : selectedPage?.status === 'GENERATING'
+                                ? t('preview.generating')
+                                : '🎨 原始页面，等待风格转换'}
+                            </p>
+                            {(!selectedPage?.id || !pageGeneratingTasks[selectedPage.id]) &&
+                             selectedPage?.status !== 'GENERATING' && (
+                              <Button
+                                variant="primary"
+                                onClick={handleRegeneratePage}
+                              >
+                                {t('preview.generateThisPage')}
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     ) : (
                       <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-background-secondary">
                         <div className="text-center">

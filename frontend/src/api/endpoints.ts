@@ -792,6 +792,68 @@ export const dissociateFileFromProject = async (
 
 // ===== 输出语言设置 =====
 
+// ===== Restyle 相关 API =====
+
+/**
+ * 创建 restyle 项目（上传原始PPT/PDF + 风格参考图）
+ */
+export const createRestyleProject = async (
+  sourceFile: File,
+  styleRefs: File[],
+  brandGuidelines?: string
+): Promise<ApiResponse<{
+  project_id: string;
+  creation_type: string;
+  status: string;
+  pages: Page[];
+  total_pages: number;
+}>> => {
+  const formData = new FormData();
+  formData.append('source_file', sourceFile);
+  styleRefs.forEach(ref => formData.append('style_refs', ref));
+  if (brandGuidelines) {
+    formData.append('brand_guidelines', brandGuidelines);
+  }
+
+  const response = await apiClient.post<ApiResponse<{
+    project_id: string;
+    creation_type: string;
+    status: string;
+    pages: Page[];
+    total_pages: number;
+  }>>('/api/projects/restyle', formData);
+  return response.data;
+};
+
+/**
+ * 启动 restyle 生成（批量）
+ */
+export const restyleGenerate = async (
+  projectId: string,
+  pageIds?: string[]
+): Promise<ApiResponse<{ task_id: string; status: string; total_pages: number }>> => {
+  const response = await apiClient.post<ApiResponse<{ task_id: string; status: string; total_pages: number }>>(
+    `/api/projects/${projectId}/restyle/generate`,
+    { page_ids: pageIds }
+  );
+  return response.data;
+};
+
+/**
+ * 启动单页 restyle 生成
+ */
+export const restyleSinglePage = async (
+  projectId: string,
+  pageId: string
+): Promise<ApiResponse<{ task_id: string; status: string }>> => {
+  const response = await apiClient.post<ApiResponse<{ task_id: string; status: string }>>(
+    `/api/projects/${projectId}/pages/${pageId}/restyle/generate`
+  );
+  return response.data;
+};
+
+// ===== 输出语言设置 =====
+
 export type OutputLanguage = 'zh' | 'ja' | 'en' | 'auto';
 
 export interface OutputLanguageOption {

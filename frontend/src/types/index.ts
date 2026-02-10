@@ -2,7 +2,7 @@
 export type PageStatus = 'DRAFT' | 'DESCRIPTION_GENERATED' | 'GENERATING' | 'COMPLETED' | 'FAILED';
 
 // 项目状态
-export type ProjectStatus = 'DRAFT' | 'OUTLINE_GENERATED' | 'DESCRIPTIONS_GENERATED' | 'COMPLETED';
+export type ProjectStatus = 'DRAFT' | 'OUTLINE_GENERATED' | 'DESCRIPTIONS_GENERATED' | 'SLIDES_EXTRACTED' | 'GENERATING_IMAGES' | 'COMPLETED';
 
 // 大纲内容
 export interface OutlineContent {
@@ -44,6 +44,7 @@ export interface Page {
   description_content?: DescriptionContent;
   generated_image_url?: string; // 后端返回 generated_image_url
   generated_image_path?: string; // 前端使用的别名
+  original_slide_image_url?: string; // Restyle: 原始slide图片URL
   status: PageStatus;
   created_at?: string;
   updated_at?: string;
@@ -68,6 +69,10 @@ export interface Project {
   template_image_url?: string; // 后端返回 template_image_url
   template_image_path?: string; // 前端使用的别名
   template_style?: string; // 风格描述文本（无模板图模式）
+  // Restyle 模式专用
+  source_file_path?: string;
+  style_ref_image_paths?: string[];
+  brand_guidelines?: string;
   // 导出设置
   export_extractor_method?: ExportExtractorMethod; // 组件提取方法
   export_inpaint_method?: ExportInpaintMethod; // 背景图获取方法
