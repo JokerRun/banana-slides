@@ -26,8 +26,9 @@ RUN if [ -n "$APT_MIRROR" ]; then \
             echo "Warning: /etc/apt/sources.list.d/debian.sources not found, skipping mirror setup." >&2; \
         fi; \
     fi && \
-    apt-get update && apt-get install -y \
+    apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    libreoffice-impress \
     && rm -rf /var/lib/apt/lists/*
 
 # 从 uv 阶段复制二进制文件
@@ -70,7 +71,7 @@ ENV IN_DOCKER=1
 EXPOSE 5000
 
 # 容器内部固定使用 5000 端口
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD ["sh", "-c", "curl -f http://localhost:5000/health || exit 1"]
 
 # 启动应用

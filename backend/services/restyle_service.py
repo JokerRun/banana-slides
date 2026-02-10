@@ -83,6 +83,7 @@ class RestyleService:
         """
         import fitz  # PyMuPDF
 
+        os.makedirs(output_dir, exist_ok=True)
         logger.info(f"Converting PDF to images: {file_path} (dpi={dpi})")
         doc = fitz.open(file_path)
         image_paths = []
