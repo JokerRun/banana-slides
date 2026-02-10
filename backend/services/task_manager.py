@@ -1145,11 +1145,15 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
             brand_guidelines = project.brand_guidelines or ""
 
             # Load style ref images as PIL Images
+            # Note: Image.open() is lazy — must .copy() to force load into memory
+            # before sharing across threads, otherwise file handles may conflict
             style_ref_images = []
             for ref_path in style_ref_paths:
                 abs_path = file_service.get_absolute_path(ref_path)
                 if os.path.exists(abs_path):
-                    style_ref_images.append(Image.open(abs_path))
+                    img = Image.open(abs_path)
+                    img.load()  # Force decode into memory
+                    style_ref_images.append(img)
                     logger.debug(f"Loaded style ref: {abs_path}")
 
             if not style_ref_images:
@@ -1189,6 +1193,7 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
                             raise ValueError(f"Original slide image not found: {original_path}")
 
                         original_image = Image.open(original_path)
+                        original_image.load()  # Force decode into memory
 
                         # Build prompt
                         prompt = get_restyle_prompt(

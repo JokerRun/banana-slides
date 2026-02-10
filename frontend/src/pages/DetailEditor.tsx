@@ -1,6 +1,6 @@
 import React, { useEffect, useCallback, useState } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, FileText, Sparkles, Download } from 'lucide-react';
+import { ArrowLeft, ArrowRight, FileText, Sparkles, Download, Info } from 'lucide-react';
 import { useT } from '@/hooks/useT';
 
 // 组件内翻译
@@ -22,7 +22,10 @@ const detailI18n = {
         confirmRegeneratePage: "该页面已有描述，重新生成将覆盖现有内容，确定继续吗？",
         refineSuccess: "页面描述修改成功", refineFailed: "修改失败，请稍后重试",
         exportSuccess: "导出成功", loadingProject: "加载项目中..."
-      }
+      },
+      restyleBanner: "风格转换项目无需编辑描述，点击右上角「→」直接进入预览页",
+      restyleTitle: "风格转换预览",
+      goToPreview: "进入预览"
     }
   },
   en: {
@@ -42,7 +45,10 @@ const detailI18n = {
         confirmRegeneratePage: "This page already has a description. Regenerating will overwrite it. Continue?",
         refineSuccess: "Descriptions modified successfully", refineFailed: "Modification failed, please try again",
         exportSuccess: "Export successful", loadingProject: "Loading project..."
-      }
+      },
+      restyleBanner: "Restyle projects don't need descriptions. Click \"→\" to go to preview.",
+      restyleTitle: "Restyle Preview",
+      goToPreview: "Go to Preview"
     }
   }
 };
@@ -178,6 +184,7 @@ export const DetailEditor: React.FC = () => {
   const hasAllDescriptions = currentProject.pages.every(
     (p) => p.description_content
   );
+  const isRestyle = currentProject.creation_type === 'restyle';
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-background-primary flex flex-col">
@@ -206,10 +213,11 @@ export const DetailEditor: React.FC = () => {
               <span className="text-base md:text-xl font-bold">{t('home.title')}</span>
             </div>
             <span className="text-gray-400 hidden lg:inline">|</span>
-            <span className="text-sm md:text-lg font-semibold hidden lg:inline">{t('detail.title')}</span>
+            <span className="text-sm md:text-lg font-semibold hidden lg:inline">{isRestyle ? t('detail.restyleTitle') : t('detail.title')}</span>
           </div>
           
-          {/* 中间：AI 修改输入框 */}
+          {/* 中间：AI 修改输入框（restyle 模式隐藏） */}
+          {!isRestyle && (
           <div className="flex-1 max-w-xl mx-auto hidden md:block md:-translate-x-3 pr-10">
             <AiRefineInput
               title=""
@@ -220,6 +228,7 @@ export const DetailEditor: React.FC = () => {
               onStatusChange={setIsAiRefining}
             />
           </div>
+          )}
           
           {/* 右侧：操作按钮 */}
           <div className="flex items-center gap-1.5 md:gap-2 flex-shrink-0">
@@ -237,7 +246,7 @@ export const DetailEditor: React.FC = () => {
               size="sm"
               icon={<ArrowRight size={16} className="md:w-[18px] md:h-[18px]" />}
               onClick={() => navigate(`/project/${projectId}/preview`)}
-              disabled={!hasAllDescriptions}
+              disabled={!isRestyle && !hasAllDescriptions}
               className="text-xs md:text-sm"
             >
               <span className="hidden sm:inline">{t('detail.generateImages')}</span>
@@ -245,7 +254,8 @@ export const DetailEditor: React.FC = () => {
           </div>
         </div>
         
-        {/* 移动端：AI 输入框 */}
+        {/* 移动端：AI 输入框（restyle 模式隐藏） */}
+        {!isRestyle && (
         <div className="mt-2 md:hidden">
             <AiRefineInput
             title=""
@@ -256,35 +266,55 @@ export const DetailEditor: React.FC = () => {
             onStatusChange={setIsAiRefining}
           />
         </div>
+        )}
       </header>
 
       {/* 操作栏 */}
       <div className="bg-white dark:bg-background-secondary border-b border-gray-200 dark:border-border-primary px-3 md:px-6 py-3 md:py-4 flex-shrink-0">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3">
-          <div className="flex items-center gap-2 sm:gap-3 flex-1">
+        {isRestyle ? (
+          /* Restyle 模式：提示横幅 */
+          <div className="flex items-center gap-3 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+            <Info size={18} className="text-blue-500 flex-shrink-0" />
+            <span className="text-sm text-blue-700 dark:text-blue-300 flex-1">
+              {t('detail.restyleBanner')}
+            </span>
             <Button
               variant="primary"
-              icon={<Sparkles size={16} className="md:w-[18px] md:h-[18px]" />}
-              onClick={handleGenerateAll}
-              className="flex-1 sm:flex-initial text-sm md:text-base"
+              size="sm"
+              icon={<ArrowRight size={16} />}
+              onClick={() => navigate(`/project/${projectId}/preview`)}
             >
-              {t('detail.batchGenerate')}
+              {t('detail.goToPreview')}
             </Button>
-            <Button
-              variant="secondary"
-              icon={<Download size={16} className="md:w-[18px] md:h-[18px]" />}
-              onClick={handleExportDescriptions}
-              disabled={!currentProject.pages.some(p => p.description_content)}
-              className="flex-1 sm:flex-initial text-sm md:text-base"
-            >
-              {t('detail.export')}
-            </Button>
-            <span className="text-xs md:text-sm text-gray-500 dark:text-foreground-tertiary whitespace-nowrap">
-              {currentProject.pages.filter((p) => p.description_content).length} /{' '}
-              {currentProject.pages.length} {t('detail.pagesCompleted')}
-            </span>
           </div>
-        </div>
+        ) : (
+          /* 非 restyle 模式：描述操作按钮 */
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 flex-1">
+              <Button
+                variant="primary"
+                icon={<Sparkles size={16} className="md:w-[18px] md:h-[18px]" />}
+                onClick={handleGenerateAll}
+                className="flex-1 sm:flex-initial text-sm md:text-base"
+              >
+                {t('detail.batchGenerate')}
+              </Button>
+              <Button
+                variant="secondary"
+                icon={<Download size={16} className="md:w-[18px] md:h-[18px]" />}
+                onClick={handleExportDescriptions}
+                disabled={!currentProject.pages.some(p => p.description_content)}
+                className="flex-1 sm:flex-initial text-sm md:text-base"
+              >
+                {t('detail.export')}
+              </Button>
+              <span className="text-xs md:text-sm text-gray-500 dark:text-foreground-tertiary whitespace-nowrap">
+                {currentProject.pages.filter((p) => p.description_content).length} /{' '}
+                {currentProject.pages.length} {t('detail.pagesCompleted')}
+              </span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* 主内容区 */}

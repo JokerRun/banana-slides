@@ -29,6 +29,7 @@ services:
     restart: unless-stopped
     healthcheck:
       # 健康检查使用容器内部固定端口 5000
+      # 容器内部固定监听 5000，不应使用宿主机端口变量
       test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
       interval: 30s
       timeout: 10s
