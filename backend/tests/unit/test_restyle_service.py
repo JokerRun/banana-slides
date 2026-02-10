@@ -203,60 +203,67 @@ class TestFindLibreoffice:
 
 
 class TestRestylePrompt:
-    """get_restyle_prompt 函数测试"""
+    """get_restyle_prompt tests (compose_images pattern)"""
 
     def test_basic_prompt(self):
-        """基础 prompt 生成"""
+        """Basic prompt with brand guidelines and IMAGE labels"""
         from services.prompts import get_restyle_prompt
-        prompt = get_restyle_prompt("使用蓝色主题", page_index=1, total_pages=5)
+        prompt = get_restyle_prompt("Use blue theme", page_index=1, total_pages=5)
 
-        assert "风格参考" in prompt
-        assert "原始PPT页面" in prompt
+        assert "IMAGE 1: Style reference template" in prompt
+        assert "IMAGE 2: Original PPT slide (content source)" in prompt
         assert "1/5" in prompt
-        assert "品牌规范" in prompt
-        assert "蓝色主题" in prompt
-        # 新增：验证关键结构部分
-        assert "内容100%保留" in prompt
-        assert "风格100%转换" in prompt
-        assert "风格转换要素" in prompt
-        assert "内容保留规则" in prompt
+        assert "Brand guidelines" in prompt
+        assert "blue theme" in prompt
+        # Key instruction preserved
+        assert "keep ALL text content exactly the same" in prompt
+        assert "Apply the visual style" in prompt
 
     def test_prompt_without_brand(self):
-        """无品牌规范时不应包含品牌部分"""
+        """No brand section when brand_guidelines is empty"""
         from services.prompts import get_restyle_prompt
         prompt = get_restyle_prompt("", page_index=2, total_pages=5)
 
-        assert "品牌规范" not in prompt
+        assert "Brand guidelines" not in prompt
         assert "2/5" in prompt
 
     def test_cover_page_prompt(self):
-        """封面页应有特殊提示"""
+        """Cover page should have COVER hint"""
         from services.prompts import get_restyle_prompt
         prompt = get_restyle_prompt("", page_index=1, total_pages=5)
 
-        assert "封面" in prompt
+        assert "COVER" in prompt
 
     def test_last_page_prompt(self):
-        """尾页应有特殊提示"""
+        """Last page should have ENDING hint"""
         from services.prompts import get_restyle_prompt
         prompt = get_restyle_prompt("", page_index=5, total_pages=5)
 
-        assert "尾页" in prompt
+        assert "ENDING" in prompt
 
     def test_middle_page_no_special_hint(self):
-        """中间页无特殊提示"""
+        """Middle page should have no special hint"""
         from services.prompts import get_restyle_prompt
         prompt = get_restyle_prompt("", page_index=3, total_pages=5)
 
-        assert "封面" not in prompt
-        assert "尾页" not in prompt
+        assert "COVER" not in prompt
+        assert "ENDING" not in prompt
 
-    def test_content_preservation_rules(self):
-        """验证内容保留规则覆盖各类型"""
+    def test_multiple_style_refs(self):
+        """Multiple style references should get numbered labels"""
+        from services.prompts import get_restyle_prompt
+        prompt = get_restyle_prompt("", page_index=2, total_pages=5, num_style_refs=3)
+
+        assert "IMAGE 1: Style reference template #1" in prompt
+        assert "IMAGE 2: Style reference template #2" in prompt
+        assert "IMAGE 3: Style reference template #3" in prompt
+        assert "IMAGE 4: Original PPT slide (content source)" in prompt
+        assert "Apply the visual style from IMAGE 1 to IMAGE 4" in prompt
+
+    def test_text_preservation_instruction(self):
+        """Verify text preservation is clearly instructed"""
         from services.prompts import get_restyle_prompt
         prompt = get_restyle_prompt("", page_index=2, total_pages=5)
 
-        assert "标题文字" in prompt
-        assert "图表" in prompt
-        assert "表格" in prompt
-        assert "数据" in prompt
+        assert "every word, number, and punctuation mark" in prompt
+        assert "preserved unchanged" in prompt

@@ -723,63 +723,57 @@ You are a helpful assistant that modifies PPT page descriptions based on user re
 
 def get_restyle_prompt(brand_guidelines: str,
                        page_index: int,
-                       total_pages: int) -> str:
+                       total_pages: int,
+                       num_style_refs: int = 1) -> str:
     """
-    生成单页风格转换的 prompt
+    Generate prompt for single-page restyle.
+
+    Uses the compose_images pattern: concise English with explicit IMAGE N labels.
+    The prompt is sent FIRST in the contents list, followed by images in order:
+      IMAGE 1..N = style reference templates
+      IMAGE N+1  = original PPT slide (content source)
 
     Args:
-        brand_guidelines: 品牌规范文本
-        page_index: 当前页码 (1-indexed)
-        total_pages: 总页数
+        brand_guidelines: Brand guidelines text (optional)
+        page_index: Current page number (1-indexed)
+        total_pages: Total number of pages
+        num_style_refs: Number of style reference images (default 1)
 
     Returns:
-        格式化后的 prompt 字符串
+        Formatted prompt string
     """
-    brand_section = f"\n## 品牌规范\n{brand_guidelines}" if brand_guidelines else ""
+    # Build image role labels
+    image_labels = []
+    for i in range(1, num_style_refs + 1):
+        if num_style_refs == 1:
+            image_labels.append(f"IMAGE {i}: Style reference template")
+        else:
+            image_labels.append(f"IMAGE {i}: Style reference template #{i}")
 
-    # 首页/尾页特殊提示
+    content_image_num = num_style_refs + 1
+    image_labels.append(f"IMAGE {content_image_num}: Original PPT slide (content source)")
+    image_section = "\n".join(image_labels)
+
+    # Page type hint
     page_hint = ""
     if page_index == 1:
-        page_hint = "\n- 当前是**封面页**，请采用封面专属设计（突出标题，简洁大气，可使用全幅背景图或大色块）"
+        page_hint = " This is a COVER page — use bold, prominent title design."
     elif page_index == total_pages:
-        page_hint = "\n- 当前是**尾页**，请采用结尾页专属设计（如感谢页、联系方式页，保持简洁收尾）"
+        page_hint = " This is an ENDING page — use clean, minimal closing design."
+
+    # Brand guidelines section
+    brand_section = f"\n\nBrand guidelines: {brand_guidelines}" if brand_guidelines else ""
 
     prompt = f"""\
-你是一位世界级PPT视觉设计师。你的任务是将最后一张图片（原始PPT页面）用前面的风格参考图的视觉风格重新设计。
+{image_section}
 
-## 输入说明
-- **前面的图片** = 目标风格参考（第1张为主风格，其他为辅助参考）
-- **最后一张图片** = 原始PPT页面（内容来源）
+Apply the visual style from IMAGE 1 to IMAGE {content_image_num}: keep ALL text content exactly the same — every word, number, and punctuation mark must be preserved unchanged. Apply the color scheme, background style, decorative elements, font styling, and layout language from the style reference.
 
-## 核心原则
-1. **内容100%保留**：原页面的每一个文字、数字、标点都必须原封不动地出现在新设计中，不得增删改
-2. **风格100%转换**：新设计的视觉语言必须与风格参考图高度一致
+Page {page_index}/{total_pages}.{page_hint}{brand_section}
 
-## 风格转换要素
-从风格参考图中提取并应用以下要素：
-- 配色方案（主色、辅色、强调色、渐变）
-- 字体风格（大小层级、粗细、字间距）
-- 背景处理（纯色/渐变/纹理/图片）
-- 装饰元素（线条、图标、色块、几何图形）
-- 版式语言（对齐方式、间距节奏、留白比例）
-- 视觉层次（标题vs正文的对比度、信息分组方式）
+Output: 16:9 landscape PPT slide, high resolution, crisp readable text."""
 
-## 内容保留规则（严格执行）
-- 标题文字：逐字保留，可以改变字体/颜色/大小，但文字内容不变
-- 正文/列表：每一条都必须保留，文字内容不变
-- 数据/数字：精确保留所有数值
-- 图表：保留图表类型和数据，可用新风格重绘（配色/线条/标注跟随新风格）
-- 图片/照片：保留位置和内容主题，可调整滤镜/边框以匹配新风格
-- 表格：保留所有行列和数据，可用新风格重绘表格样式
-
-## 输出规格
-- 16:9 横版 PPT 页面
-- 4K 分辨率
-- 文字必须清晰锐利，确保可读性
-- 当前是第 {page_index}/{total_pages} 页{page_hint}
-{brand_section}
-"""
-    logger.debug(f"[get_restyle_prompt] page {page_index}/{total_pages}")
+    logger.debug(f"[get_restyle_prompt] page {page_index}/{total_pages}, style_refs={num_style_refs}")
     return prompt
 
 

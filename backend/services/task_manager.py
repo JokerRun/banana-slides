@@ -1195,11 +1195,12 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
                         original_image = Image.open(original_path)
                         original_image.load()  # Force decode into memory
 
-                        # Build prompt
+                        # Build prompt with explicit style reference count for IMAGE labeling
                         prompt = get_restyle_prompt(
                             brand_guidelines=brand_guidelines,
                             page_index=page_index,
-                            total_pages=total_pages
+                            total_pages=total_pages,
+                            num_style_refs=len(style_ref_images)
                         )
 
                         # Build ref_images: style refs first (higher weight), original slide last

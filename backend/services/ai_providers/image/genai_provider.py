@@ -95,16 +95,15 @@ class GenAIImageProvider(ImageProvider):
             Generated PIL Image object, or None if failed
         """
         try:
-            # Build contents list with prompt and reference images
-            contents = []
+            # Build contents list: prompt FIRST, then reference images
+            # This order significantly improves instruction-following for Gemini
+            # (validated against compose_images.py pattern from gemini-imagegen skill)
+            contents = [prompt]
             
-            # Add reference images first (if any)
+            # Add reference images after prompt
             if ref_images:
                 for ref_img in ref_images:
                     contents.append(ref_img)
-            
-            # Add text prompt
-            contents.append(prompt)
             
             logger.debug(f"Calling GenAI API for image generation with {len(ref_images) if ref_images else 0} reference images...")
             logger.debug(f"Config - aspect_ratio: {aspect_ratio}, resolution: {resolution}, enable_thinking: {enable_thinking}")
