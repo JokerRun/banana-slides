@@ -83,6 +83,7 @@ class Project(db.Model):
             'export_allow_partial': self.export_allow_partial or False,
             'source_file_path': self.source_file_path,
             'style_ref_image_paths': self.get_style_ref_image_paths(),
+            'style_ref_image_urls': [f'/files/{path}' for path in self.get_style_ref_image_paths()],
             'brand_guidelines': self.brand_guidelines,
             'status': self.status,
             'created_at': created_at_str,

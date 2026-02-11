@@ -134,6 +134,7 @@ import {
   Check,
   FileText,
   Loader2,
+  Palette,
 } from 'lucide-react';
 import { Button, Loading, Modal, Textarea, useToast, useConfirm, MaterialSelector, ProjectSettingsModal, ExportTasksPanel } from '@/components/shared';
 import { MaterialGeneratorModal } from '@/components/shared/MaterialGeneratorModal';
@@ -1486,6 +1487,45 @@ export const SlidePreview: React.FC = () => {
               ))}
             </div>
           </div>
+          {/* Restyle 模式：风格参考和品牌规范 */}
+          {currentProject.creation_type === 'restyle' && (
+            (currentProject.style_ref_image_urls?.length || currentProject.brand_guidelines) && (
+              <div className="border-t border-gray-200 dark:border-border-primary p-3 md:p-4 flex-shrink-0 space-y-3">
+                {/* 风格参考图 */}
+                {currentProject.style_ref_image_urls && currentProject.style_ref_image_urls.length > 0 && (
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 dark:text-foreground-tertiary mb-2 flex items-center gap-1">
+                      <Palette size={12} />
+                      风格参考
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto">
+                      {currentProject.style_ref_image_urls.map((url, i) => (
+                        <div key={i} className="flex-shrink-0 w-24 aspect-video rounded-md overflow-hidden border border-gray-200 dark:border-border-primary hover:border-banana-400 transition-colors cursor-pointer" onClick={() => window.open(getImageUrl(url), '_blank')}>
+                          <img
+                            src={getImageUrl(url)}
+                            alt={`Style ref ${i + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* 品牌规范 */}
+                {currentProject.brand_guidelines && (
+                  <div>
+                    <div className="text-xs font-medium text-gray-500 dark:text-foreground-tertiary mb-1 flex items-center gap-1">
+                      <FileText size={12} />
+                      品牌规范
+                    </div>
+                    <p className="text-xs text-gray-600 dark:text-foreground-secondary line-clamp-3 leading-relaxed" title={currentProject.brand_guidelines}>
+                      {currentProject.brand_guidelines}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )
+          )}
         </aside>
 
         {/* 右侧：大图预览 */}

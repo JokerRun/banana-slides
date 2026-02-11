@@ -5,6 +5,7 @@ import { useImagePaste } from '@/hooks/useImagePaste';
 import { Card, ContextualStatusBadge, Button, Modal, Skeleton, Markdown } from '@/components/shared';
 import { MarkdownTextarea, type MarkdownTextareaRef } from '@/components/shared/MarkdownTextarea';
 import { useDescriptionGeneratingState } from '@/hooks/useGeneratingState';
+import { getImageUrl } from '@/api/client';
 import type { Page, DescriptionContent } from '@/types';
 
 // DescriptionCard 组件自包含翻译
@@ -144,6 +145,15 @@ export const DescriptionCard: React.FC<DescriptionCardProps> = ({
           ) : text ? (
             <div className="text-sm text-gray-700 dark:text-foreground-secondary">
               <Markdown>{text}</Markdown>
+            </div>
+          ) : page.original_slide_image_url ? (
+            <div className="relative aspect-video rounded-lg overflow-hidden bg-gray-100 dark:bg-background-secondary">
+              <img
+                src={getImageUrl(page.original_slide_image_url)}
+                alt={`Original slide ${index + 1}`}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute top-2 left-2 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded">Original</div>
             </div>
           ) : (
             <div className="text-center py-8 text-gray-400 dark:text-foreground-tertiary">

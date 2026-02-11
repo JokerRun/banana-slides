@@ -74,11 +74,10 @@ class Page(db.Model):
             filename = Path(display_image_path).name
             display_image_url = f'/files/{self.project_id}/pages/{filename}'
 
-        # Restyle: 原始slide图片URL
+        # Restyle: 原始slide图片URL（path已含project_id和子目录）
         original_slide_image_url = None
         if self.original_slide_image_path:
-            orig_filename = Path(self.original_slide_image_path).name
-            original_slide_image_url = f'/files/{self.project_id}/pages/{orig_filename}'
+            original_slide_image_url = f'/files/{self.original_slide_image_path}'
 
         data = {
             'page_id': self.id,

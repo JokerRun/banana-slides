@@ -98,6 +98,15 @@ export const SlideCard: React.FC<SlideCardProps> = ({
               </button>
             </div>
           </>
+        ) : page.original_slide_image_url ? (
+          <>
+            <img
+              src={getImageUrl(page.original_slide_image_url)}
+              alt={`Original ${index + 1}`}
+              className="w-full h-full object-cover opacity-60"
+            />
+            <div className="absolute top-1 left-1 bg-black/50 text-white text-[10px] px-1 py-0.5 rounded">Original</div>
+          </>
         ) : (
           <div className="w-full h-full flex items-center justify-center text-gray-400">
             <div className="text-center">

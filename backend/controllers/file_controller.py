@@ -11,38 +11,39 @@ from werkzeug.utils import secure_filename
 file_bp = Blueprint('files', __name__, url_prefix='/files')
 
 
-@file_bp.route('/<project_id>/<file_type>/<filename>', methods=['GET'])
-def serve_file(project_id, file_type, filename):
+@file_bp.route('/<project_id>/<file_type>/<path:subpath>', methods=['GET'])
+def serve_file(project_id, file_type, subpath):
     """
-    GET /files/{project_id}/{type}/{filename} - Serve static files
+    GET /files/{project_id}/{type}/{subpath} - Serve static files
+    
+    Supports nested paths like pages/originals/slide_001.png
     
     Args:
         project_id: Project UUID
-        file_type: 'template' or 'pages'
-        filename: File name
+        file_type: 'template', 'pages', 'materials', 'exports', or 'style_refs'
+        subpath: File path (may include subdirectories)
     """
     try:
-        if file_type not in ['template', 'pages', 'materials', 'exports']:
+        if file_type not in ['template', 'pages', 'materials', 'exports', 'style_refs']:
             return not_found('File')
         
-        # Construct file path
-        file_dir = os.path.join(
-            current_app.config['UPLOAD_FOLDER'],
-            project_id,
-            file_type
-        )
+        # Construct base directory
+        base_dir = Path(current_app.config['UPLOAD_FOLDER']) / project_id / file_type
         
-        # Check if directory exists
-        if not os.path.exists(file_dir):
+        # Resolve full path and prevent path traversal
+        full_path = base_dir / subpath
+        resolved_base = base_dir.resolve()
+        try:
+            resolved_full = full_path.resolve()
+            if not str(resolved_full).startswith(str(resolved_base)):
+                return error_response('INVALID_PATH', 'Invalid file path', 403)
+        except Exception:
+            return error_response('INVALID_PATH', 'Invalid file path', 403)
+        
+        if not resolved_full.exists():
             return not_found('File')
         
-        # Check if file exists
-        file_path = os.path.join(file_dir, filename)
-        if not os.path.exists(file_path):
-            return not_found('File')
-        
-        # Serve file
-        return send_from_directory(file_dir, filename)
+        return send_from_directory(str(resolved_full.parent), resolved_full.name)
     
     except Exception as e:
         return error_response('SERVER_ERROR', str(e), 500)

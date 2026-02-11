@@ -72,6 +72,7 @@ export interface Project {
   // Restyle 模式专用
   source_file_path?: string;
   style_ref_image_paths?: string[];
+  style_ref_image_urls?: string[];
   brand_guidelines?: string;
   // 导出设置
   export_extractor_method?: ExportExtractorMethod; // 组件提取方法

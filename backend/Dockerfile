@@ -29,6 +29,7 @@ RUN if [ -n "$APT_MIRROR" ]; then \
     apt-get update && apt-get install -y --no-install-recommends \
     curl \
     libreoffice-impress \
+    fonts-noto-cjk \
     && rm -rf /var/lib/apt/lists/*
 
 # 从 uv 阶段复制二进制文件
