@@ -234,6 +234,7 @@ export const SlidePreview: React.FC = () => {
   const [isSavingExportSettings, setIsSavingExportSettings] = useState(false);
   // 1K分辨率警告对话框状态
   const [show1KWarningDialog, setShow1KWarningDialog] = useState(false);
+  const [showOriginalThumb, setShowOriginalThumb] = useState(false);
   const [skip1KWarningChecked, setSkip1KWarningChecked] = useState(false);
   const [pending1KAction, setPending1KAction] = useState<(() => Promise<void>) | null>(null);
   // 每页编辑参数缓存（前端会话内缓存，便于重复执行）
@@ -1563,17 +1564,30 @@ export const SlidePreview: React.FC = () => {
                         className="w-full h-full object-cover select-none"
                         draggable={false}
                       />
-                      {/* Restyle 模式：原始slide悬浮对比缩略图 */}
+                      {/* Restyle 模式：原始slide对比 - 点击切换展开/收起 */}
                       {currentProject.creation_type === 'restyle' && selectedPage?.original_slide_image_url && (
-                        <div className="absolute bottom-3 left-3 group/orig">
-                          <div className="w-32 md:w-40 rounded-md shadow-lg border-2 border-white/80 dark:border-border-primary overflow-hidden transition-all duration-300 hover:w-60 md:hover:w-72 hover:shadow-2xl cursor-pointer">
-                            <div className="absolute top-0 left-0 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-br z-10">Original</div>
-                            <img
-                              src={getImageUrl(selectedPage.original_slide_image_url)}
-                              alt="Original slide"
-                              className="w-full aspect-video object-cover"
-                            />
-                          </div>
+                        <div className="absolute bottom-3 right-3 z-20">
+                          {showOriginalThumb ? (
+                            <div className="relative w-48 md:w-56 rounded-md shadow-lg border-2 border-white/80 dark:border-border-primary overflow-hidden transition-all duration-300">
+                              <button
+                                onClick={() => setShowOriginalThumb(false)}
+                                className="absolute top-0 right-0 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-bl z-10 hover:bg-black/80"
+                              >✕</button>
+                              <div className="absolute top-0 left-0 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded-br z-10">Original</div>
+                              <img
+                                src={getImageUrl(selectedPage.original_slide_image_url)}
+                                alt="Original slide"
+                                className="w-full aspect-video object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setShowOriginalThumb(true)}
+                              className="flex items-center gap-1.5 bg-black/60 hover:bg-black/80 text-white text-xs px-3 py-1.5 rounded-md shadow-lg transition-colors"
+                            >
+                              🔍 Original
+                            </button>
+                          )}
                         </div>
                       )}
                       </>
