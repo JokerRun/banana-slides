@@ -5,7 +5,7 @@ import { Sparkles, FileText, FileEdit, ImagePlus, Paperclip, Palette, Lightbulb,
 import { Button, Textarea, Card, useToast, MaterialGeneratorModal, MaterialCenterModal, ReferenceFileList, ReferenceFileSelector, FilePreviewModal, HelpModal, Footer, GithubRepoCard } from '@/components/shared';
 import { MarkdownTextarea, type MarkdownTextareaRef } from '@/components/shared/MarkdownTextarea';
 import { TemplateSelector, getTemplateFile } from '@/components/shared/TemplateSelector';
-import { listUserTemplates, type UserTemplate, uploadReferenceFile, type ReferenceFile, associateFileToProject, triggerFileParse, associateMaterialsToProject, listProjects, createRestyleProject, restyleGenerate } from '@/api/endpoints';
+import { listUserTemplates, type UserTemplate, uploadReferenceFile, type ReferenceFile, associateFileToProject, triggerFileParse, associateMaterialsToProject, createRestyleProject } from '@/api/endpoints';
 import { useProjectStore } from '@/store/useProjectStore';
 import { useTheme } from '@/hooks/useTheme';
 import { useImagePaste } from '@/hooks/useImagePaste';
@@ -124,7 +124,7 @@ const homeI18n = {
         serviceTestTip: '建议先到设置页底部进行服务测试，避免后续功能异常',
         restyleSourceRequired: '请上传 PPT/PDF 源文件',
         restyleStyleRefRequired: '请至少上传一张风格参考图',
-        restyleCreated: '风格转换项目创建成功，正在处理...',
+        restyleCreated: '风格转换项目创建成功，请在预览页点击“批量生成图片”开始转换',
         restyleFailed: '风格转换创建失败',
       },
     },
@@ -237,7 +237,7 @@ const homeI18n = {
         serviceTestTip: 'Test services in Settings first to avoid issues',
         restyleSourceRequired: 'Please upload a PPT/PDF source file',
         restyleStyleRefRequired: 'At least one style reference image is required',
-        restyleCreated: 'Restyle project created, processing...',
+        restyleCreated: 'Restyle project created. Click "Batch Generate Images" in Preview to start conversion.',
         restyleFailed: 'Failed to create restyle project',
       },
     },
@@ -593,14 +593,8 @@ export const Home: React.FC = () => {
       localStorage.setItem('currentProjectId', projectId);
       show({ message: t('home.messages.restyleCreated'), type: 'success' });
 
-      // Step 2: Start restyle generation
-      const restyleResponse = await restyleGenerate(projectId);
-      const restyleTaskId = restyleResponse.data?.task_id;
-
-      // Step 3: Navigate to SlidePreview (restyle 跳过 outline/detail，直接预览)
-      navigate(`/project/${projectId}/preview`, {
-        state: { restyleTaskId }
-      });
+      // Step 2: Navigate to SlidePreview (restyle 跳过 outline/detail，先预览原始页)
+      navigate(`/project/${projectId}/preview`);
     } catch (error: any) {
       console.error('Restyle failed:', error);
       show({

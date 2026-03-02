@@ -25,6 +25,7 @@ const previewI18n = {
       editMode: "编辑模式", viewMode: "查看模式", page: "第 {{num}} 页",
       projectSettings: "项目设置", changeTemplate: "更换模板", refresh: "刷新",
       batchGenerate: "批量生成图片 ({{count}})", generateSelected: "生成选中页面 ({{count}})",
+      restyleBatchGenerate: "开始风格转换 ({{count}})", restyleGenerateSelected: "开始选中页风格转换 ({{count}})",
       multiSelect: "多选", cancelMultiSelect: "取消多选", pagesUnit: "页",
       noPages: "还没有页面", noPagesHint: "请先返回编辑页面添加内容", backToEdit: "返回编辑",
       generating: "正在生成中...", notGenerated: "尚未生成图片", generateThisPage: "生成此页",
@@ -79,6 +80,7 @@ const previewI18n = {
       editMode: "Edit Mode", viewMode: "View Mode", page: "Page {{num}}",
       projectSettings: "Project Settings", changeTemplate: "Change Template", refresh: "Refresh",
       batchGenerate: "Batch Generate Images ({{count}})", generateSelected: "Generate Selected ({{count}})",
+      restyleBatchGenerate: "Start Restyle ({{count}})", restyleGenerateSelected: "Start Restyle for Selected ({{count}})",
       multiSelect: "Multi-select", cancelMultiSelect: "Cancel Multi-select", pagesUnit: " pages",
       noPages: "No pages yet", noPagesHint: "Please go back to editor to add content first", backToEdit: "Back to Editor",
       generating: "Generating...", notGenerated: "Image not generated yet", generateThisPage: "Generate This Page",
@@ -1357,8 +1359,12 @@ export const SlidePreview: React.FC = () => {
               disabled={isMultiSelectMode && selectedPageIds.size === 0}
             >
               {isMultiSelectMode && selectedPageIds.size > 0
-                ? t('preview.generateSelected', { count: selectedPageIds.size })
-                : t('preview.batchGenerate', { count: currentProject.pages.length })}
+                ? currentProject.creation_type === 'restyle'
+                  ? t('preview.restyleGenerateSelected', { count: selectedPageIds.size })
+                  : t('preview.generateSelected', { count: selectedPageIds.size })
+                : currentProject.creation_type === 'restyle'
+                  ? t('preview.restyleBatchGenerate', { count: currentProject.pages.length })
+                  : t('preview.batchGenerate', { count: currentProject.pages.length })}
             </Button>
           </div>
           
@@ -2197,4 +2203,3 @@ export const SlidePreview: React.FC = () => {
     </div>
   );
 };
-
