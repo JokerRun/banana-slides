@@ -4,6 +4,7 @@ Restyle Controller - handles PPT/PDF restyle endpoints
 import os
 import logging
 from datetime import datetime
+from pathlib import Path
 
 from flask import Blueprint, request, jsonify, current_app
 from werkzeug.utils import secure_filename
@@ -30,6 +31,20 @@ def _allowed_source_file(filename):
 
 def _allowed_image_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
+
+def _safe_filename_with_original_ext(filename: str, default_stem: str) -> str:
+    """
+    Build a filesystem-safe filename while preserving original extension.
+
+    secure_filename may strip non-ASCII stems (e.g. Chinese), which can
+    accidentally remove the dot and extension from the final saved filename.
+    """
+    source_path = Path(filename)
+    ext = source_path.suffix.lower()
+    safe_stem = secure_filename(source_path.stem)
+    if not safe_stem:
+        safe_stem = default_stem
+    return f"{safe_stem}{ext}"
 
 
 @restyle_bp.route('/restyle', methods=['POST'])
@@ -88,8 +103,11 @@ def create_restyle_project():
         source_dir = project_dir / 'source'
         source_dir.mkdir(exist_ok=True, parents=True)
 
-        original_filename = secure_filename(source_file.filename)
-        source_path = source_dir / original_filename
+        source_filename = _safe_filename_with_original_ext(
+            source_file.filename,
+            default_stem='source_file'
+        )
+        source_path = source_dir / source_filename
         source_file.save(str(source_path))
         project.source_file_path = source_path.relative_to(file_service.upload_folder).as_posix()
 
@@ -101,9 +119,10 @@ def create_restyle_project():
 
         style_ref_paths = []
         for i, ref in enumerate(style_refs):
-            ref_filename = secure_filename(ref.filename)
-            ext = ref_filename.rsplit('.', 1)[1].lower() if '.' in ref_filename else 'png'
-            saved_name = f"style_ref_{i + 1}.{ext}"
+            ref_ext = Path(ref.filename).suffix.lower().lstrip('.')
+            if ref_ext not in ALLOWED_IMAGE_EXTENSIONS:
+                ref_ext = 'png'
+            saved_name = f"style_ref_{i + 1}.{ref_ext}"
             ref_path = style_ref_dir / saved_name
             ref.save(str(ref_path))
             rel_path = ref_path.relative_to(file_service.upload_folder).as_posix()

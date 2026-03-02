@@ -125,6 +125,22 @@ class TestCreateRestyleProject:
         result = assert_success_response(response, 201)
         assert result['data']['creation_type'] == 'restyle'
 
+    def test_create_with_non_ascii_source_filename(self, client, sample_pdf_bytes, sample_style_ref_bytes):
+        """中文文件名也应正确保留扩展名并成功创建"""
+        data = {
+            'source_file': (io.BytesIO(sample_pdf_bytes), '源文件.pdf'),
+            'style_refs': (io.BytesIO(sample_style_ref_bytes), '参考图.png'),
+        }
+        response = client.post(
+            '/api/projects/restyle',
+            data=data,
+            content_type='multipart/form-data'
+        )
+
+        result = assert_success_response(response, 201)
+        assert result['data']['creation_type'] == 'restyle'
+        assert result['data']['total_pages'] == 2
+
     def test_create_missing_source_file(self, client, sample_style_ref_bytes):
         """缺少源文件应返回 400"""
         data = {
