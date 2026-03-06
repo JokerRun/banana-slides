@@ -49,6 +49,9 @@ def app():
     # 创建应用上下文
     with test_app.app_context():
         from models import db
+        # create_app 可能已通过旧迁移初始化过数据库，这里强制重建为当前 ORM schema，
+        # 避免新增列在测试库中缺失。
+        db.drop_all()
         db.create_all()
     
     yield test_app
@@ -178,4 +181,3 @@ def assert_error_response(response, expected_status=None):
     assert data is not None
     assert data.get('success') is False or 'error' in data
     return data
-

@@ -1494,9 +1494,9 @@ export const SlidePreview: React.FC = () => {
               ))}
             </div>
           </div>
-          {/* Restyle 模式：风格参考和品牌规范 */}
+          {/* Restyle 模式：风格参考 */}
           {currentProject.creation_type === 'restyle' && (
-            (currentProject.style_ref_image_urls?.length || currentProject.brand_guidelines) && (
+            currentProject.style_ref_image_urls?.length ? (
               <div className="border-t border-gray-200 dark:border-border-primary p-3 md:p-4 flex-shrink-0 space-y-3">
                 {/* 风格参考图 */}
                 {currentProject.style_ref_image_urls && currentProject.style_ref_image_urls.length > 0 && (
@@ -1518,20 +1518,8 @@ export const SlidePreview: React.FC = () => {
                     </div>
                   </div>
                 )}
-                {/* 品牌规范 */}
-                {currentProject.brand_guidelines && (
-                  <div>
-                    <div className="text-xs font-medium text-gray-500 dark:text-foreground-tertiary mb-1 flex items-center gap-1">
-                      <FileText size={12} />
-                      品牌规范
-                    </div>
-                    <p className="text-xs text-gray-600 dark:text-foreground-secondary line-clamp-3 leading-relaxed" title={currentProject.brand_guidelines}>
-                      {currentProject.brand_guidelines}
-                    </p>
-                  </div>
-                )}
               </div>
-            )
+            ) : null
           )}
         </aside>
 

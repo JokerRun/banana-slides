@@ -25,6 +25,7 @@ class Project(db.Model):
     source_file_path = db.Column(db.String(500), nullable=True)  # 上传的原始PPT/PDF路径
     style_ref_image_paths = db.Column(db.Text, nullable=True)  # JSON: 风格参考图路径列表
     brand_guidelines = db.Column(db.Text, nullable=True)  # 品牌风格规范文本
+    restyle_prompt = db.Column(db.Text, nullable=True)  # Restyle 自定义提示词
     # 导出设置
     export_extractor_method = db.Column(db.String(50), nullable=True, default='hybrid')  # 组件提取方法: mineru, hybrid
     export_inpaint_method = db.Column(db.String(50), nullable=True, default='hybrid')  # 背景图获取方法: generative, baidu, hybrid
@@ -85,6 +86,7 @@ class Project(db.Model):
             'style_ref_image_paths': self.get_style_ref_image_paths(),
             'style_ref_image_urls': [f'/files/{path}' for path in self.get_style_ref_image_paths()],
             'brand_guidelines': self.brand_guidelines,
+            'restyle_prompt': self.restyle_prompt,
             'status': self.status,
             'created_at': created_at_str,
             'updated_at': updated_at_str,
@@ -98,4 +100,3 @@ class Project(db.Model):
     
     def __repr__(self):
         return f'<Project {self.id}: {self.status}>'
-

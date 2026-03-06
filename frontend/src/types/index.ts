@@ -73,7 +73,7 @@ export interface Project {
   source_file_path?: string;
   style_ref_image_paths?: string[];
   style_ref_image_urls?: string[];
-  brand_guidelines?: string;
+  restyle_prompt?: string;
   // 导出设置
   export_extractor_method?: ExportExtractorMethod; // 组件提取方法
   export_inpaint_method?: ExportInpaintMethod; // 背景图获取方法
@@ -149,5 +149,3 @@ export interface Settings {
   created_at?: string;
   updated_at?: string;
 }
-
-

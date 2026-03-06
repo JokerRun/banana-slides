@@ -1140,9 +1140,9 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
 
             total_pages = len(pages)
 
-            # Get style ref images and brand guidelines
+            # Get style ref images
             style_ref_paths = project.get_style_ref_image_paths()
-            brand_guidelines = project.brand_guidelines or ""
+            restyle_prompt = project.restyle_prompt or ""
 
             # Load style ref images as PIL Images
             # Note: Image.open() is lazy — must .copy() to force load into memory
@@ -1197,10 +1197,10 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
 
                         # Build prompt with explicit style reference count for IMAGE labeling
                         prompt = get_restyle_prompt(
-                            brand_guidelines=brand_guidelines,
                             page_index=page_index,
                             total_pages=total_pages,
-                            num_style_refs=len(style_ref_images)
+                            num_style_refs=len(style_ref_images),
+                            custom_prompt=restyle_prompt
                         )
 
                         # Build ref_images: style refs first (higher weight), original slide last

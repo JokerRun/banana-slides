@@ -55,7 +55,7 @@ def create_restyle_project():
     Multipart form data:
     - source_file: File (PPT/PDF) — required
     - style_refs: File[] (1-N style reference images) — required
-    - brand_guidelines: str (optional brand guidelines text)
+    - restyle_prompt: str (optional custom restyle prompt)
 
     Flow:
     1. Save source file
@@ -84,12 +84,12 @@ def create_restyle_project():
             if not ref.filename or not _allowed_image_file(ref.filename):
                 return bad_request(f"Invalid style reference image: {ref.filename}")
 
-        brand_guidelines = request.form.get('brand_guidelines', '')
+        restyle_prompt = request.form.get('restyle_prompt', '').strip()
 
         # Create project
         project = Project(
             creation_type='restyle',
-            brand_guidelines=brand_guidelines if brand_guidelines else None,
+            restyle_prompt=restyle_prompt if restyle_prompt else None,
             status='DRAFT'
         )
         db.session.add(project)

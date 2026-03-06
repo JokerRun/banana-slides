@@ -73,7 +73,6 @@ class TestCreateRestyleProject:
         data = {
             'source_file': (io.BytesIO(sample_pdf_bytes), 'slides.pdf'),
             'style_refs': (io.BytesIO(sample_style_ref_bytes), 'ref1.png'),
-            'brand_guidelines': '使用蓝色主色调',
         }
         response = client.post(
             '/api/projects/restyle',
@@ -100,7 +99,6 @@ class TestCreateRestyleProject:
                 (io.BytesIO(sample_style_ref_bytes), 'ref1.png'),
                 (io.BytesIO(sample_style_ref_bytes_2), 'ref2.png'),
             ],
-            'brand_guidelines': '',
         }
         response = client.post(
             '/api/projects/restyle',
@@ -111,8 +109,8 @@ class TestCreateRestyleProject:
         result = assert_success_response(response, 201)
         assert result['data']['total_pages'] == 2
 
-    def test_create_without_brand_guidelines(self, client, sample_pdf_bytes, sample_style_ref_bytes):
-        """brand_guidelines 可选"""
+    def test_create_without_restyle_prompt(self, client, sample_pdf_bytes, sample_style_ref_bytes):
+        """restyle_prompt 可选"""
         data = {
             'source_file': (io.BytesIO(sample_pdf_bytes), 'slides.pdf'),
             'style_refs': (io.BytesIO(sample_style_ref_bytes), 'ref1.png'),
@@ -124,6 +122,26 @@ class TestCreateRestyleProject:
         )
         result = assert_success_response(response, 201)
         assert result['data']['creation_type'] == 'restyle'
+
+    def test_create_with_restyle_prompt(self, client, sample_pdf_bytes, sample_style_ref_bytes):
+        """restyle_prompt 可选并应持久化"""
+        custom_prompt = "必须使用底版.png作为唯一页面基础"
+        data = {
+            'source_file': (io.BytesIO(sample_pdf_bytes), 'slides.pdf'),
+            'style_refs': (io.BytesIO(sample_style_ref_bytes), 'ref1.png'),
+            'restyle_prompt': custom_prompt,
+        }
+        response = client.post(
+            '/api/projects/restyle',
+            data=data,
+            content_type='multipart/form-data'
+        )
+        result = assert_success_response(response, 201)
+        project_id = result['data']['project_id']
+
+        get_resp = client.get(f'/api/projects/{project_id}')
+        get_result = assert_success_response(get_resp, 200)
+        assert get_result['data']['restyle_prompt'] == custom_prompt
 
     def test_create_with_non_ascii_source_filename(self, client, sample_pdf_bytes, sample_style_ref_bytes):
         """中文文件名也应正确保留扩展名并成功创建"""
@@ -218,7 +236,6 @@ class TestRestyleGenerate:
         data = {
             'source_file': (io.BytesIO(sample_pdf_bytes), 'slides.pdf'),
             'style_refs': (io.BytesIO(sample_style_ref_bytes), 'ref1.png'),
-            'brand_guidelines': 'test brand',
         }
         response = client.post(
             '/api/projects/restyle',
@@ -340,7 +357,6 @@ class TestRestyleProjectGet:
         data = {
             'source_file': (io.BytesIO(sample_pdf_bytes), 'slides.pdf'),
             'style_refs': (io.BytesIO(sample_style_ref_bytes), 'ref1.png'),
-            'brand_guidelines': 'blue theme',
         }
         create_resp = client.post(
             '/api/projects/restyle',
@@ -353,7 +369,6 @@ class TestRestyleProjectGet:
         result = assert_success_response(get_resp)
 
         assert result['data']['creation_type'] == 'restyle'
-        assert result['data']['brand_guidelines'] == 'blue theme'
         assert result['data']['source_file_path'] is not None
 
     def test_delete_restyle_project(self, client, sample_pdf_bytes, sample_style_ref_bytes):

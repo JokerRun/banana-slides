@@ -1,10 +1,11 @@
 """
 AI Service Prompts - 集中管理所有 AI 服务的 prompt 模板
 """
+
 import json
 import logging
 from textwrap import dedent
-from typing import List, Dict, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict, List, Optional
 
 if TYPE_CHECKING:
     from services.ai_service import ProjectContext
@@ -14,113 +15,118 @@ logger = logging.getLogger(__name__)
 
 # 语言配置映射
 LANGUAGE_CONFIG = {
-    'zh': {
-        'name': '中文',
-        'instruction': '请使用全中文输出。',
-        'ppt_text': 'PPT文字请使用全中文。'
+    "zh": {
+        "name": "中文",
+        "instruction": "请使用全中文输出。",
+        "ppt_text": "PPT文字请使用全中文。",
     },
-    'ja': {
-        'name': '日本語',
-        'instruction': 'すべて日本語で出力してください。',
-        'ppt_text': 'PPTのテキストは全て日本語で出力してください。'
+    "ja": {
+        "name": "日本語",
+        "instruction": "すべて日本語で出力してください。",
+        "ppt_text": "PPTのテキストは全て日本語で出力してください。",
     },
-    'en': {
-        'name': 'English',
-        'instruction': 'Please output all in English.',
-        'ppt_text': 'Use English for PPT text.'
+    "en": {
+        "name": "English",
+        "instruction": "Please output all in English.",
+        "ppt_text": "Use English for PPT text.",
     },
-    'auto': {
-        'name': '自动',
-        'instruction': '',  # 自动模式不添加语言限制
-        'ppt_text': ''
-    }
+    "auto": {
+        "name": "自动",
+        "instruction": "",  # 自动模式不添加语言限制
+        "ppt_text": "",
+    },
 }
 
 
 def get_default_output_language() -> str:
     """
     获取环境变量中配置的默认输出语言
-    
+
     Returns:
         语言代码: 'zh', 'ja', 'en', 'auto'
     """
     from config import Config
-    return getattr(Config, 'OUTPUT_LANGUAGE', 'zh')
+
+    return getattr(Config, "OUTPUT_LANGUAGE", "zh")
 
 
 def get_language_instruction(language: str = None) -> str:
     """
     获取语言限制指令文本
-    
+
     Args:
         language: 语言代码，如果为 None 则使用默认语言
-    
+
     Returns:
         语言限制指令，如果是自动模式则返回空字符串
     """
     lang = language if language else get_default_output_language()
-    config = LANGUAGE_CONFIG.get(lang, LANGUAGE_CONFIG['zh'])
-    return config['instruction']
+    config = LANGUAGE_CONFIG.get(lang, LANGUAGE_CONFIG["zh"])
+    return config["instruction"]
 
 
 def get_ppt_language_instruction(language: str = None) -> str:
     """
     获取PPT文字语言限制指令
-    
+
     Args:
         language: 语言代码，如果为 None 则使用默认语言
-    
+
     Returns:
         PPT语言限制指令，如果是自动模式则返回空字符串
     """
     lang = language if language else get_default_output_language()
-    config = LANGUAGE_CONFIG.get(lang, LANGUAGE_CONFIG['zh'])
-    return config['ppt_text']
+    config = LANGUAGE_CONFIG.get(lang, LANGUAGE_CONFIG["zh"])
+    return config["ppt_text"]
 
 
-def _format_reference_files_xml(reference_files_content: Optional[List[Dict[str, str]]]) -> str:
+def _format_reference_files_xml(
+    reference_files_content: Optional[List[Dict[str, str]]],
+) -> str:
     """
     Format reference files content as XML structure
-    
+
     Args:
         reference_files_content: List of dicts with 'filename' and 'content' keys
-        
+
     Returns:
         Formatted XML string
     """
     if not reference_files_content:
         return ""
-    
+
     xml_parts = ["<uploaded_files>"]
     for file_info in reference_files_content:
-        filename = file_info.get('filename', 'unknown')
-        content = file_info.get('content', '')
+        filename = file_info.get("filename", "unknown")
+        content = file_info.get("content", "")
         xml_parts.append(f'  <file name="{filename}">')
-        xml_parts.append('    <content>')
+        xml_parts.append("    <content>")
         xml_parts.append(content)
-        xml_parts.append('    </content>')
-        xml_parts.append('  </file>')
-    xml_parts.append('</uploaded_files>')
-    xml_parts.append('')  # Empty line after XML
-    
-    return '\n'.join(xml_parts)
+        xml_parts.append("    </content>")
+        xml_parts.append("  </file>")
+    xml_parts.append("</uploaded_files>")
+    xml_parts.append("")  # Empty line after XML
+
+    return "\n".join(xml_parts)
 
 
-def get_outline_generation_prompt(project_context: 'ProjectContext', language: str = None) -> str:
+def get_outline_generation_prompt(
+    project_context: "ProjectContext", language: str = None
+) -> str:
     """
     生成 PPT 大纲的 prompt
-    
+
     Args:
         project_context: 项目上下文对象，包含所有原始信息
         language: 输出语言代码（'zh', 'ja', 'en', 'auto'），如果为 None 则使用默认语言
-        
+
     Returns:
         格式化后的 prompt 字符串
     """
     files_xml = _format_reference_files_xml(project_context.reference_files_content)
     idea_prompt = project_context.idea_prompt or ""
-    
-    prompt = (f"""\
+
+    prompt = f"""\
 You are a helpful assistant that generates an outline for a ppt.
 
 You can organize the content in two ways:
@@ -151,34 +157,36 @@ Unless otherwise specified, the first page should be kept simplest, containing o
 
 The user's request: {idea_prompt}. Now generate the outline, don't include any other text.
 {get_language_instruction(language)}
-""")
-    
+"""
+
     final_prompt = files_xml + prompt
     logger.debug(f"[get_outline_generation_prompt] Final prompt:\n{final_prompt}")
     return final_prompt
 
 
-def get_outline_parsing_prompt(project_context: 'ProjectContext', language: str = None ) -> str:
+def get_outline_parsing_prompt(
+    project_context: "ProjectContext", language: str = None
+) -> str:
     """
     解析用户提供的大纲文本的 prompt
-    
+
     Args:
         project_context: 项目上下文对象，包含所有原始信息
-        
+
     Returns:
         格式化后的 prompt 字符串
     """
     files_xml = _format_reference_files_xml(project_context.reference_files_content)
     outline_text = project_context.outline_text or ""
-    
-    prompt = (f"""\
+
+    prompt = f"""\
 You are a helpful assistant that parses a user-provided PPT outline text into a structured format.
 
 The user has provided the following outline text:
 
 {outline_text}
 
-Your task is to analyze this text and convert it into a structured JSON format WITHOUT modifying any of the original text content. 
+Your task is to analyze this text and convert it into a structured JSON format WITHOUT modifying any of the original text content.
 You should only reorganize and structure the existing content, preserving all titles, points, and text exactly as provided.
 
 You can organize the content in two ways:
@@ -215,42 +223,49 @@ Important rules:
 
 Now parse the outline text above into the structured format. Return only the JSON, don't include any other text.
 {get_language_instruction(language)}
-""")
-    
+"""
+
     final_prompt = files_xml + prompt
     logger.debug(f"[get_outline_parsing_prompt] Final prompt:\n{final_prompt}")
     return final_prompt
 
 
-def get_page_description_prompt(project_context: 'ProjectContext', outline: list, 
-                                page_outline: dict, page_index: int, 
-                                part_info: str = "",
-                                language: str = None) -> str:
+def get_page_description_prompt(
+    project_context: "ProjectContext",
+    outline: list,
+    page_outline: dict,
+    page_index: int,
+    part_info: str = "",
+    language: str = None,
+) -> str:
     """
     生成单个页面描述的 prompt
-    
+
     Args:
         project_context: 项目上下文对象，包含所有原始信息
         outline: 完整大纲
         page_outline: 当前页面的大纲
         page_index: 页面编号（从1开始）
         part_info: 可选的章节信息
-        
+
     Returns:
         格式化后的 prompt 字符串
     """
     files_xml = _format_reference_files_xml(project_context.reference_files_content)
     # 根据项目类型选择最相关的原始输入
-    if project_context.creation_type == 'idea' and project_context.idea_prompt:
+    if project_context.creation_type == "idea" and project_context.idea_prompt:
         original_input = project_context.idea_prompt
-    elif project_context.creation_type == 'outline' and project_context.outline_text:
+    elif project_context.creation_type == "outline" and project_context.outline_text:
         original_input = f"用户提供的大纲：\n{project_context.outline_text}"
-    elif project_context.creation_type == 'descriptions' and project_context.description_text:
+    elif (
+        project_context.creation_type == "descriptions"
+        and project_context.description_text
+    ):
         original_input = f"用户提供的描述：\n{project_context.description_text}"
     else:
         original_input = project_context.idea_prompt or ""
-    
-    prompt = (f"""\
+
+    prompt = f"""\
 我们正在为PPT的每一页生成内容描述。
 用户的原始需求是：\n{original_input}\n
 我们已经有了完整的大纲：\n{outline}\n{part_info}
@@ -280,23 +295,26 @@ def get_page_description_prompt(project_context: 'ProjectContext', outline: list
 【关于图片】如果参考文件中包含以 /files/ 开头的本地文件URL图片（例如 /files/mineru/xxx/image.png），请将这些图片以markdown格式输出，例如：![图片描述](/files/mineru/xxx/image.png)。这些图片会被包含在PPT页面中。
 
 {get_language_instruction(language)}
-""")
-    
+"""
+
     final_prompt = files_xml + prompt
     logger.debug(f"[get_page_description_prompt] Final prompt:\n{final_prompt}")
     return final_prompt
 
 
-def get_image_generation_prompt(page_desc: str, outline_text: str, 
-                                current_section: str,
-                                has_material_images: bool = False,
-                                extra_requirements: str = None,
-                                language: str = None,
-                                has_template: bool = True,
-                                page_index: int = 1) -> str:
+def get_image_generation_prompt(
+    page_desc: str,
+    outline_text: str,
+    current_section: str,
+    has_material_images: bool = False,
+    extra_requirements: str = None,
+    language: str = None,
+    has_template: bool = True,
+    page_index: int = 1,
+) -> str:
     """
     生成图片生成 prompt
-    
+
     Args:
         page_desc: 页面描述文本
         outline_text: 大纲文本
@@ -305,7 +323,7 @@ def get_image_generation_prompt(page_desc: str, outline_text: str,
         extra_requirements: 额外的要求（可能包含风格描述）
         language: 输出语言
         has_template: 是否有模板图片（False表示无模板图模式）
-        
+
     Returns:
         格式化后的 prompt 字符串
     """
@@ -313,22 +331,33 @@ def get_image_generation_prompt(page_desc: str, outline_text: str,
     material_images_note = ""
     if has_material_images:
         material_images_note = (
-            "\n\n提示：" + ("除了模板参考图片（用于风格参考）外，还提供了额外的素材图片。" if has_template else "用户提供了额外的素材图片。") +
-            "这些素材图片是可供挑选和使用的元素，你可以从这些素材图片中选择合适的图片、图标、图表或其他视觉元素"
+            "\n\n提示："
+            + (
+                "除了模板参考图片（用于风格参考）外，还提供了额外的素材图片。"
+                if has_template
+                else "用户提供了额外的素材图片。"
+            )
+            + "这些素材图片是可供挑选和使用的元素，你可以从这些素材图片中选择合适的图片、图标、图表或其他视觉元素"
             "直接整合到生成的PPT页面中。请根据页面内容的需要，智能地选择和组合这些素材图片中的元素。"
         )
-    
+
     # 添加额外要求到提示词
     extra_req_text = ""
     if extra_requirements and extra_requirements.strip():
         extra_req_text = f"\n\n额外要求（请务必遵循）：\n{extra_requirements}\n"
 
     # 根据是否有模板生成不同的设计指南内容（保持原prompt要点顺序）
-    template_style_guideline = "- 配色和设计语言和模板图片严格相似。" if has_template else "- 严格按照风格描述进行设计。"
-    forbidden_template_text_guidline = "- 只参考风格设计，禁止出现模板中的文字。\n" if has_template else ""
+    template_style_guideline = (
+        "- 配色和设计语言和模板图片严格相似。"
+        if has_template
+        else "- 严格按照风格描述进行设计。"
+    )
+    forbidden_template_text_guidline = (
+        "- 只参考风格设计，禁止出现模板中的文字。\n" if has_template else ""
+    )
 
     # 该处参考了@歸藏的A工具箱
-    prompt = (f"""\
+    prompt = f"""\
 你是一位专家级UI UX演示设计师，专注于生成设计良好的PPT页面。
 当前PPT页面的页面描述如下:
 <page_description>
@@ -354,20 +383,22 @@ def get_image_generation_prompt(page_desc: str, outline_text: str,
 {material_images_note}{extra_req_text}
 
 {"**注意：当前页面为ppt的封面页，请你采用专业的封面设计美学技巧，务必凸显出页面标题，分清主次，确保一下就能抓住观众的注意力。**" if page_index == 1 else ""}
-""")
-    
+"""
+
     logger.debug(f"[get_image_generation_prompt] Final prompt:\n{prompt}")
     return prompt
 
 
-def get_image_edit_prompt(edit_instruction: str, original_description: str = None) -> str:
+def get_image_edit_prompt(
+    edit_instruction: str, original_description: str = None
+) -> str:
     """
     生成图片编辑 prompt
-    
+
     Args:
         edit_instruction: 编辑指令
         original_description: 原始页面描述（可选）
-        
+
     Returns:
         格式化后的 prompt 字符串
     """
@@ -375,36 +406,38 @@ def get_image_edit_prompt(edit_instruction: str, original_description: str = Non
         # 删除"其他页面素材："之后的内容，避免被前面的图影响
         if "其他页面素材" in original_description:
             original_description = original_description.split("其他页面素材")[0].strip()
-        
-        prompt = (f"""\
+
+        prompt = f"""\
 该PPT页面的原始页面描述为：
 {original_description}
 
 现在，根据以下指令修改这张PPT页面：{edit_instruction}
 
 要求维持原有的文字内容和设计风格，只按照指令进行修改。提供的参考图中既有新素材，也有用户手动框选出的区域，请你根据原图和参考图的关系智能判断用户意图。
-""")
+"""
     else:
         prompt = f"根据以下指令修改这张PPT页面：{edit_instruction}\n保持原有的内容结构和设计风格，只按照指令进行修改。提供的参考图中既有新素材，也有用户手动框选出的区域，请你根据原图和参考图的关系智能判断用户意图。"
-    
+
     logger.debug(f"[get_image_edit_prompt] Final prompt:\n{prompt}")
     return prompt
 
 
-def get_description_to_outline_prompt(project_context: 'ProjectContext', language: str = None) -> str:
+def get_description_to_outline_prompt(
+    project_context: "ProjectContext", language: str = None
+) -> str:
     """
     从描述文本解析出大纲的 prompt
-    
+
     Args:
         project_context: 项目上下文对象，包含所有原始信息
-        
+
     Returns:
         格式化后的 prompt 字符串
     """
     files_xml = _format_reference_files_xml(project_context.reference_files_content)
     description_text = project_context.description_text or ""
-    
-    prompt = (f"""\
+
+    prompt = f"""\
 You are a helpful assistant that analyzes a user-provided PPT description text and extracts the outline structure from it.
 
 The user has provided the following description text:
@@ -449,30 +482,30 @@ Important rules:
 
 Now extract the outline structure from the description text above. Return only the JSON, don't include any other text.
 {get_language_instruction(language)}
-""")
-    
+"""
+
     final_prompt = files_xml + prompt
     logger.debug(f"[get_description_to_outline_prompt] Final prompt:\n{final_prompt}")
     return final_prompt
 
 
-def get_description_split_prompt(project_context: 'ProjectContext', 
-                                 outline: List[Dict], 
-                                 language: str = None) -> str:
+def get_description_split_prompt(
+    project_context: "ProjectContext", outline: List[Dict], language: str = None
+) -> str:
     """
     从描述文本切分出每页描述的 prompt
-    
+
     Args:
         project_context: 项目上下文对象，包含所有原始信息
         outline: 已解析出的大纲结构
-        
+
     Returns:
         格式化后的 prompt 字符串
     """
     outline_json = json.dumps(outline, ensure_ascii=False, indent=2)
     description_text = project_context.description_text or ""
-    
-    prompt = (f"""\
+
+    prompt = f"""\
 You are a helpful assistant that splits a complete PPT description text into individual page descriptions.
 
 The user has provided a complete description text:
@@ -515,54 +548,64 @@ Important rules:
 
 Now split the description text into individual page descriptions. Return only the JSON array, don't include any other text.
 {get_language_instruction(language)}
-""")
-    
+"""
+
     logger.debug(f"[get_description_split_prompt] Final prompt:\n{prompt}")
     return prompt
 
 
-def get_outline_refinement_prompt(current_outline: List[Dict], user_requirement: str,
-                                   project_context: 'ProjectContext',
-                                   previous_requirements: Optional[List[str]] = None,
-                                   language: str = None) -> str:
+def get_outline_refinement_prompt(
+    current_outline: List[Dict],
+    user_requirement: str,
+    project_context: "ProjectContext",
+    previous_requirements: Optional[List[str]] = None,
+    language: str = None,
+) -> str:
     """
     根据用户要求修改已有大纲的 prompt
-    
+
     Args:
         current_outline: 当前的大纲结构
         user_requirement: 用户的新要求
         project_context: 项目上下文对象，包含所有原始信息
         previous_requirements: 之前的修改要求列表（可选）
-        
+
     Returns:
         格式化后的 prompt 字符串
     """
     files_xml = _format_reference_files_xml(project_context.reference_files_content)
-    
+
     # 处理空大纲的情况
     if not current_outline or len(current_outline) == 0:
         outline_text = "(当前没有内容)"
     else:
         outline_text = json.dumps(current_outline, ensure_ascii=False, indent=2)
-    
+
     # 构建之前的修改历史记录
     previous_req_text = ""
     if previous_requirements and len(previous_requirements) > 0:
         prev_list = "\n".join([f"- {req}" for req in previous_requirements])
         previous_req_text = f"\n\n之前用户提出的修改要求：\n{prev_list}\n"
-    
+
     # 构建原始输入信息（根据项目类型显示不同的原始内容）
     original_input_text = "\n原始输入信息：\n"
-    if project_context.creation_type == 'idea' and project_context.idea_prompt:
+    if project_context.creation_type == "idea" and project_context.idea_prompt:
         original_input_text += f"- PPT构想：{project_context.idea_prompt}\n"
-    elif project_context.creation_type == 'outline' and project_context.outline_text:
-        original_input_text += f"- 用户提供的大纲文本：\n{project_context.outline_text}\n"
-    elif project_context.creation_type == 'descriptions' and project_context.description_text:
-        original_input_text += f"- 用户提供的页面描述文本：\n{project_context.description_text}\n"
+    elif project_context.creation_type == "outline" and project_context.outline_text:
+        original_input_text += (
+            f"- 用户提供的大纲文本：\n{project_context.outline_text}\n"
+        )
+    elif (
+        project_context.creation_type == "descriptions"
+        and project_context.description_text
+    ):
+        original_input_text += (
+            f"- 用户提供的页面描述文本：\n{project_context.description_text}\n"
+        )
     elif project_context.idea_prompt:
         original_input_text += f"- 用户输入：{project_context.idea_prompt}\n"
-    
-    prompt = (f"""\
+
+    prompt = f"""\
 You are a helpful assistant that modifies PPT outlines based on user requirements.
 {original_input_text}
 当前的 PPT 大纲结构如下：
@@ -607,76 +650,90 @@ You are a helpful assistant that modifies PPT outlines based on user requirement
 
 现在请根据用户要求修改大纲，只输出 JSON 格式的大纲，不要包含其他文字。
 {get_language_instruction(language)}
-""")
-    
+"""
+
     final_prompt = files_xml + prompt
     logger.debug(f"[get_outline_refinement_prompt] Final prompt:\n{final_prompt}")
     return final_prompt
 
 
-def get_descriptions_refinement_prompt(current_descriptions: List[Dict], user_requirement: str,
-                                       project_context: 'ProjectContext',
-                                       outline: List[Dict] = None,
-                                       previous_requirements: Optional[List[str]] = None,
-                                       language: str = None) -> str:
+def get_descriptions_refinement_prompt(
+    current_descriptions: List[Dict],
+    user_requirement: str,
+    project_context: "ProjectContext",
+    outline: List[Dict] = None,
+    previous_requirements: Optional[List[str]] = None,
+    language: str = None,
+) -> str:
     """
     根据用户要求修改已有页面描述的 prompt
-    
+
     Args:
         current_descriptions: 当前的页面描述列表，每个元素包含 {index, title, description_content}
         user_requirement: 用户的新要求
         project_context: 项目上下文对象，包含所有原始信息
         outline: 完整的大纲结构（可选）
         previous_requirements: 之前的修改要求列表（可选）
-        
+
     Returns:
         格式化后的 prompt 字符串
     """
     files_xml = _format_reference_files_xml(project_context.reference_files_content)
-    
+
     # 构建之前的修改历史记录
     previous_req_text = ""
     if previous_requirements and len(previous_requirements) > 0:
         prev_list = "\n".join([f"- {req}" for req in previous_requirements])
         previous_req_text = f"\n\n之前用户提出的修改要求：\n{prev_list}\n"
-    
+
     # 构建原始输入信息
     original_input_text = "\n原始输入信息：\n"
-    if project_context.creation_type == 'idea' and project_context.idea_prompt:
+    if project_context.creation_type == "idea" and project_context.idea_prompt:
         original_input_text += f"- PPT构想：{project_context.idea_prompt}\n"
-    elif project_context.creation_type == 'outline' and project_context.outline_text:
-        original_input_text += f"- 用户提供的大纲文本：\n{project_context.outline_text}\n"
-    elif project_context.creation_type == 'descriptions' and project_context.description_text:
-        original_input_text += f"- 用户提供的页面描述文本：\n{project_context.description_text}\n"
+    elif project_context.creation_type == "outline" and project_context.outline_text:
+        original_input_text += (
+            f"- 用户提供的大纲文本：\n{project_context.outline_text}\n"
+        )
+    elif (
+        project_context.creation_type == "descriptions"
+        and project_context.description_text
+    ):
+        original_input_text += (
+            f"- 用户提供的页面描述文本：\n{project_context.description_text}\n"
+        )
     elif project_context.idea_prompt:
         original_input_text += f"- 用户输入：{project_context.idea_prompt}\n"
-    
+
     # 构建大纲文本
     outline_text = ""
     if outline:
         outline_json = json.dumps(outline, ensure_ascii=False, indent=2)
         outline_text = f"\n\n完整的 PPT 大纲：\n{outline_json}\n"
-    
+
     # 构建所有页面描述的汇总
     all_descriptions_text = "当前所有页面的描述：\n\n"
     has_any_description = False
     for desc in current_descriptions:
-        page_num = desc.get('index', 0) + 1
-        title = desc.get('title', '未命名')
-        content = desc.get('description_content', '')
+        page_num = desc.get("index", 0) + 1
+        title = desc.get("title", "未命名")
+        content = desc.get("description_content", "")
         if isinstance(content, dict):
-            content = content.get('text', '')
-        
+            content = content.get("text", "")
+
         if content:
             has_any_description = True
             all_descriptions_text += f"--- 第 {page_num} 页：{title} ---\n{content}\n\n"
         else:
-            all_descriptions_text += f"--- 第 {page_num} 页：{title} ---\n(当前没有内容)\n\n"
-    
+            all_descriptions_text += (
+                f"--- 第 {page_num} 页：{title} ---\n(当前没有内容)\n\n"
+            )
+
     if not has_any_description:
-        all_descriptions_text = "当前所有页面的描述：\n\n(当前没有内容，需要基于大纲生成新的描述)\n\n"
-    
-    prompt = (f"""\
+        all_descriptions_text = (
+            "当前所有页面的描述：\n\n(当前没有内容，需要基于大纲生成新的描述)\n\n"
+        )
+
+    prompt = f"""\
 You are a helpful assistant that modifies PPT page descriptions based on user requirements.
 {original_input_text}{outline_text}
 {all_descriptions_text}
@@ -714,17 +771,19 @@ You are a helpful assistant that modifies PPT page descriptions based on user re
 
 现在请根据用户要求修改所有页面描述，只输出 JSON 数组，不要包含其他文字。
 {get_language_instruction(language)}
-""")
-    
+"""
+
     final_prompt = files_xml + prompt
     logger.debug(f"[get_descriptions_refinement_prompt] Final prompt:\n{final_prompt}")
     return final_prompt
 
 
-def get_restyle_prompt(brand_guidelines: str,
-                       page_index: int,
-                       total_pages: int,
-                       num_style_refs: int = 1) -> str:
+def get_restyle_prompt(
+    page_index: int,
+    total_pages: int,
+    num_style_refs: int = 1,
+    custom_prompt: str = "",
+) -> str:
     """
     Generate prompt for single-page restyle.
 
@@ -734,10 +793,10 @@ def get_restyle_prompt(brand_guidelines: str,
       IMAGE N+1  = original PPT slide (content source)
 
     Args:
-        brand_guidelines: Brand guidelines text (optional)
         page_index: Current page number (1-indexed)
         total_pages: Total number of pages
         num_style_refs: Number of style reference images (default 1)
+        custom_prompt: User-provided restyle prompt (optional)
 
     Returns:
         Formatted prompt string
@@ -751,7 +810,9 @@ def get_restyle_prompt(brand_guidelines: str,
             image_labels.append(f"IMAGE {i}: Style reference template #{i}")
 
     content_image_num = num_style_refs + 1
-    image_labels.append(f"IMAGE {content_image_num}: Original PPT slide (content source)")
+    image_labels.append(
+        f"IMAGE {content_image_num}: Original PPT slide (content source)"
+    )
     image_section = "\n".join(image_labels)
 
     # Page type hint
@@ -761,19 +822,40 @@ def get_restyle_prompt(brand_guidelines: str,
     elif page_index == total_pages:
         page_hint = " This is an ENDING page — use clean, minimal closing design."
 
-    # Brand guidelines section
-    brand_section = f"\n\nBrand guidelines: {brand_guidelines}" if brand_guidelines else ""
+    custom_prompt_text = (custom_prompt or "").strip()
+
+    if custom_prompt_text:
+        prompt = f"""\
+{image_section}
+
+Use the following restyle instructions strictly:
+{custom_prompt_text}
+
+Non-negotiable: keep ALL text content exactly the same — every word, number, and punctuation mark must be preserved unchanged.
+
+Page {page_index}/{total_pages}.{page_hint}
+
+Output: 16:9 landscape PPT slide, high resolution, crisp readable text."""
+
+        logger.debug(
+            f"[get_restyle_prompt] page {page_index}/{total_pages}, "
+            f"style_refs={num_style_refs}, custom_prompt=True"
+        )
+        return prompt
 
     prompt = f"""\
 {image_section}
 
 Apply the visual style from IMAGE 1 to IMAGE {content_image_num}: keep ALL text content exactly the same — every word, number, and punctuation mark must be preserved unchanged. Apply the color scheme, background style, decorative elements, font styling, and layout language from the style reference.
 
-Page {page_index}/{total_pages}.{page_hint}{brand_section}
+Page {page_index}/{total_pages}.{page_hint}
 
 Output: 16:9 landscape PPT slide, high resolution, crisp readable text."""
 
-    logger.debug(f"[get_restyle_prompt] page {page_index}/{total_pages}, style_refs={num_style_refs}")
+    logger.debug(
+        f"[get_restyle_prompt] page {page_index}/{total_pages}, "
+        f"style_refs={num_style_refs}, custom_prompt=False"
+    )
     return prompt
 
 
@@ -801,12 +883,12 @@ def get_clean_background_prompt() -> str:
 def get_text_attribute_extraction_prompt(content_hint: str = "") -> str:
     """
     生成文字属性提取的 prompt
-    
+
     提取文字内容、颜色、公式等信息。模型输出的文字将替代 OCR 结果。
-    
+
     Args:
         content_hint: 文字内容提示（OCR 结果参考），如果提供则会在 prompt 中包含
-    
+
     Returns:
         格式化后的 prompt 字符串
     """
@@ -848,7 +930,7 @@ def get_text_attribute_extraction_prompt(content_hint: str = "") -> str:
 }}
 ```
 """.format(content_hint=content_hint)
-    
+
     # logger.debug(f"[get_text_attribute_extraction_prompt] Final prompt:\n{prompt}")
     return prompt
 
@@ -856,16 +938,16 @@ def get_text_attribute_extraction_prompt(content_hint: str = "") -> str:
 def get_batch_text_attribute_extraction_prompt(text_elements_json: str) -> str:
     """
     生成批量文字属性提取的 prompt
-    
+
     新逻辑：给模型提供全图和所有文本元素的 bbox 及内容，
     让模型一次性分析所有文本的样式属性。
-    
+
     Args:
         text_elements_json: 文本元素列表的 JSON 字符串，每个元素包含：
             - element_id: 元素唯一标识
             - bbox: 边界框 [x0, y0, x1, y1]
             - content: 文字内容
-    
+
     Returns:
         格式化后的 prompt 字符串
     """
@@ -922,7 +1004,7 @@ def get_batch_text_attribute_extraction_prompt(text_elements_json: str) -> str:
 ]
 ```
 """
-    
+
     # logger.debug(f"[get_batch_text_attribute_extraction_prompt] Final prompt:\n{prompt}")
     return prompt
 
@@ -931,14 +1013,14 @@ def get_quality_enhancement_prompt(inpainted_regions: list = None) -> str:
     """
     生成画质提升的 prompt
     用于在百度图像修复后，使用生成式模型提升整体画质
-    
+
     Args:
         inpainted_regions: 被修复区域列表，每个区域包含百分比坐标：
             - left, top, right, bottom: 相对于图片宽高的百分比 (0-100)
             - width_percent, height_percent: 区域宽高占图片的百分比
     """
     import json
-    
+
     # 构建区域信息
     regions_info = ""
     if inpainted_regions and len(inpainted_regions) > 0:
@@ -952,7 +1034,7 @@ def get_quality_enhancement_prompt(inpainted_regions: list = None) -> str:
 
 坐标说明（所有数值都是相对于图片宽高的百分比，范围0-100%）：
 - left: 区域左边缘距离图片左边缘的百分比
-- top: 区域上边缘距离图片上边缘的百分比  
+- top: 区域上边缘距离图片上边缘的百分比
 - right: 区域右边缘距离图片左边缘的百分比
 - bottom: 区域下边缘距离图片上边缘的百分比
 - width_percent: 区域宽度占图片宽度的百分比
@@ -960,7 +1042,7 @@ def get_quality_enhancement_prompt(inpainted_regions: list = None) -> str:
 
 例如：left=10 表示区域从图片左侧10%的位置开始。
 """
-    
+
     prompt = f"""\
 你是一位专业的图像修复专家。这张ppt页面图片刚刚经过了文字/对象抹除操作，抹除工具在指定区域留下了一些修复痕迹，包括：
 - 色块不均匀、颜色不连贯
@@ -981,8 +1063,8 @@ def get_quality_enhancement_prompt(inpainted_regions: list = None) -> str:
 
 请输出修复后的高清ppt页面背景图片，不要遗漏修复任何一个被涂抹的区域。
 """
-#     prompt = f"""
-# 你是一位专业的图像修复专家。请你修复上传的图像，去除其中的涂抹痕迹，消除所有的模糊、噪点、伪影，输出处理后的高清图像，其他区域保持和原图**完全相同**，颜色、布局、线条、装饰需要完全一致.
-# {regions_info}
-# """
+    #     prompt = f"""
+    # 你是一位专业的图像修复专家。请你修复上传的图像，去除其中的涂抹痕迹，消除所有的模糊、噪点、伪影，输出处理后的高清图像，其他区域保持和原图**完全相同**，颜色、布局、线条、装饰需要完全一致.
+    # {regions_info}
+    # """
     return prompt

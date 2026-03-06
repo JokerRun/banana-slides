@@ -11,6 +11,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useImagePaste } from '@/hooks/useImagePaste';
 import { useT } from '@/hooks/useT';
 import { PRESET_STYLES } from '@/config/presetStyles';
+import { RESTYLE_PRESETS, getRestylePresetById } from '@/config/restylePresets';
 
 type CreationType = 'idea' | 'outline' | 'description' | 'restyle';
 
@@ -102,8 +103,9 @@ const homeI18n = {
         parsing: '解析中...',
         createProject: '创建新项目',
         uploadSource: '上传 PPT/PDF 源文件',
+        restylePreset: '预制模板（可选）',
         uploadStyleRef: '上传风格参考图',
-        brandGuidelines: '品牌规范（可选）',
+        restylePrompt: 'Restyle Prompt（可选）',
         startRestyle: '开始风格转换',
         converting: '转换中...',
       },
@@ -124,6 +126,8 @@ const homeI18n = {
         serviceTestTip: '建议先到设置页底部进行服务测试，避免后续功能异常',
         restyleSourceRequired: '请上传 PPT/PDF 源文件',
         restyleStyleRefRequired: '请至少上传一张风格参考图',
+        restylePresetApplied: '预制模板已应用（包含 prompt + 参照图）',
+        restylePresetApplyFailed: '预制模板应用失败',
         restyleCreated: '风格转换项目创建成功，请在预览页点击“批量生成图片”开始转换',
         restyleFailed: '风格转换创建失败',
       },
@@ -215,8 +219,9 @@ const homeI18n = {
         parsing: 'Parsing...',
         createProject: 'Create New Project',
         uploadSource: 'Upload PPT/PDF Source',
+        restylePreset: 'Preset Template (Optional)',
         uploadStyleRef: 'Upload Style Reference',
-        brandGuidelines: 'Brand Guidelines (optional)',
+        restylePrompt: 'Restyle Prompt (Optional)',
         startRestyle: 'Start Restyle',
         converting: 'Converting...',
       },
@@ -237,6 +242,8 @@ const homeI18n = {
         serviceTestTip: 'Test services in Settings first to avoid issues',
         restyleSourceRequired: 'Please upload a PPT/PDF source file',
         restyleStyleRefRequired: 'At least one style reference image is required',
+        restylePresetApplied: 'Preset applied (prompt + style reference image)',
+        restylePresetApplyFailed: 'Failed to apply preset template',
         restyleCreated: 'Restyle project created. Click "Batch Generate Images" in Preview to start conversion.',
         restyleFailed: 'Failed to create restyle project',
       },
@@ -272,7 +279,9 @@ export const Home: React.FC = () => {
   const [hoveredPresetId, setHoveredPresetId] = useState<string | null>(null);
   const [restyleSourceFile, setRestyleSourceFile] = useState<File | null>(null);
   const [restyleStyleRefs, setRestyleStyleRefs] = useState<File[]>([]);
-  const [restyleBrandGuidelines, setRestyleBrandGuidelines] = useState('');
+  const [selectedRestylePresetId, setSelectedRestylePresetId] = useState<string>('');
+  const [restylePrompt, setRestylePrompt] = useState('');
+  const [isApplyingRestylePreset, setIsApplyingRestylePreset] = useState(false);
   const [isRestyleSubmitting, setIsRestyleSubmitting] = useState(false);
   const restyleSourceInputRef = useRef<HTMLInputElement>(null);
   const restyleStyleRefInputRef = useRef<HTMLInputElement>(null);
@@ -536,6 +545,50 @@ export const Home: React.FC = () => {
     },
   };
 
+  const selectedRestylePreset = useMemo(() => {
+    if (!selectedRestylePresetId) {
+      return undefined;
+    }
+    return getRestylePresetById(selectedRestylePresetId);
+  }, [selectedRestylePresetId]);
+
+  const getPresetStyleRefFile = useCallback(async (imageUrl: string, fileName: string) => {
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch preset image: ${response.status}`);
+    }
+    const blob = await response.blob();
+    return new File([blob], fileName, { type: blob.type || 'image/png' });
+  }, []);
+
+  const applyRestylePreset = useCallback(async (presetId: string) => {
+    setSelectedRestylePresetId(presetId);
+    if (!presetId) {
+      return;
+    }
+
+    const preset = getRestylePresetById(presetId);
+    if (!preset) {
+      return;
+    }
+
+    setIsApplyingRestylePreset(true);
+    try {
+      const presetStyleRef = await getPresetStyleRefFile(
+        preset.styleRefImageUrl,
+        preset.styleRefFileName
+      );
+      setRestyleStyleRefs([presetStyleRef]);
+      setRestylePrompt(preset.prompt);
+      show({ message: t('home.messages.restylePresetApplied'), type: 'success' });
+    } catch (error) {
+      console.error('应用 restyle 预制模板失败:', error);
+      show({ message: t('home.messages.restylePresetApplyFailed'), type: 'error' });
+    } finally {
+      setIsApplyingRestylePreset(false);
+    }
+  }, [getPresetStyleRefFile, show, t]);
+
   const handleTemplateSelect = async (templateFile: File | null, templateId?: string) => {
     // 总是设置文件（如果提供）
     if (templateFile) {
@@ -581,7 +634,9 @@ export const Home: React.FC = () => {
       const response = await createRestyleProject(
         restyleSourceFile,
         restyleStyleRefs,
-        restyleBrandGuidelines.trim() || undefined
+        {
+          restylePrompt: restylePrompt.trim() || undefined,
+        }
       );
 
       if (!response.data?.project_id) {
@@ -994,6 +1049,33 @@ export const Home: React.FC = () => {
                 </div>
               </div>
 
+              {/* 预制模板 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-foreground-secondary mb-2">
+                  🧩 {t('home.actions.restylePreset')}
+                </label>
+                <select
+                  value={selectedRestylePresetId}
+                  onChange={(e) => {
+                    void applyRestylePreset(e.target.value);
+                  }}
+                  disabled={isApplyingRestylePreset || isRestyleSubmitting}
+                  className="w-full rounded-lg border-2 border-gray-200 dark:border-border-primary bg-white dark:bg-background-tertiary px-3 py-2 text-sm text-gray-800 dark:text-white focus:border-banana-400 dark:focus:border-banana"
+                >
+                  <option value="">{i18n.language?.startsWith('zh') ? '不使用预制模板（手动配置）' : 'No preset (manual setup)'}</option>
+                  {RESTYLE_PRESETS.map((preset) => (
+                    <option key={preset.id} value={preset.id}>
+                      {preset.name}
+                    </option>
+                  ))}
+                </select>
+                {selectedRestylePreset && (
+                  <p className="mt-2 text-xs text-gray-500 dark:text-foreground-tertiary">
+                    {selectedRestylePreset.description}
+                  </p>
+                )}
+              </div>
+
               {/* 风格参考图上传 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-foreground-secondary mb-2">
@@ -1036,16 +1118,18 @@ export const Home: React.FC = () => {
                 />
               </div>
 
-              {/* 品牌规范 */}
+              {/* Restyle Prompt */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-foreground-secondary mb-2">
-                  📋 {t('home.actions.brandGuidelines')}
+                  📝 {t('home.actions.restylePrompt')}
                 </label>
                 <Textarea
-                  placeholder="例如：使用DDI品牌色 #445664 深灰 + #FAA300 金色，标题用 Century Gothic Bold，Logo放右下角..."
-                  value={restyleBrandGuidelines}
-                  onChange={(e) => setRestyleBrandGuidelines(e.target.value)}
-                  rows={3}
+                  placeholder={i18n.language?.startsWith('zh')
+                    ? '可粘贴完整 restyle 指令。建议包含内容保真、版式约束和颜色规范。'
+                    : 'Paste full restyle instructions. Include content fidelity, layout constraints, and color rules.'}
+                  value={restylePrompt}
+                  onChange={(e) => setRestylePrompt(e.target.value)}
+                  rows={8}
                   className="text-sm border-2 border-gray-200 dark:border-border-primary dark:bg-background-tertiary dark:text-white focus:border-banana-400 dark:focus:border-banana transition-colors"
                 />
               </div>

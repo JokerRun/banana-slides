@@ -797,10 +797,14 @@ export const dissociateFileFromProject = async (
 /**
  * 创建 restyle 项目（上传原始PPT/PDF + 风格参考图）
  */
+export interface CreateRestyleProjectOptions {
+  restylePrompt?: string;
+}
+
 export const createRestyleProject = async (
   sourceFile: File,
   styleRefs: File[],
-  brandGuidelines?: string
+  options?: CreateRestyleProjectOptions
 ): Promise<ApiResponse<{
   project_id: string;
   creation_type: string;
@@ -811,8 +815,8 @@ export const createRestyleProject = async (
   const formData = new FormData();
   formData.append('source_file', sourceFile);
   styleRefs.forEach(ref => formData.append('style_refs', ref));
-  if (brandGuidelines) {
-    formData.append('brand_guidelines', brandGuidelines);
+  if (options?.restylePrompt) {
+    formData.append('restyle_prompt', options.restylePrompt);
   }
 
   const response = await apiClient.post<ApiResponse<{
