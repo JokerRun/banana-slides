@@ -143,8 +143,7 @@ export interface Settings {
   // 推理模式配置（分别控制文本和图像）
   enable_text_reasoning: boolean;
   text_thinking_budget: number;
-  enable_image_reasoning: boolean;
-  image_thinking_budget: number;
+  image_thinking_level: string;
   baidu_ocr_api_key_length: number;
   created_at?: string;
   updated_at?: string;

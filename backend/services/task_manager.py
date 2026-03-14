@@ -4,6 +4,7 @@ No need for Celery or Redis, uses in-memory task tracking
 """
 import logging
 import os
+import time
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Callable, List, Dict, Any, Optional
@@ -1144,6 +1145,10 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
             style_ref_paths = project.get_style_ref_image_paths()
             restyle_prompt = project.restyle_prompt or ""
 
+            logger.info(f"🚀 Restyle task started: project={project_id}, pages={total_pages}, "
+                        f"style_refs={len(style_ref_paths)}, prompt={'yes' if restyle_prompt else 'no'}, "
+                        f"aspect_ratio={aspect_ratio}, resolution={resolution}, max_workers={max_workers}")
+
             # Load style ref images as PIL Images
             # Note: Image.open() is lazy — must .copy() to force load into memory
             # before sharing across threads, otherwise file handles may conflict
@@ -1154,7 +1159,9 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
                     img = Image.open(abs_path)
                     img.load()  # Force decode into memory
                     style_ref_images.append(img)
-                    logger.debug(f"Loaded style ref: {abs_path}")
+                    logger.info(f"🖼️  Style ref loaded: {ref_path} ({img.size[0]}x{img.size[1]})")
+                else:
+                    logger.warning(f"⚠️  Style ref not found: {abs_path}")
 
             if not style_ref_images:
                 raise ValueError("No style reference images found")
@@ -1203,19 +1210,24 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
                             custom_prompt=restyle_prompt
                         )
 
-                        # Build ref_images: style refs first (higher weight), original slide last
-                        ref_images = list(style_ref_images) + [original_image]
+                        # Build ref_images: original slide first, then style refs
+                        ref_images = [original_image] + list(style_ref_images)
 
                         # Generate restyled image via AIService
-                        logger.info(f"🎨 Restyling page {page_index}/{total_pages} (page_id={page_id})...")
+                        thinking_level = ai_svc._get_image_thinking_level()
+                        logger.info(f"🎨 Restyling page {page_index}/{total_pages} (page_id={page_id}): "
+                                    f"original={original_path} ({original_image.size[0]}x{original_image.size[1]}), "
+                                    f"ref_images={len(ref_images)}, thinking_level={thinking_level}")
+
+                        t0 = time.time()
                         image = ai_svc.image_provider.generate_image(
                             prompt=prompt,
                             ref_images=ref_images,
                             aspect_ratio=aspect_ratio,
                             resolution=resolution,
-                            enable_thinking=ai_svc.enable_image_reasoning,
-                            thinking_budget=ai_svc._get_image_thinking_budget()
+                            thinking_level=thinking_level
                         )
+                        elapsed = time.time() - t0
 
                         if not image:
                             raise ValueError("Failed to generate restyled image")
@@ -1225,7 +1237,7 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
                             image, project_id, page_id, file_service, page_obj=page_obj
                         )
 
-                        logger.info(f"✅ Restyle page {page_index}/{total_pages} completed")
+                        logger.info(f"✅ Restyle page {page_index}/{total_pages} completed in {elapsed:.1f}s → {image_path} ({image.size[0]}x{image.size[1]})")
                         return (page_id, image_path, None)
 
                     except Exception as e:
@@ -1259,7 +1271,7 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
                     if task:
                         task.update_progress(completed=completed, failed=failed)
                         db.session.commit()
-                        logger.info(f"Restyle Progress: {completed}/{total_pages} pages completed")
+                        logger.info(f"📊 Restyle progress: {completed}/{total_pages} completed, {failed} failed")
 
             # Mark task as completed
             task = Task.query.get(task_id)
@@ -1267,7 +1279,7 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
                 task.status = 'COMPLETED'
                 task.completed_at = datetime.utcnow()
                 db.session.commit()
-                logger.info(f"Task {task_id} COMPLETED - {completed} pages restyled, {failed} failed")
+                logger.info(f"🏁 Restyle task {task_id} COMPLETED - {completed}/{total_pages} pages restyled, {failed} failed")
 
             # Update project status
             project = Project.query.get(project_id)

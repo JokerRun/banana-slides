@@ -954,8 +954,7 @@ export interface TestSettingsOverride {
   image_resolution?: string;
   enable_text_reasoning?: boolean;
   text_thinking_budget?: number;
-  enable_image_reasoning?: boolean;
-  image_thinking_budget?: number;
+  image_thinking_level?: string;
 }
 
 /**

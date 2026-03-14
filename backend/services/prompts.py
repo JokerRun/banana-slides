@@ -801,18 +801,15 @@ def get_restyle_prompt(
     Returns:
         Formatted prompt string
     """
-    # Build image role labels
-    image_labels = []
+    # Build image role labels: original slide first, then style refs
+    image_labels = ["IMAGE 1: Original PPT slide (content source)"]
     for i in range(1, num_style_refs + 1):
+        img_num = i + 1
         if num_style_refs == 1:
-            image_labels.append(f"IMAGE {i}: Style reference template")
+            image_labels.append(f"IMAGE {img_num}: Style reference template")
         else:
-            image_labels.append(f"IMAGE {i}: Style reference template #{i}")
+            image_labels.append(f"IMAGE {img_num}: Style reference template #{i}")
 
-    content_image_num = num_style_refs + 1
-    image_labels.append(
-        f"IMAGE {content_image_num}: Original PPT slide (content source)"
-    )
     image_section = "\n".join(image_labels)
 
     # Page type hint
@@ -846,7 +843,7 @@ Output: 16:9 landscape PPT slide, high resolution, crisp readable text."""
     prompt = f"""\
 {image_section}
 
-Apply the visual style from IMAGE 1 to IMAGE {content_image_num}: keep ALL text content exactly the same — every word, number, and punctuation mark must be preserved unchanged. Apply the color scheme, background style, decorative elements, font styling, and layout language from the style reference.
+Apply the visual style from IMAGE 2 to IMAGE 1: keep ALL text content exactly the same — every word, number, and punctuation mark must be preserved unchanged. Apply the color scheme, background style, decorative elements, font styling, and layout language from the style reference.
 
 Page {page_index}/{total_pages}.{page_hint}
 

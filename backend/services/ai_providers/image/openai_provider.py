@@ -111,15 +111,14 @@ class OpenAIImageProvider(ImageProvider):
         ref_images: Optional[List[Image.Image]] = None,
         aspect_ratio: str = "16:9",
         resolution: str = "2K",
-        enable_thinking: bool = False,
-        thinking_budget: int = 0
+        thinking_level: str = "none"
     ) -> Optional[Image.Image]:
         """
         Generate image using OpenAI SDK
         
         Supports resolution control via extra_body parameters for compatible providers.
         Note: Not all providers support 2K/4K resolution - some may return 1K regardless.
-        Note: enable_thinking and thinking_budget are ignored (OpenAI format doesn't support thinking mode)
+        Note: thinking_level is ignored (OpenAI format doesn't support thinking mode)
         
         The provider will:
         1. Try to use extra_body parameters (API易/AvalAI style) for resolution control
@@ -130,8 +129,7 @@ class OpenAIImageProvider(ImageProvider):
             ref_images: Optional list of reference images
             aspect_ratio: Image aspect ratio
             resolution: Image resolution ("1K", "2K", "4K") - support depends on provider
-            enable_thinking: Ignored, kept for interface compatibility
-            thinking_budget: Ignored, kept for interface compatibility
+            thinking_level: Ignored, kept for interface compatibility
             
         Returns:
             Generated PIL Image object, or None if failed

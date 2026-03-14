@@ -6,6 +6,11 @@ import { downloadFile } from './index';
  * 获取项目标题
  */
 export const getProjectTitle = (project: Project): string => {
+  // restyle 项目优先使用 idea_prompt（即源文件名）
+  if (project.creation_type === 'restyle' && project.idea_prompt) {
+    return project.idea_prompt;
+  }
+
   // 从第一个页面的大纲标题获取项目名称
   if (project.pages && project.pages.length > 0) {
     const sortedPages = [...project.pages].sort((a, b) =>
@@ -18,7 +23,8 @@ export const getProjectTitle = (project: Project): string => {
     }
   }
 
-  return '未命名项目';
+  // 兜底：idea_prompt 或默认名
+  return project.idea_prompt || '未命名项目';
 };
 
 /**

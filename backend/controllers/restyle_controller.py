@@ -86,9 +86,13 @@ def create_restyle_project():
 
         restyle_prompt = request.form.get('restyle_prompt', '').strip()
 
+        # Use source filename (without extension) as project name
+        source_name = Path(source_file.filename).stem or 'Restyle Project'
+
         # Create project
         project = Project(
             creation_type='restyle',
+            idea_prompt=source_name,
             restyle_prompt=restyle_prompt if restyle_prompt else None,
             status='DRAFT'
         )
@@ -111,7 +115,7 @@ def create_restyle_project():
         source_file.save(str(source_path))
         project.source_file_path = source_path.relative_to(file_service.upload_folder).as_posix()
 
-        logger.info(f"Source file saved: {source_path}")
+        logger.info(f"📁 Source file saved: {source_path} ({os.path.getsize(str(source_path)) / 1024:.1f} KB)")
 
         # Save style reference images
         style_ref_dir = project_dir / 'style_refs'
@@ -127,7 +131,7 @@ def create_restyle_project():
             ref.save(str(ref_path))
             rel_path = ref_path.relative_to(file_service.upload_folder).as_posix()
             style_ref_paths.append(rel_path)
-            logger.debug(f"Style ref {i + 1} saved: {ref_path}")
+            logger.info(f"🎨 Style ref {i + 1}/{len(style_refs)} saved: {ref_path} ({os.path.getsize(str(ref_path)) / 1024:.1f} KB)")
 
         project.set_style_ref_image_paths(style_ref_paths)
 
@@ -137,9 +141,9 @@ def create_restyle_project():
         originals_dir = str(pages_dir / 'originals')
         os.makedirs(originals_dir, exist_ok=True)
 
-        logger.info(f"Converting source file to images...")
+        logger.info(f"📄 Converting source file to images: {source_filename}")
         slide_images = restyle_service.convert_to_images(str(source_path), originals_dir)
-        logger.info(f"Converted {len(slide_images)} pages")
+        logger.info(f"✅ Converted {len(slide_images)} pages from {source_filename}")
 
         # Create Page records
         pages_list = []
@@ -163,7 +167,7 @@ def create_restyle_project():
         project.updated_at = datetime.utcnow()
         db.session.commit()
 
-        logger.info(f"Restyle project created: {project.id}, {len(pages_list)} pages")
+        logger.info(f"✅ Restyle project created: id={project.id}, name='{source_name}', pages={len(pages_list)}, style_refs={len(style_refs)}, prompt={'yes' if restyle_prompt else 'no'}")
 
         return success_response({
             'project_id': project.id,

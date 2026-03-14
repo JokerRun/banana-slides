@@ -225,9 +225,8 @@ def _load_settings_to_config(app):
         # Load reasoning mode settings (separate for text and image)
         app.config['ENABLE_TEXT_REASONING'] = settings.enable_text_reasoning
         app.config['TEXT_THINKING_BUDGET'] = settings.text_thinking_budget
-        app.config['ENABLE_IMAGE_REASONING'] = settings.enable_image_reasoning
-        app.config['IMAGE_THINKING_BUDGET'] = settings.image_thinking_budget
-        logging.info(f"Loaded reasoning config: text={settings.enable_text_reasoning}(budget={settings.text_thinking_budget}), image={settings.enable_image_reasoning}(budget={settings.image_thinking_budget})")
+        app.config['IMAGE_THINKING_LEVEL'] = settings.image_thinking_level
+        logging.info(f"Loaded reasoning config: text={settings.enable_text_reasoning}(budget={settings.text_thinking_budget}), image_thinking_level={settings.image_thinking_level}")
         
         # Load Baidu OCR settings
         if settings.baidu_ocr_api_key:
