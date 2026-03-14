@@ -96,13 +96,9 @@ def temporary_settings_override(settings_override: dict):
             original_values["TEXT_THINKING_BUDGET"] = current_app.config.get("TEXT_THINKING_BUDGET")
             current_app.config["TEXT_THINKING_BUDGET"] = settings_override["text_thinking_budget"]
 
-        if "enable_image_reasoning" in settings_override:
-            original_values["ENABLE_IMAGE_REASONING"] = current_app.config.get("ENABLE_IMAGE_REASONING")
-            current_app.config["ENABLE_IMAGE_REASONING"] = settings_override["enable_image_reasoning"]
-
-        if "image_thinking_budget" in settings_override:
-            original_values["IMAGE_THINKING_BUDGET"] = current_app.config.get("IMAGE_THINKING_BUDGET")
-            current_app.config["IMAGE_THINKING_BUDGET"] = settings_override["image_thinking_budget"]
+        if "image_thinking_level" in settings_override:
+            original_values["IMAGE_THINKING_LEVEL"] = current_app.config.get("IMAGE_THINKING_LEVEL")
+            current_app.config["IMAGE_THINKING_LEVEL"] = settings_override["image_thinking_level"]
 
         yield
 
@@ -233,14 +229,11 @@ def update_settings():
                 return bad_request("Text thinking budget must be between 1 and 8192")
             settings.text_thinking_budget = budget
         
-        if "enable_image_reasoning" in data:
-            settings.enable_image_reasoning = bool(data["enable_image_reasoning"])
-        
-        if "image_thinking_budget" in data:
-            budget = int(data["image_thinking_budget"])
-            if budget < 1 or budget > 8192:
-                return bad_request("Image thinking budget must be between 1 and 8192")
-            settings.image_thinking_budget = budget
+        if "image_thinking_level" in data:
+            level = str(data["image_thinking_level"]).lower()
+            if level not in ('none', 'minimal', 'high'):
+                return bad_request("Image thinking level must be 'none', 'minimal', or 'high'")
+            settings.image_thinking_level = level
 
         # Update Baidu OCR configuration
         if "baidu_ocr_api_key" in data:
@@ -300,8 +293,7 @@ def reset_settings():
         # 重置推理模式配置
         settings.enable_text_reasoning = False
         settings.text_thinking_budget = 1024
-        settings.enable_image_reasoning = False
-        settings.image_thinking_budget = 1024
+        settings.image_thinking_level = 'none'
         settings.baidu_ocr_api_key = Config.BAIDU_OCR_API_KEY or None
         settings.image_resolution = Config.DEFAULT_RESOLUTION
         settings.image_aspect_ratio = Config.DEFAULT_ASPECT_RATIO
@@ -505,20 +497,17 @@ def _sync_settings_to_config(settings: Settings):
     # Check if reasoning configuration changed (requires AIService cache clear)
     old_text_reasoning = current_app.config.get("ENABLE_TEXT_REASONING")
     old_text_budget = current_app.config.get("TEXT_THINKING_BUDGET")
-    old_image_reasoning = current_app.config.get("ENABLE_IMAGE_REASONING")
-    old_image_budget = current_app.config.get("IMAGE_THINKING_BUDGET")
+    old_image_level = current_app.config.get("IMAGE_THINKING_LEVEL")
     
     if (old_text_reasoning != settings.enable_text_reasoning or 
         old_text_budget != settings.text_thinking_budget or
-        old_image_reasoning != settings.enable_image_reasoning or
-        old_image_budget != settings.image_thinking_budget):
+        old_image_level != settings.image_thinking_level):
         ai_config_changed = True
-        logger.info(f"Reasoning config changed: text={old_text_reasoning}({old_text_budget})->{settings.enable_text_reasoning}({settings.text_thinking_budget}), image={old_image_reasoning}({old_image_budget})->{settings.enable_image_reasoning}({settings.image_thinking_budget})")
+        logger.info(f"Reasoning config changed: text={old_text_reasoning}({old_text_budget})->{settings.enable_text_reasoning}({settings.text_thinking_budget}), image_level={old_image_level}->{settings.image_thinking_level}")
     
     current_app.config["ENABLE_TEXT_REASONING"] = settings.enable_text_reasoning
     current_app.config["TEXT_THINKING_BUDGET"] = settings.text_thinking_budget
-    current_app.config["ENABLE_IMAGE_REASONING"] = settings.enable_image_reasoning
-    current_app.config["IMAGE_THINKING_BUDGET"] = settings.image_thinking_budget
+    current_app.config["IMAGE_THINKING_LEVEL"] = settings.image_thinking_level
     
     # Sync Baidu OCR settings
     if settings.baidu_ocr_api_key:
@@ -830,8 +819,7 @@ def run_settings_test(test_name: str):
         # 推理模式设置
         test_settings["enable_text_reasoning"] = global_settings.enable_text_reasoning
         test_settings["text_thinking_budget"] = global_settings.text_thinking_budget
-        test_settings["enable_image_reasoning"] = global_settings.enable_image_reasoning
-        test_settings["image_thinking_budget"] = global_settings.image_thinking_budget
+        test_settings["image_thinking_level"] = global_settings.image_thinking_level
 
         # 应用前端发送的覆盖参数（如果有的话，用于测试未保存的配置）
         override_settings = request.get_json() or {}

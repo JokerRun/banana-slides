@@ -29,8 +29,7 @@ class Settings(db.Model):
     # 推理模式配置（分别控制文本和图像生成）
     enable_text_reasoning = db.Column(db.Boolean, nullable=False, default=False)  # 文本生成是否开启推理
     text_thinking_budget = db.Column(db.Integer, nullable=False, default=1024)  # 文本推理思考负载 (1-8192)
-    enable_image_reasoning = db.Column(db.Boolean, nullable=False, default=False)  # 图像生成是否开启推理
-    image_thinking_budget = db.Column(db.Integer, nullable=False, default=1024)  # 图像推理思考负载 (1-8192)
+    image_thinking_level = db.Column(db.String(10), nullable=False, default='none')  # 图像思考级别: none, minimal, high
     
     # 百度 OCR 配置
     baidu_ocr_api_key = db.Column(db.String(500), nullable=True)  # 百度 OCR API Key
@@ -57,8 +56,7 @@ class Settings(db.Model):
             'output_language': self.output_language,
             'enable_text_reasoning': self.enable_text_reasoning,
             'text_thinking_budget': self.text_thinking_budget,
-            'enable_image_reasoning': self.enable_image_reasoning,
-            'image_thinking_budget': self.image_thinking_budget,
+            'image_thinking_level': self.image_thinking_level,
             'baidu_ocr_api_key_length': len(self.baidu_ocr_api_key) if self.baidu_ocr_api_key else 0,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
@@ -100,6 +98,9 @@ class Settings(db.Model):
                 mineru_token=Config.MINERU_TOKEN,
                 image_caption_model=Config.IMAGE_CAPTION_MODEL,
                 output_language='zh',  # 默认中文
+                enable_text_reasoning=Config.ENABLE_TEXT_REASONING,
+                text_thinking_budget=Config.TEXT_THINKING_BUDGET,
+                image_thinking_level=Config.IMAGE_THINKING_LEVEL,
                 baidu_ocr_api_key=Config.BAIDU_OCR_API_KEY or None,
             )
             settings.id = 1

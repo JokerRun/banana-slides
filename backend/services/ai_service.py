@@ -91,15 +91,13 @@ class AIService:
             # 分离的文本和图像推理配置
             self.enable_text_reasoning = current_app.config.get("ENABLE_TEXT_REASONING", False)
             self.text_thinking_budget = current_app.config.get("TEXT_THINKING_BUDGET", 1024)
-            self.enable_image_reasoning = current_app.config.get("ENABLE_IMAGE_REASONING", False)
-            self.image_thinking_budget = current_app.config.get("IMAGE_THINKING_BUDGET", 1024)
+            self.image_thinking_level = current_app.config.get("IMAGE_THINKING_LEVEL", "none")
         else:
             self.text_model = config.TEXT_MODEL
             self.image_model = config.IMAGE_MODEL
             self.enable_text_reasoning = False
             self.text_thinking_budget = 1024
-            self.enable_image_reasoning = False
-            self.image_thinking_budget = 1024
+            self.image_thinking_level = "none"
         
         # Use provided providers or create from factory based on AI_PROVIDER_FORMAT (from Flask config or env var)
         self.text_provider = text_provider or get_text_provider(model=self.text_model)
@@ -114,14 +112,14 @@ class AIService:
         """
         return self.text_thinking_budget if self.enable_text_reasoning else 0
     
-    def _get_image_thinking_budget(self) -> int:
+    def _get_image_thinking_level(self) -> str:
         """
-        获取图像生成的思考负载
+        获取图像生成的思考级别
         
         Returns:
-            如果启用图像推理则返回配置的 budget，否则返回 0
+            Thinking level string: "none", "minimal", "high"
         """
-        return self.image_thinking_budget if self.enable_image_reasoning else 0
+        return self.image_thinking_level
     
     @staticmethod
     def extract_image_urls_from_markdown(text: str) -> List[str]:
@@ -520,17 +518,15 @@ class AIService:
                             logger.warning(f"Invalid image reference: {ref_img}, skipping...")
             
             logger.debug(f"Calling image provider for generation with {len(ref_images)} reference images...")
-            logger.debug(f"Enable image reasoning/thinking: {self.enable_image_reasoning}, budget: {self._get_image_thinking_budget()}")
+            logger.debug(f"Image thinking level: {self._get_image_thinking_level()}")
             
             # 使用 image_provider 生成图片
-            # 根据 enable_image_reasoning 配置控制图像生成的思考模式
             return self.image_provider.generate_image(
                 prompt=prompt,
                 ref_images=ref_images if ref_images else None,
                 aspect_ratio=aspect_ratio,
                 resolution=resolution,
-                enable_thinking=self.enable_image_reasoning,
-                thinking_budget=self._get_image_thinking_budget()
+                thinking_level=self._get_image_thinking_level()
             )
             
         except Exception as e:

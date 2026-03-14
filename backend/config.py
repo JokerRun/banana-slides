@@ -87,6 +87,13 @@ class Config:
     # CORS配置
     CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:3000').split(',')
     
+    # Thinking/推理模式配置
+    ENABLE_TEXT_REASONING = os.getenv('ENABLE_TEXT_REASONING', 'false').lower() in ('true', '1', 'yes')
+    TEXT_THINKING_BUDGET = int(os.getenv('TEXT_THINKING_BUDGET', '1024'))
+    # 图像思考级别 (Gemini 3.1 Flash Image): none, minimal, high
+    # See: https://ai.google.dev/gemini-api/docs/image-generation#thinking-process
+    IMAGE_THINKING_LEVEL = os.getenv('IMAGE_THINKING_LEVEL', 'none').lower()
+    
     # 输出语言配置
     # 可选值: 'zh' (中文), 'ja' (日本語), 'en' (English), 'auto' (自动)
     OUTPUT_LANGUAGE = os.getenv('OUTPUT_LANGUAGE', 'zh')

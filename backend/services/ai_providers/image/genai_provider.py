@@ -77,8 +77,7 @@ class GenAIImageProvider(ImageProvider):
         ref_images: Optional[List[Image.Image]] = None,
         aspect_ratio: str = "16:9",
         resolution: str = "2K",
-        enable_thinking: bool = True,
-        thinking_budget: int = 1024
+        thinking_level: str = "none"
     ) -> Optional[Image.Image]:
         """
         Generate image using Google GenAI SDK
@@ -88,8 +87,7 @@ class GenAIImageProvider(ImageProvider):
             ref_images: Optional list of reference images
             aspect_ratio: Image aspect ratio
             resolution: Image resolution (supports "1K", "2K", "4K")
-            enable_thinking: If True, enable thinking chain mode (may generate multiple images)
-            thinking_budget: Thinking budget for the model
+            thinking_level: Thinking level for Gemini 3 ("none", "minimal", "high")
             
         Returns:
             Generated PIL Image object, or None if failed
@@ -105,8 +103,13 @@ class GenAIImageProvider(ImageProvider):
                 for ref_img in ref_images:
                     contents.append(ref_img)
             
-            logger.debug(f"Calling GenAI API for image generation with {len(ref_images) if ref_images else 0} reference images...")
-            logger.debug(f"Config - aspect_ratio: {aspect_ratio}, resolution: {resolution}, enable_thinking: {enable_thinking}")
+            ref_count = len(ref_images) if ref_images else 0
+            ref_details = ", ".join(f"{img.size[0]}x{img.size[1]}" for img in ref_images) if ref_images else "none"
+            prompt_preview = prompt[:200] + "..." if len(prompt) > 200 else prompt
+            logger.info(f"🌐 GenAI image request: model={self.model}, "
+                        f"ref_images={ref_count} [{ref_details}], "
+                        f"aspect_ratio={aspect_ratio}, resolution={resolution}, thinking_level={thinking_level}")
+            logger.info(f"📝 Prompt ({len(prompt)} chars): {prompt_preview}")
             
             # Build config
             config_params = {
@@ -117,12 +120,17 @@ class GenAIImageProvider(ImageProvider):
                 )
             }
             
-            # Add thinking config if enabled
-            if enable_thinking:
-                # In Vertex AI (Gemini) Thinking mode, enabling include_thoughts=True requires explicitly setting thinking_budget
-                config_params['thinking_config'] = types.ThinkingConfig(  
-                    thinking_budget=thinking_budget, 
-                    include_thoughts=True  
+            # Add thinking config if a valid level is specified
+            # Gemini 3.1 Flash Image only supports "minimal" (default) and "high"
+            # See: https://ai.google.dev/gemini-api/docs/image-generation#thinking-process
+            level_map = {
+                'minimal': 'MINIMAL',
+                'high': 'HIGH',
+            }
+            if thinking_level.lower() in level_map:
+                config_params['thinking_config'] = types.ThinkingConfig(
+                    thinking_level=level_map[thinking_level.lower()],
+                    include_thoughts=True
                 )
             
             response = self.client.models.generate_content(
@@ -131,19 +139,22 @@ class GenAIImageProvider(ImageProvider):
                 config=types.GenerateContentConfig(**config_params)
             )
             
-            logger.debug("GenAI API call completed")
+            total_parts = len(response.parts) if response.parts else 0
+            logger.info(f"📨 GenAI response: {total_parts} parts")
             
             # Extract the final image from the response.
             # Earlier images are usually low resolution drafts 
             # Therefore, always use the last image found.
             last_image = None
+            image_count = 0
             
             for i, part in enumerate(response.parts):
                 if part.text is not None:
-                    logger.debug(f"Part {i}: TEXT - {part.text[:100] if len(part.text) > 100 else part.text}")
+                    text_preview = part.text[:150] + "..." if len(part.text) > 150 else part.text
+                    part_label = "💭 Thought" if getattr(part, 'thought', False) else "💬 Text"
+                    logger.info(f"  Part {i}: {part_label} - {text_preview}")
                 else:
                     try:
-                        logger.debug(f"Part {i}: Attempting to extract image...")
                         image = part.as_image()
                         if image:
                             # as_image() should return PIL Image directly (official SDK)
@@ -155,14 +166,16 @@ class GenAIImageProvider(ImageProvider):
                             elif hasattr(image, '_pil_image') and image._pil_image:
                                 last_image = image._pil_image
                             else:
-                                logger.warning(f"Part {i}: Image object type {type(image)} has no usable conversion method")
+                                logger.warning(f"  Part {i}: ⚠️ Image object type {type(image)} has no usable conversion method")
                                 continue
-                            logger.debug(f"Successfully extracted image from part {i}")
+                            image_count += 1
+                            logger.info(f"  Part {i}: 🖼️ Image {image_count} extracted ({last_image.size[0]}x{last_image.size[1]})")
                     except Exception as e:
-                        logger.warning(f"Part {i}: Failed to extract image - {type(e).__name__}: {str(e)}")
+                        logger.warning(f"  Part {i}: ⚠️ Failed to extract image - {type(e).__name__}: {str(e)}")
             
             # Return the last image found (highest quality in thinking chain scenarios)
             if last_image:
+                logger.info(f"✅ Final image selected: image {image_count}/{image_count} ({last_image.size[0]}x{last_image.size[1]})")
                 return last_image
             
             # No image found in response

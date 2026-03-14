@@ -45,8 +45,7 @@ const settingsI18n = {
         defaultOutputLanguage: "默认输出语言", defaultOutputLanguageDesc: "AI 生成内容时使用的默认语言",
         enableTextReasoning: "启用文本推理", enableTextReasoningDesc: "开启后，文本生成（大纲、描述等）会使用 extended thinking 进行深度推理",
         textThinkingBudget: "文本思考负载", textThinkingBudgetDesc: "文本推理的思考 token 预算 (1-8192)，数值越大推理越深入",
-        enableImageReasoning: "启用图像推理", enableImageReasoningDesc: "开启后，图像生成会使用思考链模式，可能获得更好的构图效果",
-        imageThinkingBudget: "图像思考负载", imageThinkingBudgetDesc: "图像推理的思考 token 预算 (1-8192)，数值越大推理越深入",
+        imageThinkingLevel: "图像思考级别", imageThinkingLevelDesc: "图像生成的推理深度级别，none=关闭, minimal=默认(低延迟), high=最深推理",
         baiduOcrApiKey: "百度 OCR API Key", baiduOcrApiKeyPlaceholder: "输入百度 OCR API Key",
         baiduOcrApiKeyDesc: "用于可编辑 PPTX 导出时的文字识别功能，留空则保持当前设置不变"
       },
@@ -118,8 +117,7 @@ const settingsI18n = {
         defaultOutputLanguage: "Default Output Language", defaultOutputLanguageDesc: "Default language for AI-generated content",
         enableTextReasoning: "Enable Text Reasoning", enableTextReasoningDesc: "When enabled, text generation uses extended thinking for deeper reasoning",
         textThinkingBudget: "Text Thinking Budget", textThinkingBudgetDesc: "Token budget for text reasoning (1-8192), higher values enable deeper reasoning",
-        enableImageReasoning: "Enable Image Reasoning", enableImageReasoningDesc: "When enabled, image generation uses chain-of-thought mode for better composition",
-        imageThinkingBudget: "Image Thinking Budget", imageThinkingBudgetDesc: "Token budget for image reasoning (1-8192), higher values enable deeper reasoning",
+        imageThinkingLevel: "Image Thinking Level", imageThinkingLevelDesc: "Reasoning depth for image generation: none=off, minimal=default, high=deepest",
         baiduOcrApiKey: "Baidu OCR API Key", baiduOcrApiKeyPlaceholder: "Enter Baidu OCR API Key",
         baiduOcrApiKeyDesc: "For text recognition in editable PPTX export, leave empty to keep current setting"
       },
@@ -206,8 +204,7 @@ const initialFormData = {
   // 推理模式配置（分别控制文本和图像）
   enable_text_reasoning: false,
   text_thinking_budget: 1024,
-  enable_image_reasoning: false,
-  image_thinking_budget: 1024,
+  image_thinking_level: 'none',
   baidu_ocr_api_key: '',
 };
 
@@ -375,18 +372,15 @@ export const Settings: React.FC = () => {
       icon: <Brain size={20} />,
       fields: [
         {
-          key: 'enable_image_reasoning',
-          label: t('settings.fields.enableImageReasoning'),
-          type: 'switch',
-          description: t('settings.fields.enableImageReasoningDesc'),
-        },
-        {
-          key: 'image_thinking_budget',
-          label: t('settings.fields.imageThinkingBudget'),
-          type: 'number',
-          min: 1,
-          max: 8192,
-          description: t('settings.fields.imageThinkingBudgetDesc'),
+          key: 'image_thinking_level',
+          label: t('settings.fields.imageThinkingLevel'),
+          type: 'select',
+          options: [
+            { value: 'none', label: 'None (Off)' },
+            { value: 'minimal', label: 'Minimal (Default)' },
+            { value: 'high', label: 'High' },
+          ],
+          description: t('settings.fields.imageThinkingLevelDesc'),
         },
       ],
     },
@@ -441,8 +435,7 @@ export const Settings: React.FC = () => {
           output_language: response.data.output_language || 'zh',
           enable_text_reasoning: response.data.enable_text_reasoning || false,
           text_thinking_budget: response.data.text_thinking_budget || 1024,
-          enable_image_reasoning: response.data.enable_image_reasoning || false,
-          image_thinking_budget: response.data.image_thinking_budget || 1024,
+          image_thinking_level: response.data.image_thinking_level || 'none',
           baidu_ocr_api_key: '',
         });
       }
@@ -520,8 +513,7 @@ export const Settings: React.FC = () => {
               output_language: response.data.output_language || 'zh',
               enable_text_reasoning: response.data.enable_text_reasoning || false,
               text_thinking_budget: response.data.text_thinking_budget || 1024,
-              enable_image_reasoning: response.data.enable_image_reasoning || false,
-              image_thinking_budget: response.data.image_thinking_budget || 1024,
+              image_thinking_level: response.data.image_thinking_level || 'none',
               baidu_ocr_api_key: '',
             });
             show({ message: t('settings.messages.resetSuccess'), type: 'success' });
@@ -582,11 +574,8 @@ export const Settings: React.FC = () => {
       if (formData.text_thinking_budget !== undefined) {
         testSettings.text_thinking_budget = formData.text_thinking_budget;
       }
-      if (formData.enable_image_reasoning !== undefined) {
-        testSettings.enable_image_reasoning = formData.enable_image_reasoning;
-      }
-      if (formData.image_thinking_budget !== undefined) {
-        testSettings.image_thinking_budget = formData.image_thinking_budget;
+      if (formData.image_thinking_level !== undefined) {
+        testSettings.image_thinking_level = formData.image_thinking_level;
       }
 
       // 启动异步测试，获取任务ID
@@ -733,8 +722,6 @@ export const Settings: React.FC = () => {
     let isDisabled = false;
     if (field.key === 'text_thinking_budget') {
       isDisabled = !formData.enable_text_reasoning;
-    } else if (field.key === 'image_thinking_budget') {
-      isDisabled = !formData.enable_image_reasoning;
     }
 
     return (
