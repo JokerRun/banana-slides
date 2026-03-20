@@ -10,7 +10,7 @@ from werkzeug.utils import secure_filename
 from models import db, Project, Page, Task
 from utils import (
     error_response, not_found, bad_request, success_response,
-    parse_page_ids_from_query, parse_page_ids_from_body, get_filtered_pages
+    parse_page_ids_from_query, parse_page_ids_from_body, get_filtered_pages, get_current_user_id
 )
 from services import ExportService, FileService
 from services.ai_service_manager import get_ai_service
@@ -251,6 +251,7 @@ def export_editable_pptx(project_id):
         # Create task record
         task = Task(
             project_id=project_id,
+            owner_id=get_current_user_id(),
             task_type='EXPORT_EDITABLE_PPTX',
             status='PENDING'
         )

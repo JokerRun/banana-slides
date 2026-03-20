@@ -4,7 +4,7 @@ Page Controller - handles page-related endpoints
 import logging
 from flask import Blueprint, request, current_app
 from models import db, Project, Page, PageImageVersion, Task
-from utils import success_response, error_response, not_found, bad_request
+from utils import success_response, error_response, not_found, bad_request, get_current_user_id
 from services import FileService, ProjectContext
 from services.ai_service_manager import get_ai_service
 from services.task_manager import task_manager, generate_single_page_image_task, edit_page_image_task
@@ -447,6 +447,7 @@ def generate_page_image(project_id, page_id):
         # Create async task for image generation
         task = Task(
             project_id=project_id,
+            owner_id=get_current_user_id(),
             task_type='GENERATE_PAGE_IMAGE',
             status='PENDING'
         )
@@ -620,6 +621,7 @@ def edit_page_image(project_id, page_id):
         # Create async task for image editing
         task = Task(
             project_id=project_id,
+            owner_id=get_current_user_id(),
             task_type='EDIT_PAGE_IMAGE',
             status='PENDING'
         )

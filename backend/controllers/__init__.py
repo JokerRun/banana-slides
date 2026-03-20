@@ -8,6 +8,7 @@ from .material_controller import material_bp
 from .settings_controller import settings_bp
 from .restyle_controller import restyle_bp
 from .auth_controller import auth_bp
+from .task_controller import task_bp
 
 __all__ = [
     'project_bp',
@@ -20,4 +21,5 @@ __all__ = [
     'settings_bp',
     'restyle_bp',
     'auth_bp',
+    'task_bp',
 ]

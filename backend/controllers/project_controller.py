@@ -22,7 +22,7 @@ from services.task_manager import (
 )
 from utils import (
     success_response, error_response, not_found, bad_request,
-    parse_page_ids_from_body, get_filtered_pages
+    parse_page_ids_from_body, get_filtered_pages, get_current_user_id
 )
 
 logger = logging.getLogger(__name__)
@@ -615,6 +615,7 @@ def generate_descriptions(project_id):
         # Create task
         task = Task(
             project_id=project_id,
+            owner_id=get_current_user_id(),
             task_type='GENERATE_DESCRIPTIONS',
             status='PENDING'
         )
@@ -730,6 +731,7 @@ def generate_images(project_id):
         task_type = 'RESTYLE_IMAGES' if project.creation_type == 'restyle' else 'GENERATE_IMAGES'
         task = Task(
             project_id=project_id,
+            owner_id=get_current_user_id(),
             task_type=task_type,
             status='PENDING'
         )

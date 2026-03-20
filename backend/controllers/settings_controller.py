@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from flask import Blueprint, request, current_app
 from PIL import Image
 from models import db, Settings, Task
-from utils import success_response, error_response, bad_request
+from utils import success_response, error_response, bad_request, get_current_user_id, require_auth
 from config import Config, PROJECT_ROOT
 from services.ai_service import AIService
 from services.file_parser_service import FileParserService
@@ -769,6 +769,7 @@ def _run_test_async(task_id: str, test_name: str, test_settings: dict, app):
 
 
 @settings_bp.route("/tests/<test_name>", methods=["POST"], strict_slashes=False)
+@require_auth
 def run_settings_test(test_name: str):
     """
     POST /api/settings/tests/<test_name> - 启动异步服务测试
@@ -830,6 +831,7 @@ def run_settings_test(test_name: str):
         # 创建任务记录（使用特殊的 project_id='settings-test'）
         task = Task(
             project_id='settings-test',  # 特殊标记，表示这是设置测试任务
+            owner_id=get_current_user_id(),
             task_type=f'TEST_{test_name.upper().replace("-", "_")}',
             status='PENDING'
         )
@@ -864,6 +866,7 @@ def run_settings_test(test_name: str):
 
 
 @settings_bp.route("/tests/<task_id>/status", methods=["GET"], strict_slashes=False)
+@require_auth
 def get_test_status(task_id: str):
     """
     GET /api/settings/tests/<task_id>/status - 查询测试任务状态
@@ -879,7 +882,7 @@ def get_test_status(task_id: str):
         }
     """
     try:
-        task = Task.query.get(task_id)
+        task = Task.query.filter_by(id=task_id, owner_id=get_current_user_id()).first()
         if not task:
             return error_response("TASK_NOT_FOUND", "测试任务不存在", 404)
 

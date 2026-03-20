@@ -3,7 +3,7 @@
 import importlib.util
 from pathlib import Path
 
-from models import db, Project, ReferenceFile
+from models import db, Project, ReferenceFile, Task, User
 
 
 def _load_m017_module():
@@ -125,3 +125,72 @@ def test_backfill_owner_and_persist_extract_id(app, monkeypatch):
         assert refreshed.parse_status == 'completed'
         assert refreshed.mineru_batch_id == 'batch-1'
         assert refreshed.mineru_extract_id == 'extract-1'
+
+
+def test_global_task_status_owner_only(app):
+    """Global task status endpoint should be owner-scoped."""
+    with app.app_context():
+        user_a = User(display_name='User A', is_active=True)
+        user_b = User(display_name='User B', is_active=True)
+        db.session.add_all([user_a, user_b])
+        db.session.flush()
+
+        task = Task(
+            project_id='global',
+            owner_id=user_a.id,
+            task_type='GENERATE_MATERIAL',
+            status='PENDING',
+        )
+        task.set_progress({'total': 1, 'completed': 0, 'failed': 0})
+        db.session.add(task)
+        db.session.commit()
+
+        with app.test_client() as client_anon:
+            res = client_anon.get(f'/api/tasks/{task.id}')
+            assert res.status_code == 401
+
+        with app.test_client() as client_a:
+            with client_a.session_transaction() as sess:
+                sess['user_id'] = user_a.id
+            res = client_a.get(f'/api/tasks/{task.id}')
+            assert res.status_code == 200
+
+        with app.test_client() as client_b:
+            with client_b.session_transaction() as sess:
+                sess['user_id'] = user_b.id
+            res = client_b.get(f'/api/tasks/{task.id}')
+            assert res.status_code == 404
+
+
+def test_settings_task_status_owner_scope(app):
+    """Settings task status should be owner-scoped as well."""
+    with app.app_context():
+        user_a = User(display_name='User A', is_active=True)
+        user_b = User(display_name='User B', is_active=True)
+        db.session.add_all([user_a, user_b])
+        db.session.flush()
+
+        task = Task(
+            project_id='settings-test',
+            owner_id=user_a.id,
+            task_type='TEST_TEXT_MODEL',
+            status='PENDING',
+        )
+        db.session.add(task)
+        db.session.commit()
+
+        with app.test_client() as client_anon:
+            res = client_anon.get(f'/api/settings/tests/{task.id}/status')
+            assert res.status_code == 401
+
+        with app.test_client() as client_a:
+            with client_a.session_transaction() as sess:
+                sess['user_id'] = user_a.id
+            res = client_a.get(f'/api/settings/tests/{task.id}/status')
+            assert res.status_code == 200
+
+        with app.test_client() as client_b:
+            with client_b.session_transaction() as sess:
+                sess['user_id'] = user_b.id
+            res = client_b.get(f'/api/settings/tests/{task.id}/status')
+            assert res.status_code == 404

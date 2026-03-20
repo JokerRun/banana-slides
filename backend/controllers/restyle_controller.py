@@ -13,7 +13,7 @@ from models import db, Project, Page, Task
 from services.restyle_service import RestyleService
 from services.ai_service_manager import get_ai_service
 from services.task_manager import task_manager, restyle_images_task
-from utils import success_response, error_response, not_found, bad_request, parse_page_ids_from_body, get_filtered_pages
+from utils import success_response, error_response, not_found, bad_request, parse_page_ids_from_body, get_filtered_pages, get_current_user_id
 
 logger = logging.getLogger(__name__)
 
@@ -214,6 +214,7 @@ def restyle_generate(project_id):
         # Create task
         task = Task(
             project_id=project_id,
+            owner_id=get_current_user_id(),
             task_type='RESTYLE_IMAGES',
             status='PENDING'
         )
@@ -281,6 +282,7 @@ def restyle_single_page(project_id, page_id):
         # Create task
         task = Task(
             project_id=project_id,
+            owner_id=get_current_user_id(),
             task_type='RESTYLE_IMAGES',
             status='PENDING'
         )
