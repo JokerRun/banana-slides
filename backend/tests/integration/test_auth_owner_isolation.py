@@ -1,9 +1,15 @@
-"""Integration tests for auth ownership migration and mineru mapping persistence."""
+"""Integration tests for auth ownership migration and owner isolation."""
 
 import importlib.util
 from pathlib import Path
 
 from models import db, Project, ReferenceFile, Task, User
+from models import Material, UserTemplate
+
+
+def _login(client, user_id: str) -> None:
+    with client.session_transaction() as sess:
+        sess['user_id'] = user_id
 
 
 def _load_m017_module():
@@ -194,3 +200,190 @@ def test_settings_task_status_owner_scope(app):
                 sess['user_id'] = user_b.id
             res = client_b.get(f'/api/settings/tests/{task.id}/status')
             assert res.status_code == 404
+
+
+def test_auth_required_and_project_isolation(app):
+    """Business endpoints should enforce unauthenticated=401 and non-owner=404."""
+    with app.app_context():
+        user_a = User(display_name='Owner', is_active=True)
+        user_b = User(display_name='Other', is_active=True)
+        db.session.add_all([user_a, user_b])
+        db.session.flush()
+
+        project = Project(owner_id=user_a.id, status='DRAFT', creation_type='idea')
+        db.session.add(project)
+        db.session.commit()
+
+        project_id = project.id
+        user_a_id = user_a.id
+        user_b_id = user_b.id
+
+    with app.test_client() as anon:
+        res = anon.get('/api/projects')
+        assert res.status_code == 401
+
+    with app.test_client() as owner_client:
+        _login(owner_client, user_a_id)
+        res = owner_client.get(f'/api/projects/{project_id}')
+        assert res.status_code == 200
+
+    with app.test_client() as other_client:
+        _login(other_client, user_b_id)
+        res = other_client.get(f'/api/projects/{project_id}')
+        assert res.status_code == 404
+
+
+def test_files_project_route_owner_guard(app):
+    """/files/<project_id>/* should be owner-scoped with 401/404 semantics."""
+    with app.app_context():
+        user_a = User(display_name='Owner', is_active=True)
+        user_b = User(display_name='Other', is_active=True)
+        db.session.add_all([user_a, user_b])
+        db.session.flush()
+
+        project = Project(owner_id=user_a.id, status='DRAFT', creation_type='idea')
+        db.session.add(project)
+        db.session.commit()
+
+        target = Path(app.config['UPLOAD_FOLDER']) / project.id / 'template' / 'preview.png'
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b'project-file')
+
+        project_id = project.id
+        user_a_id = user_a.id
+        user_b_id = user_b.id
+
+    with app.test_client() as anon:
+        res = anon.get(f'/files/{project_id}/template/preview.png')
+        assert res.status_code == 401
+
+    with app.test_client() as owner_client:
+        _login(owner_client, user_a_id)
+        res = owner_client.get(f'/files/{project_id}/template/preview.png')
+        assert res.status_code == 200
+
+    with app.test_client() as other_client:
+        _login(other_client, user_b_id)
+        res = other_client.get(f'/files/{project_id}/template/preview.png')
+        assert res.status_code == 404
+
+
+def test_files_user_template_owner_guard(app):
+    """/files/user-templates/* should be owner-scoped with 401/404 semantics."""
+    with app.app_context():
+        user_a = User(display_name='Owner', is_active=True)
+        user_b = User(display_name='Other', is_active=True)
+        db.session.add_all([user_a, user_b])
+        db.session.flush()
+
+        template = UserTemplate(
+            owner_id=user_a.id,
+            file_path='user-templates/tpl-1/template.png',
+        )
+        db.session.add(template)
+        db.session.commit()
+
+        target = Path(app.config['UPLOAD_FOLDER']) / 'user-templates' / template.id / 'template.png'
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b'user-template')
+
+        template_id = template.id
+        user_a_id = user_a.id
+        user_b_id = user_b.id
+
+    with app.test_client() as anon:
+        res = anon.get(f'/files/user-templates/{template_id}/template.png')
+        assert res.status_code == 401
+
+    with app.test_client() as owner_client:
+        _login(owner_client, user_a_id)
+        res = owner_client.get(f'/files/user-templates/{template_id}/template.png')
+        assert res.status_code == 200
+
+    with app.test_client() as other_client:
+        _login(other_client, user_b_id)
+        res = other_client.get(f'/files/user-templates/{template_id}/template.png')
+        assert res.status_code == 404
+
+
+def test_files_material_owner_guard(app):
+    """/files/materials/* should be owner-scoped with 401/404 semantics."""
+    with app.app_context():
+        user_a = User(display_name='Owner', is_active=True)
+        user_b = User(display_name='Other', is_active=True)
+        db.session.add_all([user_a, user_b])
+        db.session.flush()
+
+        material = Material(
+            owner_id=user_a.id,
+            project_id=None,
+            filename='shared.png',
+            relative_path='materials/shared.png',
+            url='/files/materials/shared.png',
+        )
+        db.session.add(material)
+        db.session.commit()
+
+        target = Path(app.config['UPLOAD_FOLDER']) / 'materials' / 'shared.png'
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b'material')
+
+        user_a_id = user_a.id
+        user_b_id = user_b.id
+
+    with app.test_client() as anon:
+        res = anon.get('/files/materials/shared.png')
+        assert res.status_code == 401
+
+    with app.test_client() as owner_client:
+        _login(owner_client, user_a_id)
+        res = owner_client.get('/files/materials/shared.png')
+        assert res.status_code == 200
+
+    with app.test_client() as other_client:
+        _login(other_client, user_b_id)
+        res = other_client.get('/files/materials/shared.png')
+        assert res.status_code == 404
+
+
+def test_files_mineru_owner_guard(app):
+    """/files/mineru/<extract_id>/* should be owner-scoped with 401/404 semantics."""
+    with app.app_context():
+        user_a = User(display_name='Owner', is_active=True)
+        user_b = User(display_name='Other', is_active=True)
+        db.session.add_all([user_a, user_b])
+        db.session.flush()
+
+        ref = ReferenceFile(
+            owner_id=user_a.id,
+            project_id=None,
+            filename='doc.pdf',
+            file_path='reference_files/doc.pdf',
+            file_size=1,
+            file_type='pdf',
+            parse_status='completed',
+            mineru_extract_id='extract-owned',
+        )
+        db.session.add(ref)
+        db.session.commit()
+
+        target = Path(app.config['UPLOAD_FOLDER']) / 'mineru_files' / 'extract-owned' / 'chunk_001.md'
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text('mineru output')
+
+        user_a_id = user_a.id
+        user_b_id = user_b.id
+
+    with app.test_client() as anon:
+        res = anon.get('/files/mineru/extract-owned/chunk_001.md')
+        assert res.status_code == 401
+
+    with app.test_client() as owner_client:
+        _login(owner_client, user_a_id)
+        res = owner_client.get('/files/mineru/extract-owned/chunk_001.md')
+        assert res.status_code == 200
+
+    with app.test_client() as other_client:
+        _login(other_client, user_b_id)
+        res = other_client.get('/files/mineru/extract-owned/chunk_001.md')
+        assert res.status_code == 404

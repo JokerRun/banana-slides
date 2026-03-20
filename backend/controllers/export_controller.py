@@ -10,7 +10,7 @@ from werkzeug.utils import secure_filename
 from models import db, Project, Page, Task
 from utils import (
     error_response, not_found, bad_request, success_response,
-    parse_page_ids_from_query, parse_page_ids_from_body, get_filtered_pages, get_current_user_id
+    parse_page_ids_from_query, parse_page_ids_from_body, get_filtered_pages, get_current_user_id, require_auth_response
 )
 from services import ExportService, FileService
 from services.ai_service_manager import get_ai_service
@@ -18,6 +18,15 @@ from services.ai_service_manager import get_ai_service
 logger = logging.getLogger(__name__)
 
 export_bp = Blueprint('export', __name__, url_prefix='/api/projects')
+
+
+@export_bp.before_request
+def _export_auth_guard():
+    return require_auth_response()
+
+
+def _get_owned_project(project_id: str):
+    return Project.query.filter_by(id=project_id, owner_id=get_current_user_id()).first()
 
 
 @export_bp.route('/<project_id>/export/pptx', methods=['GET'])
@@ -40,7 +49,7 @@ def export_pptx(project_id):
         }
     """
     try:
-        project = Project.query.get(project_id)
+        project = _get_owned_project(project_id)
         
         if not project:
             return not_found('Project')
@@ -117,7 +126,7 @@ def export_pdf(project_id):
         }
     """
     try:
-        project = Project.query.get(project_id)
+        project = _get_owned_project(project_id)
         
         if not project:
             return not_found('Project')
@@ -209,7 +218,7 @@ def export_editable_pptx(project_id):
     轮询 /api/projects/{project_id}/tasks/{task_id} 获取进度和下载链接
     """
     try:
-        project = Project.query.get(project_id)
+        project = _get_owned_project(project_id)
         
         if not project:
             return not_found('Project')

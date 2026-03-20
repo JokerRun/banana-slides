@@ -13,7 +13,7 @@ from models import db, Project, Page, Task
 from services.restyle_service import RestyleService
 from services.ai_service_manager import get_ai_service
 from services.task_manager import task_manager, restyle_images_task
-from utils import success_response, error_response, not_found, bad_request, parse_page_ids_from_body, get_filtered_pages, get_current_user_id
+from utils import success_response, error_response, not_found, bad_request, parse_page_ids_from_body, get_filtered_pages, get_current_user_id, require_auth_response
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,11 @@ ALLOWED_SOURCE_EXTENSIONS = {'pptx', 'ppt', 'pdf'}
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'bmp'}
 MAX_SOURCE_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 MAX_STYLE_REFS = 5
+
+
+@restyle_bp.before_request
+def _restyle_auth_guard():
+    return require_auth_response()
 
 
 def _allowed_source_file(filename):
@@ -91,6 +96,7 @@ def create_restyle_project():
 
         # Create project
         project = Project(
+            owner_id=get_current_user_id(),
             creation_type='restyle',
             idea_prompt=source_name,
             restyle_prompt=restyle_prompt if restyle_prompt else None,
@@ -195,7 +201,7 @@ def restyle_generate(project_id):
     }
     """
     try:
-        project = Project.query.get(project_id)
+        project = Project.query.filter_by(id=project_id, owner_id=get_current_user_id()).first()
         if not project:
             return not_found('Project')
 
@@ -268,14 +274,14 @@ def restyle_single_page(project_id, page_id):
     POST /api/projects/{id}/pages/{page_id}/restyle/generate - Restyle single page
     """
     try:
-        project = Project.query.get(project_id)
+        project = Project.query.filter_by(id=project_id, owner_id=get_current_user_id()).first()
         if not project:
             return not_found('Project')
 
         if project.creation_type != 'restyle':
             return bad_request("This endpoint is only for restyle type projects")
 
-        page = Page.query.get(page_id)
+        page = Page.query.filter_by(id=page_id, project_id=project_id).first()
         if not page or page.project_id != project_id:
             return not_found('Page')
 
