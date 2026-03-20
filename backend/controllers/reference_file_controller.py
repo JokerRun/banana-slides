@@ -74,6 +74,7 @@ def _parse_file_async(file_id: str, file_path: str, filename: str, app):
             
             # Update database
             reference_file.mineru_batch_id = batch_id
+            reference_file.mineru_extract_id = extract_id
             if error_message:
                 reference_file.parse_status = 'failed'
                 reference_file.error_message = error_message
@@ -332,6 +333,7 @@ def trigger_file_parse(file_id):
             # 清空之前的解析结果，以便重新解析
             reference_file.markdown_content = None
             reference_file.mineru_batch_id = None
+            reference_file.mineru_extract_id = None
             db.session.commit()
         
         # 获取文件路径
@@ -432,4 +434,3 @@ def dissociate_file_from_project(file_id):
     except Exception as e:
         logger.error(f"Error dissociating reference file: {str(e)}", exc_info=True)
         return error_response('SERVER_ERROR', str(e), 500)
-
