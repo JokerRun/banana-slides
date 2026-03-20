@@ -4,6 +4,7 @@ Simplified Flask Application Entry Point
 import os
 import sys
 import logging
+from datetime import timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 from sqlalchemy import event
@@ -24,7 +25,7 @@ from config import Config
 from controllers.material_controller import material_bp, material_global_bp
 from controllers.reference_file_controller import reference_file_bp
 from controllers.settings_controller import settings_bp
-from controllers import project_bp, page_bp, template_bp, user_template_bp, export_bp, file_bp, restyle_bp
+from controllers import project_bp, page_bp, template_bp, user_template_bp, export_bp, file_bp, restyle_bp, auth_bp
 
 
 # Enable SQLite WAL mode for all connections
@@ -76,6 +77,11 @@ def create_app():
     else:
         cors_origins = [o.strip() for o in raw_cors.split(',') if o.strip()]
     app.config['CORS_ORIGINS'] = cors_origins
+
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['SESSION_COOKIE_SECURE'] = os.getenv('SESSION_COOKIE_SECURE', 'false').lower() in ('1', 'true', 'yes')
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
     
     # Initialize logging (log to stdout so Docker can capture it)
     log_level = getattr(logging, app.config['LOG_LEVEL'], logging.INFO)
@@ -94,7 +100,12 @@ def create_app():
 
     # Initialize extensions
     db.init_app(app)
-    CORS(app, origins=cors_origins)
+    supports_credentials = True
+    if supports_credentials and cors_origins == '*':
+        logging.warning('CORS_ORIGINS="*" is invalid when credentials are enabled, fallback to http://localhost:3000')
+        cors_origins = ['http://localhost:3000']
+        app.config['CORS_ORIGINS'] = cors_origins
+    CORS(app, origins=cors_origins, supports_credentials=supports_credentials)
     # Database migrations (Alembic via Flask-Migrate)
     Migrate(app, db)
     
@@ -110,6 +121,7 @@ def create_app():
     app.register_blueprint(reference_file_bp, url_prefix='/api/reference-files')
     app.register_blueprint(settings_bp)
     app.register_blueprint(restyle_bp)
+    app.register_blueprint(auth_bp)
 
     with app.app_context():
         # Load settings from database and sync to app.config

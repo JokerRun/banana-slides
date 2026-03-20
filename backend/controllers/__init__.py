@@ -7,6 +7,17 @@ from .file_controller import file_bp
 from .material_controller import material_bp
 from .settings_controller import settings_bp
 from .restyle_controller import restyle_bp
+from .auth_controller import auth_bp
 
-__all__ = ['project_bp', 'page_bp', 'template_bp', 'user_template_bp', 'export_bp', 'file_bp', 'material_bp', 'settings_bp', 'restyle_bp']
-
+__all__ = [
+    'project_bp',
+    'page_bp',
+    'template_bp',
+    'user_template_bp',
+    'export_bp',
+    'file_bp',
+    'material_bp',
+    'settings_bp',
+    'restyle_bp',
+    'auth_bp',
+]
