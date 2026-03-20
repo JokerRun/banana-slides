@@ -8,6 +8,7 @@ const API_BASE_URL = '';
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 300000, // 5分钟超时（AI生成可能很慢）
+  withCredentials: true,
 });
 
 // 请求拦截器
@@ -41,6 +42,9 @@ apiClient.interceptors.response.use(
     // 统一错误处理
     if (error.response) {
       // 服务器返回错误状态码
+      if (error.response.status === 401 && typeof window !== 'undefined' && window.location.pathname !== '/login') {
+        window.location.assign('/login');
+      }
       console.error('API Error:', error.response.data);
     } else if (error.request) {
       // 请求已发送但没有收到响应
@@ -76,4 +80,3 @@ export const getImageUrl = (path?: string, timestamp?: string | number): string 
 };
 
 export default apiClient;
-

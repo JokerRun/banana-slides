@@ -1,6 +1,25 @@
 import { apiClient } from './client';
 import type { Project, Task, ApiResponse, CreateProjectRequest, Page } from '@/types';
+import type { AuthMeResponse } from '@/types/auth';
 import type { Settings } from '../types/index';
+
+// ===== 认证相关 API =====
+
+/**
+ * 获取当前登录用户。
+ */
+export const getAuthMe = async (): Promise<ApiResponse<AuthMeResponse>> => {
+  const response = await apiClient.get<ApiResponse<AuthMeResponse>>('/api/auth/me');
+  return response.data;
+};
+
+/**
+ * 退出登录。
+ */
+export const logoutAuth = async (): Promise<ApiResponse<{ ok: boolean }>> => {
+  const response = await apiClient.post<ApiResponse<{ ok: boolean }>>('/api/auth/logout');
+  return response.data;
+};
 
 // ===== 项目相关 API =====
 
@@ -402,6 +421,14 @@ export const addPage = async (projectId: string, data: Partial<Page>): Promise<A
  */
 export const getTaskStatus = async (projectId: string, taskId: string): Promise<ApiResponse<Task>> => {
   const response = await apiClient.get<ApiResponse<Task>>(`/api/projects/${projectId}/tasks/${taskId}`);
+  return response.data;
+};
+
+/**
+ * 查询全局任务状态（owner scoped）。
+ */
+export const getGlobalTaskStatus = async (taskId: string): Promise<ApiResponse<Task>> => {
+  const response = await apiClient.get<ApiResponse<Task>>(`/api/tasks/${taskId}`);
   return response.data;
 };
 

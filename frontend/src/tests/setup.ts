@@ -48,3 +48,13 @@ window.scrollTo = vi.fn()
 // Mock fetch (可以在具体测试中覆盖)
 global.fetch = vi.fn()
 
+// Provide stable localStorage mock for node/vitest runtime.
+Object.defineProperty(window, 'localStorage', {
+  value: {
+    getItem: vi.fn(() => null),
+    setItem: vi.fn(),
+    removeItem: vi.fn(),
+    clear: vi.fn(),
+  },
+  writable: true,
+})

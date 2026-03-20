@@ -45,7 +45,7 @@ const materialGeneratorI18n = {
   }
 };
 import { Skeleton } from './Loading';
-import { generateMaterialImage, getTaskStatus } from '@/api/endpoints';
+import { generateMaterialImage, getGlobalTaskStatus, getTaskStatus } from '@/api/endpoints';
 import { getImageUrl } from '@/api/client';
 import type { Material } from '@/api/endpoints';
 import type { Task } from '@/types';
@@ -166,7 +166,9 @@ export const MaterialGeneratorModal: React.FC<MaterialGeneratorModalProps> = ({
     const poll = async () => {
       try {
         attempts++;
-        const response = await getTaskStatus(targetProjectId, taskId);
+        const response = targetProjectId === 'global'
+          ? await getGlobalTaskStatus(taskId)
+          : await getTaskStatus(targetProjectId, taskId);
         const task: Task = response.data;
 
         if (task.status === 'COMPLETED') {
