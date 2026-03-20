@@ -60,3 +60,4 @@ _local_backup/
 
 .idea/
 .venv
+.worktrees/
