@@ -9,7 +9,7 @@ from services.auth.auth_service import AuthService
 
 
 def test_auth_schema_columns_exist(db_session):
-    """M1 should add auth tables and owner-related nullable columns."""
+    """Auth tables and owner columns exist; owner_id is NOT NULL after M3."""
     inspector = inspect(db_session.get_bind())
 
     table_names = inspector.get_table_names()
@@ -19,7 +19,7 @@ def test_auth_schema_columns_exist(db_session):
     for table in ['projects', 'user_templates', 'materials', 'tasks', 'reference_files']:
         columns = {col['name']: col for col in inspector.get_columns(table)}
         assert 'owner_id' in columns
-        assert columns['owner_id']['nullable'] is True
+        assert columns['owner_id']['nullable'] is False
 
     reference_file_columns = {
         col['name']: col for col in inspector.get_columns('reference_files')

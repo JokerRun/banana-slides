@@ -14,7 +14,7 @@ class Task(db.Model):
     __tablename__ = 'tasks'
     
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    owner_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=True, index=True)
+    owner_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False, index=True)
     project_id = db.Column(db.String(36), db.ForeignKey('projects.id'), nullable=False)
     task_type = db.Column(db.String(50), nullable=False)  # GENERATE_DESCRIPTIONS|GENERATE_IMAGES
     status = db.Column(db.String(50), nullable=False, default='PENDING')

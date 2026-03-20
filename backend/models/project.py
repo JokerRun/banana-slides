@@ -14,7 +14,7 @@ class Project(db.Model):
     __tablename__ = 'projects'
     
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    owner_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=True, index=True)
+    owner_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False, index=True)
     idea_prompt = db.Column(db.Text, nullable=True)
     outline_text = db.Column(db.Text, nullable=True)  # 用户输入的大纲文本（用于outline类型）
     description_text = db.Column(db.Text, nullable=True)  # 用户输入的描述文本（用于description类型）

@@ -13,7 +13,7 @@ class ReferenceFile(db.Model):
     __tablename__ = 'reference_files'
     
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
-    owner_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=True, index=True)
+    owner_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False, index=True)
     project_id = db.Column(db.String(36), db.ForeignKey('projects.id'), nullable=True)  # Can be null for global files
     filename = db.Column(db.String(500), nullable=False)
     file_path = db.Column(db.String(500), nullable=False)  # Path relative to upload folder

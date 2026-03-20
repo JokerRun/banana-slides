@@ -1,7 +1,8 @@
 """Integration tests for auth ownership migration and owner isolation."""
 
-import importlib.util
 from pathlib import Path
+
+import pytest
 
 from models import db, Project, ReferenceFile, Task, User
 from models import Material, UserTemplate
@@ -12,86 +13,22 @@ def _login(client, user_id: str) -> None:
         sess['user_id'] = user_id
 
 
-def _load_m017_module():
-    backend_dir = Path(__file__).resolve().parents[2]
-    migration_path = backend_dir / 'migrations' / 'versions' / '017_auth_owner_backfill.py'
-    spec = importlib.util.spec_from_file_location('m017_auth_owner_backfill', migration_path)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+def test_extract_id_persistence(app, monkeypatch):
+    """Parser extract_id persistence regression test.
 
-
-def test_backfill_owner_and_persist_extract_id(app, monkeypatch):
-    """M2 should backfill legacy owner_id and persist parser extract_id."""
-    m017 = _load_m017_module()
-
+    The NULL->backfill portion is skipped post-M3 because the ORM schema now
+    enforces NOT NULL on owner_id.  The extract_id persistence part remains
+    as a live regression test.
+    """
     with app.app_context():
-        conn = db.engine.connect()
-        tx = conn.begin()
-        try:
-            conn.exec_driver_sql(
-                """
-                INSERT INTO projects (id, owner_id, status, creation_type, created_at, updated_at)
-                VALUES ('project-a', NULL, 'DRAFT', 'idea', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                """
-            )
-            conn.exec_driver_sql(
-                """
-                INSERT INTO user_templates (id, owner_id, file_path, created_at, updated_at)
-                VALUES ('tpl-a', NULL, 'user-templates/tpl-a/a.png', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                """
-            )
-            conn.exec_driver_sql(
-                """
-                INSERT INTO materials (id, owner_id, project_id, filename, relative_path, url, created_at, updated_at)
-                VALUES ('mat-a', NULL, NULL, 'mat.png', 'materials/mat.png', '/files/materials/mat.png', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                """
-            )
-            conn.exec_driver_sql(
-                """
-                INSERT INTO tasks (id, owner_id, project_id, task_type, status, created_at)
-                VALUES ('task-a', NULL, 'global', 'GENERATE_MATERIAL', 'PENDING', CURRENT_TIMESTAMP)
-                """
-            )
-            conn.exec_driver_sql(
-                """
-                INSERT INTO reference_files (id, owner_id, project_id, filename, file_path, file_size, file_type, parse_status, created_at, updated_at)
-                VALUES
-                    ('ref-project', NULL, 'project-a', 'a.pdf', 'reference_files/a.pdf', 1, 'pdf', 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-                    ('ref-orphan', NULL, 'missing-project', 'b.pdf', 'reference_files/b.pdf', 1, 'pdf', 'pending', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-                """
-            )
-
-            m017.run_owner_backfill(conn)
-
-            bootstrap_id = m017.BOOTSTRAP_USER_ID
-            user_row = conn.exec_driver_sql(
-                "SELECT id, is_active FROM users WHERE id = ?",
-                (bootstrap_id,),
-            ).fetchone()
-            assert user_row is not None
-            assert user_row[1] == 0
-
-            for table, row_id in [
-                ('projects', 'project-a'),
-                ('user_templates', 'tpl-a'),
-                ('materials', 'mat-a'),
-                ('tasks', 'task-a'),
-                ('reference_files', 'ref-project'),
-                ('reference_files', 'ref-orphan'),
-            ]:
-                owner_row = conn.exec_driver_sql(
-                    f"SELECT owner_id FROM {table} WHERE id = ?",
-                    (row_id,),
-                ).fetchone()
-                assert owner_row is not None
-                assert owner_row[0] == bootstrap_id
-        finally:
-            tx.rollback()
-            conn.close()
+        # --- extract_id persistence part (still valid post-M3) ---
+        test_user = User(display_name='Parse Test User', is_active=True)
+        db.session.add(test_user)
+        db.session.flush()
 
         project = Project(
             id='project-parse',
+            owner_id=test_user.id,
             status='DRAFT',
             creation_type='idea',
         )
@@ -106,6 +43,7 @@ def test_backfill_owner_and_persist_extract_id(app, monkeypatch):
 
         rf = ReferenceFile(
             project_id=project.id,
+            owner_id=test_user.id,
             filename='parse.pdf',
             file_path='reference_files/parse.pdf',
             file_size=4,
@@ -387,3 +325,46 @@ def test_files_mineru_owner_guard(app):
         _login(other_client, user_b_id)
         res = other_client.get('/files/mineru/extract-owned/chunk_001.md')
         assert res.status_code == 404
+
+
+def test_owner_columns_non_null_after_m3(app):
+    """After M3 migration, inserting rows with NULL owner_id should raise IntegrityError."""
+    import sqlalchemy
+    with app.app_context():
+        # Project with NULL owner_id should fail
+        with pytest.raises(sqlalchemy.exc.IntegrityError):
+            p = Project(status='DRAFT', creation_type='idea', owner_id=None)
+            db.session.add(p)
+            db.session.flush()
+        db.session.rollback()
+
+        # UserTemplate with NULL owner_id should fail
+        with pytest.raises(sqlalchemy.exc.IntegrityError):
+            t = UserTemplate(file_path='x/y.png', owner_id=None)
+            db.session.add(t)
+            db.session.flush()
+        db.session.rollback()
+
+        # Material with NULL owner_id should fail
+        with pytest.raises(sqlalchemy.exc.IntegrityError):
+            m = Material(filename='x.png', relative_path='m/x.png', url='/files/m/x.png', owner_id=None)
+            db.session.add(m)
+            db.session.flush()
+        db.session.rollback()
+
+        # Task with NULL owner_id should fail
+        with pytest.raises(sqlalchemy.exc.IntegrityError):
+            tk = Task(project_id='global', task_type='GENERATE_MATERIAL', status='PENDING', owner_id=None)
+            db.session.add(tk)
+            db.session.flush()
+        db.session.rollback()
+
+        # ReferenceFile with NULL owner_id should fail
+        with pytest.raises(sqlalchemy.exc.IntegrityError):
+            rf = ReferenceFile(
+                project_id=None, filename='z.pdf', file_path='rf/z.pdf',
+                file_size=1, file_type='pdf', parse_status='pending', owner_id=None,
+            )
+            db.session.add(rf)
+            db.session.flush()
+        db.session.rollback()
