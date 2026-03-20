@@ -3,11 +3,12 @@
 from models import db, User
 
 
-def test_auth_me_unauthenticated_returns_401(client):
-    response = client.get('/api/auth/me')
-    assert response.status_code == 401
-    payload = response.get_json()
-    assert payload['error']['code'] == 'AUTH_REQUIRED'
+def test_auth_me_unauthenticated_returns_401(app):
+    with app.test_client() as anon_client:
+        response = anon_client.get('/api/auth/me')
+        assert response.status_code == 401
+        payload = response.get_json()
+        assert payload['error']['code'] == 'AUTH_REQUIRED'
 
 
 def test_callback_invalid_state_redirects_login_reason(client):

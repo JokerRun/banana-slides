@@ -66,15 +66,24 @@ def app():
 
 @pytest.fixture(scope='function')
 def client(app):
-    """创建测试客户端"""
+    """创建已认证的测试客户端（自动创建 User 并设置 session）"""
     with app.test_client() as test_client:
         with app.app_context():
-            from models import db
+            from models import db, User
             # 清理旧数据，保持测试隔离
             db.session.rollback()
             for table in reversed(db.metadata.sorted_tables):
                 db.session.execute(table.delete())
             db.session.commit()
+
+            # 创建默认测试用户并登录
+            test_user = User(display_name='Test User', is_active=True)
+            db.session.add(test_user)
+            db.session.commit()
+
+            with test_client.session_transaction() as sess:
+                sess['user_id'] = test_user.id
+
             yield test_client
             db.session.rollback()
 
@@ -86,8 +95,13 @@ def db_session(app):
         from models import db
         db.create_all()
         yield db.session
-        db.session.remove()
-        db.drop_all()
+        db.session.rollback()
+        for table in reversed(db.metadata.sorted_tables):
+            try:
+                db.session.execute(table.delete())
+            except Exception:
+                db.session.rollback()
+        db.session.commit()
 
 
 @pytest.fixture
