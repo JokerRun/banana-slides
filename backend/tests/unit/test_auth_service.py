@@ -5,6 +5,7 @@ from sqlalchemy import inspect
 from sqlalchemy.exc import IntegrityError
 
 from models import User, UserOAuthAccount
+from services.auth.auth_service import AuthService
 
 
 def test_auth_schema_columns_exist(db_session):
@@ -57,3 +58,33 @@ def test_oauth_identity_unique_key(db_session):
         db_session.commit()
 
     db_session.rollback()
+
+
+def test_auth_service_upsert_user_from_oauth(db_session):
+    """AuthService should upsert user by (provider, provider_user_id)."""
+    auth_service = AuthService(db_session)
+
+    payload = {
+        'provider_user_id': 'oauth-001',
+        'display_name': 'Rico',
+        'email': 'rico@example.com',
+        'avatar_url': 'https://example.com/rico.png',
+        'username': 'rico-u',
+        'raw_profile': {'id': 'oauth-001'},
+    }
+
+    user_1 = auth_service.upsert_user_from_oauth('github', payload)
+    db_session.flush()
+
+    payload_updated = {
+        **payload,
+        'display_name': 'Rico Updated',
+        'email': 'rico.new@example.com',
+    }
+    user_2 = auth_service.upsert_user_from_oauth('github', payload_updated)
+    db_session.flush()
+
+    assert user_1.id == user_2.id
+    accounts = UserOAuthAccount.query.filter_by(provider='github', provider_user_id='oauth-001').all()
+    assert len(accounts) == 1
+    assert accounts[0].email_at_provider == 'rico.new@example.com'

@@ -112,6 +112,27 @@ class Config:
     # 百度 API 配置（用于 OCR 和图像修复）
     BAIDU_OCR_API_KEY = os.getenv('BAIDU_OCR_API_KEY', '')
 
+    # OAuth providers
+    GITHUB_CLIENT_ID = os.getenv('GITHUB_CLIENT_ID', '')
+    GITHUB_CLIENT_SECRET = os.getenv('GITHUB_CLIENT_SECRET', '')
+    GITHUB_REDIRECT_URI = os.getenv('GITHUB_REDIRECT_URI', '')
+
+    AZURE_CLIENT_ID = os.getenv('AZURE_CLIENT_ID', '')
+    AZURE_CLIENT_SECRET = os.getenv('AZURE_CLIENT_SECRET', '')
+    AZURE_AUTH_URL = os.getenv(
+        'AZURE_AUTH_URL',
+        'https://login.partner.microsoftonline.cn/common/oauth2/v2.0/authorize',
+    )
+    AZURE_TOKEN_URL = os.getenv(
+        'AZURE_TOKEN_URL',
+        'https://login.partner.microsoftonline.cn/common/oauth2/v2.0/token',
+    )
+    AZURE_USER_INFO_URL = os.getenv(
+        'AZURE_USER_INFO_URL',
+        'https://microsoftgraph.chinacloudapi.cn/v1.0/me',
+    )
+    AZURE_REDIRECT_URI = os.getenv('AZURE_REDIRECT_URI', '')
+
 
 class DevelopmentConfig(Config):
     """Development configuration"""
