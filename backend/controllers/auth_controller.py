@@ -11,6 +11,12 @@ from utils.auth import get_current_user, require_auth
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/auth')
 
 
+def _frontend_url(path: str = '/') -> str:
+    """Build an absolute frontend URL for OAuth redirects."""
+    base = current_app.config.get('FRONTEND_URL', 'http://localhost:3000').rstrip('/')
+    return f'{base}{path}'
+
+
 def get_oauth_provider(provider: str):
     if provider == 'github':
         return GitHubOAuth(
@@ -47,16 +53,16 @@ def oauth_login(provider: str):
 def oauth_callback(provider: str):
     oauth_provider = get_oauth_provider(provider)
     if oauth_provider is None:
-        return redirect('/login?reason=oauth_callback_invalid')
+        return redirect(_frontend_url('/login?reason=oauth_callback_invalid'))
 
     state = request.args.get('state')
     expected_state = session.get('oauth_state')
     if not state or not expected_state or state != expected_state:
-        return redirect('/login?reason=oauth_state_invalid')
+        return redirect(_frontend_url('/login?reason=oauth_state_invalid'))
 
     code = request.args.get('code')
     if not code:
-        return redirect('/login?reason=oauth_callback_invalid')
+        return redirect(_frontend_url('/login?reason=oauth_callback_invalid'))
 
     try:
         token = oauth_provider.exchange_code_for_token(code)
@@ -75,17 +81,17 @@ def oauth_callback(provider: str):
 
         if not user.is_active:
             session.clear()
-            return redirect('/login?reason=user_disabled')
+            return redirect(_frontend_url('/login?reason=user_disabled'))
 
         session.clear()
         session['user_id'] = user.id
         session['provider'] = provider
         session['provider_user_id'] = normalized.get('provider_user_id')
         session.permanent = True
-        return redirect('/')
+        return redirect(_frontend_url('/'))
     except Exception:
         db.session.rollback()
-        return redirect('/login?reason=oauth_profile_failed')
+        return redirect(_frontend_url('/login?reason=oauth_profile_failed'))
 
 
 @auth_bp.route('/me', methods=['GET'])

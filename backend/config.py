@@ -112,6 +112,9 @@ class Config:
     # 百度 API 配置（用于 OCR 和图像修复）
     BAIDU_OCR_API_KEY = os.getenv('BAIDU_OCR_API_KEY', '')
 
+    # Frontend URL (used for OAuth callback redirects in dev where ports differ)
+    FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+
     # OAuth providers
     GITHUB_CLIENT_ID = os.getenv('GITHUB_CLIENT_ID', '')
     GITHUB_CLIENT_SECRET = os.getenv('GITHUB_CLIENT_SECRET', '')
