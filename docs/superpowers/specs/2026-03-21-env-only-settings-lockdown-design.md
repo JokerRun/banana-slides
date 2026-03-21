@@ -126,6 +126,11 @@ No Frontend Settings Entry/Route
 
 若缺失，启动失败并输出清晰错误。
 
+Validation rule:
+
+1. optional env 缺失：允许 fallback/degrade。
+2. env 已提供但值非法（枚举/布尔/数值越界）：启动失败（fail-fast）。
+
 ## 9.2 Settings controller behavior
 
 1. 保留 blueprint 仅用于返回 locked response（兼容旧客户端调用路径）。
@@ -149,6 +154,7 @@ Audit scope:
 1. 导出当前 `settings` 表快照（备份用途）。
 2. 对照第 6 节清单，将当前实际值写入 `.env`/secrets manager。
 3. 运行 preflight：仅检查 required env 是否存在。
+4. 执行一次性 completeness check：列出“DB 中仍有值但 env 未配置”的 optional 项，避免切换后 silent degrade。
 
 ## 10.2 Deploy
 
