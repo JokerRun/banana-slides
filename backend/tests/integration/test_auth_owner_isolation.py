@@ -106,8 +106,8 @@ def test_global_task_status_owner_only(app):
             assert res.status_code == 404
 
 
-def test_settings_task_status_owner_scope(app):
-    """Settings task status should be owner-scoped as well."""
+def test_settings_task_status_locked_for_authenticated_users(app):
+    """Settings test status endpoint is locked in env-only mode."""
     with app.app_context():
         user_a = User(display_name='User A', is_active=True)
         user_b = User(display_name='User B', is_active=True)
@@ -131,13 +131,17 @@ def test_settings_task_status_owner_scope(app):
             with client_a.session_transaction() as sess:
                 sess['user_id'] = user_a.id
             res = client_a.get(f'/api/settings/tests/{task.id}/status')
-            assert res.status_code == 200
+            assert res.status_code == 403
+            payload = res.get_json()
+            assert payload['error']['code'] == 'SETTINGS_LOCKED'
 
         with app.test_client() as client_b:
             with client_b.session_transaction() as sess:
                 sess['user_id'] = user_b.id
             res = client_b.get(f'/api/settings/tests/{task.id}/status')
-            assert res.status_code == 404
+            assert res.status_code == 403
+            payload = res.get_json()
+            assert payload['error']['code'] == 'SETTINGS_LOCKED'
 
 
 def test_auth_required_and_project_isolation(app):
