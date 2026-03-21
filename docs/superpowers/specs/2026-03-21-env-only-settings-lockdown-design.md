@@ -33,6 +33,15 @@ Status: Ready for implementation planning
 3. **Frontend lockdown**：前端移除 settings 导航与专属路由。
 4. **Rollback model**：只支持代码版本回滚，不提供运行时开关切回。
 
+## 4.1 Required vs Optional Policy
+
+为避免实现歧义，本方案明确分两类：
+
+1. **Required + fail-fast**：缺失则启动失败。
+2. **Optional + default**：缺失时使用代码默认值或功能降级。
+
+默认规则：生产与测试环境都遵循上述规则；不再区分“local dev 特殊 required 例外”。
+
 ## 5. Target Architecture
 
 ```text
@@ -53,20 +62,20 @@ No Frontend Settings Entry/Route
 | AI provider format | `ai_provider_format` | `AI_PROVIDER_FORMAT` | Yes | No | startup fail-fast |
 | API base URL | `api_base_url` | `GOOGLE_API_BASE` or `OPENAI_API_BASE` | No | No | fallback to provider default |
 | API key | `api_key` | `GOOGLE_API_KEY` or `OPENAI_API_KEY` | Yes | Yes | startup fail-fast |
-| Text model | `text_model` | `TEXT_MODEL` | Yes | No | use config default only in local dev |
-| Image model | `image_model` | `IMAGE_MODEL` | Yes | No | use config default only in local dev |
+| Text model | `text_model` | `TEXT_MODEL` | No | No | fallback to config default |
+| Image model | `image_model` | `IMAGE_MODEL` | No | No | fallback to config default |
 | Image caption model | `image_caption_model` | `IMAGE_CAPTION_MODEL` | No | No | disable caption fallback |
 | MinerU base | `mineru_api_base` | `MINERU_API_BASE` | No | No | disable MinerU-related features |
 | MinerU token | `mineru_token` | `MINERU_TOKEN` | No | Yes | disable MinerU-related features |
 | Baidu OCR key | `baidu_ocr_api_key` | `BAIDU_OCR_API_KEY` | No | Yes | disable OCR-related features |
-| Output language | `output_language` | `OUTPUT_LANGUAGE` | Yes | No | fallback to `zh` |
-| Image resolution | `image_resolution` | `DEFAULT_RESOLUTION` | Yes | No | fallback to `2K` |
-| Image aspect ratio | `image_aspect_ratio` | `DEFAULT_ASPECT_RATIO` | Yes | No | fallback to `16:9` |
-| Description workers | `max_description_workers` | `MAX_DESCRIPTION_WORKERS` | Yes | No | fallback to `5` |
-| Image workers | `max_image_workers` | `MAX_IMAGE_WORKERS` | Yes | No | fallback to `8` |
-| Text reasoning toggle | `enable_text_reasoning` | `ENABLE_TEXT_REASONING` | Yes | No | fallback to `false` |
-| Text thinking budget | `text_thinking_budget` | `TEXT_THINKING_BUDGET` | Yes | No | fallback to `1024` |
-| Image thinking level | `image_thinking_level` | `IMAGE_THINKING_LEVEL` | Yes | No | fallback to `none` |
+| Output language | `output_language` | `OUTPUT_LANGUAGE` | No | No | fallback to `zh` |
+| Image resolution | `image_resolution` | `DEFAULT_RESOLUTION` | No | No | fallback to `2K` |
+| Image aspect ratio | `image_aspect_ratio` | `DEFAULT_ASPECT_RATIO` | No | No | fallback to `16:9` |
+| Description workers | `max_description_workers` | `MAX_DESCRIPTION_WORKERS` | No | No | fallback to `5` |
+| Image workers | `max_image_workers` | `MAX_IMAGE_WORKERS` | No | No | fallback to `8` |
+| Text reasoning toggle | `enable_text_reasoning` | `ENABLE_TEXT_REASONING` | No | No | fallback to `false` |
+| Text thinking budget | `text_thinking_budget` | `TEXT_THINKING_BUDGET` | No | No | fallback to `1024` |
+| Image thinking level | `image_thinking_level` | `IMAGE_THINKING_LEVEL` | No | No | fallback to `none` |
 
 ## 7. API Contract
 
@@ -108,6 +117,15 @@ No Frontend Settings Entry/Route
 1. 移除启动时 DB settings 覆盖 `app.config` 的路径。
 2. 运行中仅依赖 `Config`（env）构建配置。
 
+## 9.1.1 Startup preflight
+
+启动时 preflight 仅检查 **required + fail-fast** 环境变量：
+
+1. `AI_PROVIDER_FORMAT`
+2. `GOOGLE_API_KEY` 或 `OPENAI_API_KEY`（按 provider 选择）
+
+若缺失，启动失败并输出清晰错误。
+
 ## 9.2 Settings controller behavior
 
 1. 保留 blueprint 仅用于返回 locked response（兼容旧客户端调用路径）。
@@ -130,7 +148,7 @@ Audit scope:
 
 1. 导出当前 `settings` 表快照（备份用途）。
 2. 对照第 6 节清单，将当前实际值写入 `.env`/secrets manager。
-3. 运行 preflight：检查 required env 是否全部存在。
+3. 运行 preflight：仅检查 required env 是否存在。
 
 ## 10.2 Deploy
 
@@ -147,6 +165,8 @@ Audit scope:
 
 建议在稳定后执行一次清理迁移，清空历史敏感字段，降低残留泄漏面。
 
+为保证回滚安全，`S3` 只能在“回滚窗口关闭后”执行；若必须在窗口期执行，则需保留并可恢复第 10.1 步导出的 settings 快照。
+
 Cleanup targets:
 
 1. `settings.api_key`
@@ -156,9 +176,10 @@ Cleanup targets:
 ## 12. Observability And Security Guardrails
 
 1. 启动日志固定打印 `env_only_mode=true`。
-2. 启动时若检测到 DB settings 仍存在敏感值，仅告警且不用于运行配置。
-3. 统一统计 `SETTINGS_LOCKED` 命中次数，识别遗留客户端调用。
-4. 禁止在日志中输出任何敏感配置明文。
+2. 统一统计 `SETTINGS_LOCKED` 命中次数，识别遗留客户端调用。
+3. 禁止在日志中输出任何敏感配置明文。
+
+备注：为保持“无运行时 DB settings 依赖”边界，启动阶段不读取 `settings` 表做告警扫描；该扫描若需要，放入一次性维护脚本。
 
 ## 13. Migration Phases And DoD
 
@@ -196,6 +217,11 @@ Definition of Done:
 ## 15. Rollback Strategy
 
 仅支持**代码版本回滚**，不提供运行时 feature-flag 回切。
+
+Phase-aware rule:
+
+1. `S1/S2` 期间：代码回滚即可。
+2. `S3` 之后：仅在已关闭回滚窗口时执行；若仍需回滚旧版本，必须先恢复第 10.1 导出的 settings 快照。
 
 Rollback steps:
 
