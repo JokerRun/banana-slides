@@ -85,6 +85,8 @@ No Frontend Settings Entry/Route
 2. `PUT /api/settings` -> locked
 3. `POST /api/settings/reset` -> locked
 4. `POST /api/settings/verify` -> locked
+5. `POST /api/settings/tests/<test_name>` -> locked
+6. `GET /api/settings/tests/<task_id>/status` -> locked
 
 ## 7.2 Access semantics
 
