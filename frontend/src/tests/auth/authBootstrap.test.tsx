@@ -28,10 +28,6 @@ vi.mock('@/pages/SlidePreview', () => ({
   SlidePreview: () => <div>PREVIEW_PAGE</div>,
 }))
 
-vi.mock('@/pages/Settings', () => ({
-  SettingsPage: () => <div>SETTINGS_PAGE</div>,
-}))
-
 vi.mock('@/pages/Login', () => ({
   Login: () => <div>LOGIN_PAGE</div>,
 }))
@@ -99,6 +95,25 @@ describe('Auth Bootstrap', () => {
     })
 
     window.history.replaceState({}, '', '/')
+    render(<App />)
+
+    await waitFor(() => {
+      expect(screen.getByText('HOME_PAGE')).toBeInTheDocument()
+    })
+  })
+
+  it('redirects /settings to / when authenticated', async () => {
+    vi.mocked(getAuthMe).mockResolvedValue({
+      success: true,
+      data: {
+        user: {
+          id: 'user-1',
+          is_active: true,
+        },
+      },
+    })
+
+    window.history.replaceState({}, '', '/settings')
     render(<App />)
 
     await waitFor(() => {

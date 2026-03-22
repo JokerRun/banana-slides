@@ -7,7 +7,6 @@ import { History } from './pages/History';
 import { OutlineEditor } from './pages/OutlineEditor';
 import { DetailEditor } from './pages/DetailEditor';
 import { SlidePreview } from './pages/SlidePreview';
-import { SettingsPage } from './pages/Settings';
 import { Login } from './pages/Login';
 import { useProjectStore } from './store/useProjectStore';
 import { useToast } from './components/shared';
@@ -85,7 +84,6 @@ function App() {
         <Route path="/landing" element={<Landing />} />
         <Route path="/" element={<RequireAuth authStatus={authStatus}><Home /></RequireAuth>} />
         <Route path="/history" element={<RequireAuth authStatus={authStatus}><History /></RequireAuth>} />
-        <Route path="/settings" element={<RequireAuth authStatus={authStatus}><SettingsPage /></RequireAuth>} />
         <Route path="/project/:projectId/outline" element={<RequireAuth authStatus={authStatus}><OutlineEditor /></RequireAuth>} />
         <Route path="/project/:projectId/detail" element={<RequireAuth authStatus={authStatus}><DetailEditor /></RequireAuth>} />
         <Route path="/project/:projectId/preview" element={<RequireAuth authStatus={authStatus}><SlidePreview /></RequireAuth>} />

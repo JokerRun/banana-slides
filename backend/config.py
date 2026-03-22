@@ -78,8 +78,8 @@ class Config:
     MAX_IMAGE_WORKERS = int(os.getenv('MAX_IMAGE_WORKERS', '8'))
     
     # 图片生成配置
-    DEFAULT_ASPECT_RATIO = "16:9"
-    DEFAULT_RESOLUTION = "2K"
+    DEFAULT_ASPECT_RATIO = os.getenv('DEFAULT_ASPECT_RATIO', '16:9')
+    DEFAULT_RESOLUTION = os.getenv('DEFAULT_RESOLUTION', '2K')
     
     # 日志配置
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()

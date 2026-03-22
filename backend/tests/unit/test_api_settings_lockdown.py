@@ -1,5 +1,7 @@
 """Settings API lockdown tests for env-only mode."""
 
+import importlib
+
 
 def test_settings_endpoints_require_auth(app):
     """Unauthenticated requests should still return 401 via auth guard."""
@@ -42,3 +44,41 @@ def test_settings_options_is_locked_for_authenticated_user(client):
     body = resp.get_json()
     assert body is not None
     assert body.get('error', {}).get('code') == 'SETTINGS_LOCKED'
+
+
+def test_startup_preflight_missing_required_env(monkeypatch):
+    """Missing AI_PROVIDER_FORMAT env should fail fast at app startup."""
+    app_module = importlib.import_module('app')
+    app_module = importlib.reload(app_module)
+
+    monkeypatch.delenv('AI_PROVIDER_FORMAT', raising=False)
+    monkeypatch.setenv('GOOGLE_API_KEY', 'mock-api-key-for-testing')
+
+    import pytest
+
+    with pytest.raises(ValueError, match='AI_PROVIDER_FORMAT'):
+        app_module.create_app()
+
+
+def test_startup_preflight_invalid_provider(monkeypatch):
+    """Invalid AI_PROVIDER_FORMAT env should fail fast at app startup."""
+    app_module = importlib.import_module('app')
+    app_module = importlib.reload(app_module)
+
+    monkeypatch.setenv('AI_PROVIDER_FORMAT', 'bad-provider')
+    monkeypatch.setenv('GOOGLE_API_KEY', 'mock-api-key-for-testing')
+
+    import pytest
+
+    with pytest.raises(ValueError, match='AI_PROVIDER_FORMAT'):
+        app_module.create_app()
+
+
+def test_output_language_reads_from_config_not_db(app):
+    """/api/output-language should read from app config instead of DB settings."""
+    app.config['OUTPUT_LANGUAGE'] = 'en'
+    with app.test_client() as c:
+        resp = c.get('/api/output-language')
+        assert resp.status_code == 200
+        payload = resp.get_json()
+        assert payload == {'data': {'language': 'en'}}

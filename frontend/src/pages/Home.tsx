@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Sparkles, FileText, FileEdit, ImagePlus, Paperclip, Palette, Lightbulb, Search, Settings, FolderOpen, HelpCircle, Sun, Moon, Globe, Monitor, ChevronDown, RefreshCw, Upload, LogOut } from 'lucide-react';
+import { Sparkles, FileText, FileEdit, ImagePlus, Paperclip, Palette, Lightbulb, Search, FolderOpen, HelpCircle, Sun, Moon, Globe, Monitor, ChevronDown, RefreshCw, Upload, LogOut } from 'lucide-react';
 import { Button, Textarea, Card, useToast, MaterialGeneratorModal, MaterialCenterModal, ReferenceFileList, ReferenceFileSelector, FilePreviewModal, HelpModal, Footer, GithubRepoCard } from '@/components/shared';
 import { MarkdownTextarea, type MarkdownTextareaRef } from '@/components/shared/MarkdownTextarea';
 import { TemplateSelector, getTemplateFile } from '@/components/shared/TemplateSelector';
@@ -20,7 +20,7 @@ const homeI18n = {
   zh: {
     nav: {
       materialGenerate: '素材生成', materialCenter: '素材中心',
-      history: '历史项目', settings: '设置', help: '帮助', logout: '退出登录'
+      history: '历史项目', help: '帮助', logout: '退出登录'
     },
     settings: {
       language: { label: '界面语言' },
@@ -123,7 +123,6 @@ const homeI18n = {
         pptTip: '提示：建议将PPT转换为PDF格式上传，可获得更好的解析效果',
         filesAdded: '已添加 {{count}} 个参考文件',
         imageRemoved: '已移除图片',
-        serviceTestTip: '建议先到设置页底部进行服务测试，避免后续功能异常',
         restyleSourceRequired: '请上传 PPT/PDF 源文件',
         restyleStyleRefRequired: '请至少上传一张风格参考图',
         restylePresetApplied: '预制模板已应用（包含 prompt + 参照图）',
@@ -136,7 +135,7 @@ const homeI18n = {
   en: {
     nav: {
       materialGenerate: 'Generate Material', materialCenter: 'Material Center',
-      history: 'History', settings: 'Settings', help: 'Help', logout: 'Logout'
+      history: 'History', help: 'Help', logout: 'Logout'
     },
     settings: {
       language: { label: 'Interface Language' },
@@ -239,7 +238,6 @@ const homeI18n = {
         pptTip: 'Tip: Convert PPT to PDF for better parsing results',
         filesAdded: 'Added {{count}} reference file(s)',
         imageRemoved: 'Image removed',
-        serviceTestTip: 'Test services in Settings first to avoid issues',
         restyleSourceRequired: 'Please upload a PPT/PDF source file',
         restyleStyleRefRequired: 'At least one style reference image is required',
         restylePresetApplied: 'Preset applied (prompt + style reference image)',
@@ -829,15 +827,6 @@ export const Home: React.FC = () => {
             >
               <span className="hidden sm:inline">{t('nav.history')}</span>
               <span className="sm:hidden">{t('nav.history')}</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<Settings size={16} className="md:w-[18px] md:h-[18px]" />}
-              onClick={() => navigate('/settings')}
-              className="text-xs md:text-sm hover:bg-banana-100/60 hover:shadow-sm hover:scale-105 transition-all duration-200 font-medium"
-            >
-              <span className="hidden md:inline">{t('nav.settings')}</span>
             </Button>
             <Button
               variant="ghost"

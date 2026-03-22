@@ -52,6 +52,8 @@ def set_sqlite_pragma(dbapi_conn, connection_record):
 def create_app():
     """Application factory"""
     app = Flask(__name__)
+
+    _preflight_env_or_raise()
     
     # Load configuration from Config class
     app.config.from_object(Config)
@@ -124,10 +126,6 @@ def create_app():
     app.register_blueprint(auth_bp)
     app.register_blueprint(task_bp)
 
-    with app.app_context():
-        # Load settings from database and sync to app.config
-        _load_settings_to_config(app)
-
     # Health check endpoint
     @app.route('/health')
     def health_check():
@@ -136,17 +134,8 @@ def create_app():
     # Output language endpoint
     @app.route('/api/output-language', methods=['GET'])
     def get_output_language():
-        """
-        获取用户的输出语言偏好（从数据库 Settings 读取）
-        返回: zh, ja, en, auto
-        """
-        from models import Settings
-        try:
-            settings = Settings.get_settings()
-            return {'data': {'language': settings.output_language}}
-        except SQLAlchemyError as db_error:
-            logging.warning(f"Failed to load output language from settings: {db_error}")
-            return {'data': {'language': Config.OUTPUT_LANGUAGE}}  # 默认中文
+        """Return output language from current runtime config (env-managed)."""
+        return {'data': {'language': app.config.get('OUTPUT_LANGUAGE', Config.OUTPUT_LANGUAGE)}}
 
     # Root endpoint
     @app.route('/')
@@ -248,6 +237,20 @@ def _load_settings_to_config(app):
 
     except Exception as e:
         logging.warning(f"Could not load settings from database: {e}")
+
+
+def _preflight_env_or_raise() -> None:
+    """Fail fast on invalid required envs for env-only mode."""
+    provider = (os.getenv('AI_PROVIDER_FORMAT') or '').strip().lower()
+    if provider not in {'openai', 'gemini'}:
+        raise ValueError('AI_PROVIDER_FORMAT must be set to "openai" or "gemini"')
+
+    if provider == 'openai':
+        if not (os.getenv('OPENAI_API_KEY') or '').strip():
+            raise ValueError('OPENAI_API_KEY is required when AI_PROVIDER_FORMAT=openai')
+    else:
+        if not (os.getenv('GOOGLE_API_KEY') or '').strip():
+            raise ValueError('GOOGLE_API_KEY is required when AI_PROVIDER_FORMAT=gemini')
 
 
 # Create app instance
