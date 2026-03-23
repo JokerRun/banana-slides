@@ -677,14 +677,95 @@ def edit_page_image_task(task_id: str, project_id: str, page_id: str,
             # Edit image
             logger.info(f"🎨 Editing image for page {page_id}...")
             try:
-                image = ai_service.edit_image(
-                    edit_instruction,
-                    current_image_path,
-                    aspect_ratio,
-                    resolution,
-                    original_description=original_description,
-                    additional_ref_images=additional_ref_images if additional_ref_images else None
-                )
+                # Check if this is a restyle project
+                from models import Project
+                project = Project.query.get(project_id)
+                
+                if project and project.creation_type == 'restyle':
+                    # Use conversation context for restyle edits
+                    from services.restyle_edit_context import (
+                        build_restyle_edit_context,
+                        MissingStructuralImagesError,
+                        ContextImageLimitExceeded,
+                    )
+                    from config import get_config
+                    config = get_config()
+                    
+                    # Validate structural image availability (DB path → abs → readable)
+                    original_slide_abs = None
+                    if page.original_slide_image_path:
+                        candidate = file_service.get_absolute_path(
+                            page.original_slide_image_path
+                        )
+                        if os.path.exists(candidate):
+                            original_slide_abs = candidate
+                        else:
+                            logger.warning(f"Original slide file missing on disk: {candidate}")
+                    
+                    current_abs = current_image_path if os.path.exists(current_image_path) else None
+                    if not current_abs:
+                        logger.warning(f"Current selected image missing on disk: {current_image_path}")
+                    
+                    # Validate style ref availability
+                    style_ref_abs_paths = []
+                    for ref_path in (project.get_style_ref_image_paths() or []):
+                        abs_path = file_service.get_absolute_path(ref_path)
+                        if os.path.exists(abs_path):
+                            style_ref_abs_paths.append(abs_path)
+                        else:
+                            logger.warning(f"Style ref file missing on disk: {abs_path}")
+                    
+                    # Normalize extra ref paths (may be /files/..., abs paths, or temp uploads)
+                    normalized_extras = None
+                    if additional_ref_images:
+                        normalized_extras = []
+                        upload_folder = file_service.upload_folder if hasattr(file_service, 'upload_folder') else ''
+                        for ref in additional_ref_images:
+                            if os.path.exists(ref):
+                                normalized_extras.append(ref)
+                            elif ref.startswith('/files/') and upload_folder:
+                                relative = ref[len('/files/'):].lstrip('/')
+                                local = os.path.abspath(os.path.join(upload_folder, relative))
+                                if os.path.exists(local):
+                                    normalized_extras.append(local)
+                                else:
+                                    logger.warning(f"Extra ref not found after /files/ resolve: {ref}")
+                            else:
+                                logger.warning(f"Skipping unresolvable extra ref in restyle edit: {ref}")
+                    
+                    total_pages_count = Page.query.filter_by(
+                        project_id=project_id
+                    ).count()
+                    
+                    try:
+                        ctx = build_restyle_edit_context(
+                            original_slide_path=original_slide_abs,
+                            style_ref_paths=style_ref_abs_paths,
+                            restyle_base_prompt_snapshot=page.restyle_base_prompt_snapshot,
+                            restyle_prompt=project.restyle_prompt or '',
+                            current_selected_path=current_abs,
+                            edit_instruction=edit_instruction,
+                            current_extra_ref_paths=normalized_extras,
+                            page_index=page.order_index + 1,
+                            total_pages=total_pages_count,
+                            prunable_cap=config.RESTYLE_EDIT_MAX_PRUNABLE_IMAGES,
+                            total_cap=config.RESTYLE_EDIT_MAX_TOTAL_IMAGES,
+                        )
+                        image = ai_service.edit_restyle_image_with_context(
+                            ctx, aspect_ratio, resolution
+                        )
+                    except (MissingStructuralImagesError, ContextImageLimitExceeded) as e:
+                        raise ValueError(f"Restyle edit context error: {e}")
+                else:
+                    # Legacy path for non-restyle projects
+                    image = ai_service.edit_image(
+                        edit_instruction,
+                        current_image_path,
+                        aspect_ratio,
+                        resolution,
+                        original_description=original_description,
+                        additional_ref_images=additional_ref_images if additional_ref_images else None
+                    )
             finally:
                 # Clean up temp directory if created
                 if temp_dir:
@@ -1236,6 +1317,12 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
                         image_path, version = save_image_with_version(
                             image, project_id, page_id, file_service, page_obj=page_obj
                         )
+
+                        # Persist first-pass prompt snapshot (write-once)
+                        if not page_obj.restyle_base_prompt_snapshot:
+                            page_obj.restyle_base_prompt_snapshot = prompt
+                            db.session.commit()
+                            logger.info(f"📝 Snapshot persisted for page {page_id}")
 
                         logger.info(f"✅ Restyle page {page_index}/{total_pages} completed in {elapsed:.1f}s → {image_path} ({image.size[0]}x{image.size[1]})")
                         return (page_id, image_path, None)

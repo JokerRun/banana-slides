@@ -23,6 +23,7 @@ class Page(db.Model):
     generated_image_path = db.Column(db.String(500), nullable=True)  # Original PNG image path
     cached_image_path = db.Column(db.String(500), nullable=True)  # Compressed JPG thumbnail path
     original_slide_image_path = db.Column(db.String(500), nullable=True)  # Restyle: 原始slide图片路径
+    restyle_base_prompt_snapshot = db.Column(db.Text, nullable=True)  # Restyle: 首轮生成prompt快照
     status = db.Column(db.String(50), nullable=False, default='DRAFT')
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -87,6 +88,7 @@ class Page(db.Model):
             'description_content': self.get_description_content(),
             'generated_image_url': display_image_url,
             'original_slide_image_url': original_slide_image_url,
+            'restyle_base_prompt_snapshot': self.restyle_base_prompt_snapshot,
             'status': self.status,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,

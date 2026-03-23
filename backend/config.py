@@ -81,6 +81,10 @@ class Config:
     DEFAULT_ASPECT_RATIO = os.getenv('DEFAULT_ASPECT_RATIO', '16:9')
     DEFAULT_RESOLUTION = os.getenv('DEFAULT_RESOLUTION', '2K')
     
+    # Restyle 编辑上下文图片上限
+    RESTYLE_EDIT_MAX_PRUNABLE_IMAGES = int(os.getenv('RESTYLE_EDIT_MAX_PRUNABLE_IMAGES', '6'))
+    RESTYLE_EDIT_MAX_TOTAL_IMAGES = int(os.getenv('RESTYLE_EDIT_MAX_TOTAL_IMAGES', '8'))
+    
     # 日志配置
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
     

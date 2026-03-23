@@ -8,6 +8,8 @@ from PIL import Image
 
 class ImageProvider(ABC):
     """Abstract base class for image generation"""
+
+    supports_conversation_contents = False
     
     @abstractmethod
     def generate_image(
@@ -32,3 +34,26 @@ class ImageProvider(ABC):
             Generated PIL Image object, or None if failed
         """
         pass
+
+    def generate_image_from_conversation(
+        self,
+        contents: list,
+        aspect_ratio: str = "16:9",
+        resolution: str = "2K",
+        thinking_level: str = "none"
+    ) -> Optional[Image.Image]:
+        """
+        Generate image from multi-turn conversation contents.
+        
+        Only supported by providers that set supports_conversation_contents = True.
+        
+        Args:
+            contents: Multi-turn conversation contents (provider-specific format)
+            aspect_ratio: Image aspect ratio
+            resolution: Image resolution
+            thinking_level: Thinking level for supported models
+            
+        Returns:
+            Generated PIL Image object, or None if failed
+        """
+        raise NotImplementedError("Conversation contents not supported by this provider")
