@@ -691,17 +691,47 @@ def edit_page_image_task(task_id: str, project_id: str, page_id: str,
                     from config import get_config
                     config = get_config()
                     
+                    # Validate structural image availability (DB path → abs → readable)
                     original_slide_abs = None
                     if page.original_slide_image_path:
-                        original_slide_abs = file_service.get_absolute_path(
+                        candidate = file_service.get_absolute_path(
                             page.original_slide_image_path
                         )
+                        if os.path.exists(candidate):
+                            original_slide_abs = candidate
+                        else:
+                            logger.warning(f"Original slide file missing on disk: {candidate}")
                     
+                    current_abs = current_image_path if os.path.exists(current_image_path) else None
+                    if not current_abs:
+                        logger.warning(f"Current selected image missing on disk: {current_image_path}")
+                    
+                    # Validate style ref availability
                     style_ref_abs_paths = []
                     for ref_path in (project.get_style_ref_image_paths() or []):
-                        style_ref_abs_paths.append(
-                            file_service.get_absolute_path(ref_path)
-                        )
+                        abs_path = file_service.get_absolute_path(ref_path)
+                        if os.path.exists(abs_path):
+                            style_ref_abs_paths.append(abs_path)
+                        else:
+                            logger.warning(f"Style ref file missing on disk: {abs_path}")
+                    
+                    # Normalize extra ref paths (may be /files/..., abs paths, or temp uploads)
+                    normalized_extras = None
+                    if additional_ref_images:
+                        normalized_extras = []
+                        upload_folder = file_service.upload_folder if hasattr(file_service, 'upload_folder') else ''
+                        for ref in additional_ref_images:
+                            if os.path.exists(ref):
+                                normalized_extras.append(ref)
+                            elif ref.startswith('/files/') and upload_folder:
+                                relative = ref[len('/files/'):].lstrip('/')
+                                local = os.path.abspath(os.path.join(upload_folder, relative))
+                                if os.path.exists(local):
+                                    normalized_extras.append(local)
+                                else:
+                                    logger.warning(f"Extra ref not found after /files/ resolve: {ref}")
+                            else:
+                                logger.warning(f"Skipping unresolvable extra ref in restyle edit: {ref}")
                     
                     total_pages_count = Page.query.filter_by(
                         project_id=project_id
@@ -713,9 +743,9 @@ def edit_page_image_task(task_id: str, project_id: str, page_id: str,
                             style_ref_paths=style_ref_abs_paths,
                             restyle_base_prompt_snapshot=page.restyle_base_prompt_snapshot,
                             restyle_prompt=project.restyle_prompt or '',
-                            current_selected_path=current_image_path,
+                            current_selected_path=current_abs,
                             edit_instruction=edit_instruction,
-                            current_extra_ref_paths=additional_ref_images,
+                            current_extra_ref_paths=normalized_extras,
                             page_index=page.order_index + 1,
                             total_pages=total_pages_count,
                             prunable_cap=config.RESTYLE_EDIT_MAX_PRUNABLE_IMAGES,

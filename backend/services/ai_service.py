@@ -576,8 +576,16 @@ class AIService:
         
         conversation_attempted = False
         provider_fallback = False
+        conversation_supported = getattr(self.image_provider, 'supports_conversation_contents', False)
+        snapshot_present = not context.degraded_context or bool(context.conversation_contents)
         
-        if self.image_provider.supports_conversation_contents:
+        logger.info("restyle_edit_context: capability decision", extra={
+            'conversation_supported': conversation_supported,
+            'snapshot_present': snapshot_present,
+            'degraded_context': context.degraded_context,
+        })
+        
+        if conversation_supported:
             conversation_attempted = True
             try:
                 resolved_contents = self._resolve_conversation_images(context.conversation_contents)
@@ -595,6 +603,7 @@ class AIService:
                         'degraded_context': context.degraded_context,
                         'baseline_images_count': context.baseline_images_count,
                         'current_images_count': context.current_images_count,
+                        'snapshot_present': snapshot_present,
                     })
                     return result
             except Exception as e:
@@ -621,6 +630,7 @@ class AIService:
             'degraded_context': context.degraded_context,
             'baseline_images_count': context.baseline_images_count,
             'current_images_count': context.current_images_count,
+            'snapshot_present': snapshot_present,
         })
         
         return result
