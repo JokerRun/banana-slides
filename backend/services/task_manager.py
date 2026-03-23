@@ -677,14 +677,65 @@ def edit_page_image_task(task_id: str, project_id: str, page_id: str,
             # Edit image
             logger.info(f"🎨 Editing image for page {page_id}...")
             try:
-                image = ai_service.edit_image(
-                    edit_instruction,
-                    current_image_path,
-                    aspect_ratio,
-                    resolution,
-                    original_description=original_description,
-                    additional_ref_images=additional_ref_images if additional_ref_images else None
-                )
+                # Check if this is a restyle project
+                from models import Project
+                project = Project.query.get(project_id)
+                
+                if project and project.creation_type == 'restyle':
+                    # Use conversation context for restyle edits
+                    from services.restyle_edit_context import (
+                        build_restyle_edit_context,
+                        MissingStructuralImagesError,
+                        ContextImageLimitExceeded,
+                    )
+                    from config import get_config
+                    config = get_config()
+                    
+                    original_slide_abs = None
+                    if page.original_slide_image_path:
+                        original_slide_abs = file_service.get_absolute_path(
+                            page.original_slide_image_path
+                        )
+                    
+                    style_ref_abs_paths = []
+                    for ref_path in (project.get_style_ref_image_paths() or []):
+                        style_ref_abs_paths.append(
+                            file_service.get_absolute_path(ref_path)
+                        )
+                    
+                    total_pages_count = Page.query.filter_by(
+                        project_id=project_id
+                    ).count()
+                    
+                    try:
+                        ctx = build_restyle_edit_context(
+                            original_slide_path=original_slide_abs,
+                            style_ref_paths=style_ref_abs_paths,
+                            restyle_base_prompt_snapshot=page.restyle_base_prompt_snapshot,
+                            restyle_prompt=project.restyle_prompt or '',
+                            current_selected_path=current_image_path,
+                            edit_instruction=edit_instruction,
+                            current_extra_ref_paths=additional_ref_images,
+                            page_index=page.order_index + 1,
+                            total_pages=total_pages_count,
+                            prunable_cap=config.RESTYLE_EDIT_MAX_PRUNABLE_IMAGES,
+                            total_cap=config.RESTYLE_EDIT_MAX_TOTAL_IMAGES,
+                        )
+                        image = ai_service.edit_restyle_image_with_context(
+                            ctx, aspect_ratio, resolution
+                        )
+                    except (MissingStructuralImagesError, ContextImageLimitExceeded) as e:
+                        raise ValueError(f"Restyle edit context error: {e}")
+                else:
+                    # Legacy path for non-restyle projects
+                    image = ai_service.edit_image(
+                        edit_instruction,
+                        current_image_path,
+                        aspect_ratio,
+                        resolution,
+                        original_description=original_description,
+                        additional_ref_images=additional_ref_images if additional_ref_images else None
+                    )
             finally:
                 # Clean up temp directory if created
                 if temp_dir:

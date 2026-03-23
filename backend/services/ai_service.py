@@ -560,6 +560,104 @@ class AIService:
         )
         return self.generate_image(edit_instruction, current_image_path, aspect_ratio, resolution, additional_ref_images)
     
+    def edit_restyle_image_with_context(self, context, aspect_ratio='16:9', resolution='2K'):
+        """
+        Edit restyle image using conversation context with single fallback.
+        
+        Args:
+            context: RestyleEditContext from build_restyle_edit_context()
+            aspect_ratio: Image aspect ratio
+            resolution: Image resolution
+        
+        Returns:
+            PIL Image or raises
+        """
+        from .restyle_edit_context import is_retryable_conversation_error
+        
+        conversation_attempted = False
+        provider_fallback = False
+        
+        if self.image_provider.supports_conversation_contents:
+            conversation_attempted = True
+            try:
+                resolved_contents = self._resolve_conversation_images(context.conversation_contents)
+                result = self.image_provider.generate_image_from_conversation(
+                    contents=resolved_contents,
+                    aspect_ratio=aspect_ratio,
+                    resolution=resolution,
+                    thinking_level=self._get_image_thinking_level()
+                )
+                if result:
+                    logger.info("restyle_edit_context: conversation mode success", extra={
+                        'context_mode': 'restyle_conversation',
+                        'conversation_attempted': True,
+                        'provider_fallback': False,
+                        'degraded_context': context.degraded_context,
+                        'baseline_images_count': context.baseline_images_count,
+                        'current_images_count': context.current_images_count,
+                    })
+                    return result
+            except Exception as e:
+                if is_retryable_conversation_error(e):
+                    logger.warning(f"Conversation mode failed with retryable error, falling back to legacy: {e}")
+                    provider_fallback = True
+                else:
+                    raise
+        
+        # Legacy fallback path
+        ref_images = self._resolve_ref_image_paths(context.legacy_ref_images)
+        result = self.image_provider.generate_image(
+            prompt=context.legacy_prompt,
+            ref_images=ref_images if ref_images else None,
+            aspect_ratio=aspect_ratio,
+            resolution=resolution,
+            thinking_level=self._get_image_thinking_level()
+        )
+        
+        logger.info("restyle_edit_context: legacy mode", extra={
+            'context_mode': 'legacy_flattened',
+            'conversation_attempted': conversation_attempted,
+            'provider_fallback': provider_fallback,
+            'degraded_context': context.degraded_context,
+            'baseline_images_count': context.baseline_images_count,
+            'current_images_count': context.current_images_count,
+        })
+        
+        return result
+    
+    def _resolve_conversation_images(self, contents):
+        """Resolve image_path entries in conversation contents to PIL Images for Gemini."""
+        resolved = []
+        for turn in contents:
+            new_parts = []
+            for part in turn['parts']:
+                if 'image_path' in part:
+                    path = part['image_path']
+                    if os.path.exists(path):
+                        img = Image.open(path)
+                        img.load()
+                        new_parts.append(img)
+                    else:
+                        logger.warning(f"Image not found, skipping: {path}")
+                elif 'text' in part:
+                    new_parts.append(part['text'])
+                else:
+                    new_parts.append(part)
+            resolved.append({'role': turn['role'], 'parts': new_parts})
+        return resolved
+    
+    def _resolve_ref_image_paths(self, image_paths):
+        """Resolve image path strings to PIL Image objects for legacy mode."""
+        images = []
+        for path in image_paths:
+            if os.path.exists(path):
+                img = Image.open(path)
+                img.load()
+                images.append(img)
+            else:
+                logger.warning(f"Legacy ref image not found, skipping: {path}")
+        return images
+    
     def parse_description_to_outline(self, project_context: ProjectContext, language='zh') -> List[Dict]:
         """
         从描述文本解析出大纲结构
