@@ -1288,6 +1288,12 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
                             image, project_id, page_id, file_service, page_obj=page_obj
                         )
 
+                        # Persist first-pass prompt snapshot (write-once)
+                        if not page_obj.restyle_base_prompt_snapshot:
+                            page_obj.restyle_base_prompt_snapshot = prompt
+                            db.session.commit()
+                            logger.info(f"📝 Snapshot persisted for page {page_id}")
+
                         logger.info(f"✅ Restyle page {page_index}/{total_pages} completed in {elapsed:.1f}s → {image_path} ({image.size[0]}x{image.size[1]})")
                         return (page_id, image_path, None)
 

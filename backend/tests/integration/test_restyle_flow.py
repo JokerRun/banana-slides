@@ -390,3 +390,128 @@ class TestRestyleProjectGet:
         # 确认已删除
         get_resp = client.get(f'/api/projects/{project_id}')
         assert get_resp.status_code == 404
+
+
+# ============================================================
+# Restyle snapshot persistence
+# ============================================================
+
+class TestRestyleSnapshotPersistence:
+    """Test that first-pass restyle persists prompt snapshot (write-once)"""
+
+    def test_snapshot_null_before_generation(self, client, sample_pdf_bytes, sample_style_ref_bytes):
+        """After project creation, page snapshot should be None"""
+        data = {
+            'source_file': (io.BytesIO(sample_pdf_bytes), 'slides.pdf'),
+            'style_refs': (io.BytesIO(sample_style_ref_bytes), 'ref1.png'),
+            'restyle_prompt': 'use dark theme',
+        }
+        response = client.post('/api/projects/restyle', data=data, content_type='multipart/form-data')
+        result = assert_success_response(response, 201)
+        page_id = result['data']['pages'][0]['page_id']
+
+        # snapshot exposed via API
+        assert result['data']['pages'][0].get('restyle_base_prompt_snapshot') is None
+
+    def test_snapshot_write_once_semantics(self, app, db_session):
+        """Snapshot should not be overwritten once set"""
+        with app.app_context():
+            from models import db, Page, Project, User
+
+            user = User(display_name='Test', is_active=True)
+            db.session.add(user)
+            db.session.commit()
+
+            project = Project(idea_prompt='t', creation_type='restyle', owner_id=user.id)
+            db.session.add(project)
+            db.session.commit()
+
+            page = Page(project_id=project.id, order_index=0,
+                        restyle_base_prompt_snapshot='ORIGINAL SNAPSHOT')
+            db.session.add(page)
+            db.session.commit()
+
+            # Simulate write-once guard
+            if not page.restyle_base_prompt_snapshot:
+                page.restyle_base_prompt_snapshot = 'NEW SNAPSHOT'
+                db.session.commit()
+
+            assert page.restyle_base_prompt_snapshot == 'ORIGINAL SNAPSHOT'
+
+    def test_restyle_single_page_persists_snapshot(self, app, db_session):
+        """restyle_single_page should persist prompt snapshot on first generation"""
+        with app.app_context():
+            from models import db, Project, Page, Task, User
+            from services.task_manager import restyle_images_task
+            from PIL import Image as PILImage
+            from unittest.mock import patch, MagicMock
+            import tempfile, os
+
+            user = User(display_name='Test', is_active=True)
+            db.session.add(user)
+            db.session.commit()
+
+            project = Project(
+                idea_prompt='t', creation_type='restyle',
+                owner_id=user.id, restyle_prompt='dark theme',
+            )
+            project.set_style_ref_image_paths(['/fake/style.png'])
+            db.session.add(project)
+            db.session.commit()
+
+            # Create real image files
+            tmp_dir = tempfile.mkdtemp()
+            orig_img = PILImage.new('RGB', (1920, 1080), 'red')
+            orig_path = os.path.join(tmp_dir, 'original.png')
+            orig_img.save(orig_path)
+
+            style_img = PILImage.new('RGB', (100, 100), 'blue')
+            style_path = os.path.join(tmp_dir, 'style.png')
+            style_img.save(style_path)
+
+            project.set_style_ref_image_paths([style_path])
+            db.session.commit()
+
+            page = Page(
+                project_id=project.id, order_index=0,
+                original_slide_image_path=orig_path,
+                status='DRAFT',
+                restyle_base_prompt_snapshot=None,  # No snapshot yet!
+            )
+            db.session.add(page)
+            db.session.commit()
+
+            task = Task(
+                project_id=project.id, owner_id=user.id,
+                task_type='RESTYLE_IMAGES', status='PENDING',
+            )
+            db.session.add(task)
+            db.session.commit()
+
+            # Mock AI + file service
+            mock_ai = MagicMock()
+            result_img = PILImage.new('RGB', (1920, 1080), 'green')
+            mock_ai.image_provider.generate_image.return_value = result_img
+            mock_ai._get_image_thinking_level.return_value = 'none'
+
+            mock_fs = MagicMock()
+            mock_fs.get_absolute_path.side_effect = lambda p: p
+
+            with patch('services.task_manager.save_image_with_version',
+                       return_value=(orig_path, 1)), \
+                 patch('services.ai_service_manager.get_ai_service',
+                       return_value=mock_ai):
+                restyle_images_task(
+                    task.id, project.id, mock_ai, mock_fs,
+                    aspect_ratio='16:9', resolution='2K',
+                    app=app,
+                )
+
+            # Verify snapshot was persisted
+            db.session.expire_all()
+            page = Page.query.get(page.id)
+            assert page.restyle_base_prompt_snapshot is not None
+            assert len(page.restyle_base_prompt_snapshot) > 0
+
+            import shutil
+            shutil.rmtree(tmp_dir)

@@ -469,3 +469,78 @@ class TestAIServiceRestyleEdit:
             # Only text should remain, missing image skipped
             assert len(resolved[0]['parts']) == 1
             assert resolved[0]['parts'][0] == 'hello'
+
+
+class TestRestyleEditBackwardCompat:
+    """Test that old restyle projects without snapshot can still be edited."""
+
+    def test_restyle_edit_no_snapshot_uses_degrade(self, app, db_session):
+        """Page without snapshot should still be editable via degrade path."""
+        with app.app_context():
+            from models import db, Project, Page, Task, User
+            from services.task_manager import edit_page_image_task
+            from PIL import Image
+            import tempfile, os
+            from unittest.mock import patch, MagicMock
+
+            user = User(display_name='Test', is_active=True)
+            db.session.add(user)
+            db.session.commit()
+
+            project = Project(
+                idea_prompt='t', creation_type='restyle',
+                owner_id=user.id, restyle_prompt='dark theme',
+            )
+            db.session.add(project)
+            db.session.commit()
+
+            tmp_dir = tempfile.mkdtemp()
+            orig_img = Image.new('RGB', (100, 100), 'red')
+            orig_path = os.path.join(tmp_dir, 'original.png')
+            orig_img.save(orig_path)
+
+            cur_img = Image.new('RGB', (100, 100), 'blue')
+            cur_path = os.path.join(tmp_dir, 'current.png')
+            cur_img.save(cur_path)
+
+            page = Page(
+                project_id=project.id, order_index=0,
+                original_slide_image_path=orig_path,
+                generated_image_path=cur_path,
+                status='COMPLETED',
+                restyle_base_prompt_snapshot=None,  # No snapshot!
+            )
+            db.session.add(page)
+            db.session.commit()
+
+            task = Task(
+                project_id=project.id, owner_id=user.id,
+                task_type='EDIT_PAGE_IMAGE', status='PENDING',
+            )
+            db.session.add(task)
+            db.session.commit()
+
+            mock_ai = MagicMock()
+            result_img = Image.new('RGB', (1920, 1080), 'green')
+            mock_ai.edit_restyle_image_with_context.return_value = result_img
+
+            mock_fs = MagicMock()
+            mock_fs.get_absolute_path.side_effect = lambda p: p
+
+            with patch('services.task_manager.save_image_with_version',
+                       return_value=(cur_path, 2)):
+                edit_page_image_task(
+                    task.id, project.id, page.id,
+                    'brighten it', mock_ai, mock_fs,
+                    '16:9', '2K', None, None, None, app
+                )
+
+            # Should succeed even without snapshot
+            mock_ai.edit_restyle_image_with_context.assert_called_once()
+            # Verify the context was degraded
+            call_args = mock_ai.edit_restyle_image_with_context.call_args
+            ctx = call_args[0][0]
+            assert ctx.degraded_context is True
+
+            import shutil
+            shutil.rmtree(tmp_dir)
