@@ -33,7 +33,7 @@
 !template*.png
 
 # 忽略临时文档，但保留项目文档
-*.md
+!.agents/**/*.md
 !README.md
 !docs/**/*.md
 !.github/**/*.md
@@ -55,9 +55,11 @@ uploads/
 *.orig
 # 本地备份目录（保存测试文件等）
 _local_backup/
-!CLA.md 
+!CLA.md
 !CONTRIBUTING.md
 
 .idea/
 .venv
 .worktrees/
+*.zip
+.agents/references/md.md
