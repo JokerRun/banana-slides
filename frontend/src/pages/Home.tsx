@@ -5,7 +5,7 @@ import { Sparkles, FileText, FileEdit, ImagePlus, Paperclip, Palette, Lightbulb,
 import { Button, Textarea, Card, useToast, MaterialGeneratorModal, MaterialCenterModal, ReferenceFileList, ReferenceFileSelector, FilePreviewModal, HelpModal, Footer, GithubRepoCard } from '@/components/shared';
 import { MarkdownTextarea, type MarkdownTextareaRef } from '@/components/shared/MarkdownTextarea';
 import { TemplateSelector, getTemplateFile } from '@/components/shared/TemplateSelector';
-import { listUserTemplates, type UserTemplate, uploadReferenceFile, type ReferenceFile, associateFileToProject, triggerFileParse, associateMaterialsToProject, createRestyleProject, logoutAuth } from '@/api/endpoints';
+import { getAuthMe, listUserTemplates, type UserTemplate, uploadReferenceFile, type ReferenceFile, associateFileToProject, triggerFileParse, associateMaterialsToProject, createRestyleProject, logoutAuth } from '@/api/endpoints';
 import { useProjectStore } from '@/store/useProjectStore';
 import { useTheme } from '@/hooks/useTheme';
 import { useImagePaste } from '@/hooks/useImagePaste';
@@ -20,7 +20,7 @@ const homeI18n = {
   zh: {
     nav: {
       materialGenerate: '素材生成', materialCenter: '素材中心',
-      history: '历史项目', help: '帮助', logout: '退出登录'
+      history: '历史项目', help: '帮助', logout: '退出登录', loggedIn: '已登录：{{name}}'
     },
     settings: {
       language: { label: '界面语言' },
@@ -135,7 +135,7 @@ const homeI18n = {
   en: {
     nav: {
       materialGenerate: 'Generate Material', materialCenter: 'Material Center',
-      history: 'History', help: 'Help', logout: 'Logout'
+      history: 'History', help: 'Help', logout: 'Logout', loggedIn: 'Signed in: {{name}}'
     },
     settings: {
       language: { label: 'Interface Language' },
@@ -281,6 +281,7 @@ export const Home: React.FC = () => {
   const [restylePrompt, setRestylePrompt] = useState('');
   const [isApplyingRestylePreset, setIsApplyingRestylePreset] = useState(false);
   const [isRestyleSubmitting, setIsRestyleSubmitting] = useState(false);
+  const [authUserName, setAuthUserName] = useState('');
   const restyleSourceInputRef = useRef<HTMLInputElement>(null);
   const restyleStyleRefInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -302,7 +303,27 @@ export const Home: React.FC = () => {
         console.error('加载用户模板失败:', error);
       }
     };
+
+    const loadAuthUser = async () => {
+      try {
+        const response = await getAuthMe();
+        const user = response.data?.user;
+        const displayName = user?.display_name?.trim();
+        if (displayName) {
+          setAuthUserName(displayName);
+          return;
+        }
+
+        if (user?.id) {
+          setAuthUserName(`User-${user.id.slice(0, 6)}`);
+        }
+      } catch (error) {
+        console.error('加载登录用户失败:', error);
+      }
+    };
+
     loadTemplates();
+    loadAuthUser();
   }, []);
 
   // 首次访问自动弹出帮助模态框
@@ -902,6 +923,15 @@ export const Home: React.FC = () => {
             <GithubRepoCard />
             {/* 分隔线 */}
             <div className="h-5 w-px bg-gray-300 dark:bg-border-primary mx-1" />
+            {/* 登录态 */}
+            {authUserName && (
+              <span
+                className="hidden md:inline-flex items-center max-w-[180px] truncate px-2 py-1 text-xs text-gray-600 dark:text-foreground-tertiary bg-gray-50 dark:bg-background-elevated border border-gray-200 dark:border-border-primary rounded-md"
+                title={t('nav.loggedIn', { name: authUserName })}
+              >
+                {t('nav.loggedIn', { name: authUserName })}
+              </span>
+            )}
             {/* 退出登录 */}
             <button
               onClick={async () => {
