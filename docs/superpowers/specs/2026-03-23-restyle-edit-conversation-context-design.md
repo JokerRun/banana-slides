@@ -77,6 +77,9 @@ Write rules:
 
 ## 8.1 Conversation Envelope (Gemini `contents[]`)
 
+The backend builds a provider-agnostic conversation-context object first.
+Gemini provider is the first adapter that serializes it to the `contents[]` wire format below.
+
 For restyle edit, build multi-turn content with strict ordering:
 
 1. Turn 1 (`user`, text): baseline instruction block
@@ -85,7 +88,7 @@ For restyle edit, build multi-turn content with strict ordering:
      - project-level `restyle_prompt` (if exists),
      - page-level `restyle_base_prompt_snapshot`.
 2. Turn 2 (`user`, image parts): baseline images
-   - `original slide` + all `original style refs`.
+   - `original slide` + original style refs (prefer all; under budget pressure keep as many as possible while preserving at least one style ref when refs exist).
 3. Turn 3 (`model`, image part): current selected slide version
    - Encodes “this is the previous output state to modify”.
 4. Turn 4 (`user`, text + optional images): current delta instruction
@@ -146,7 +149,7 @@ In page edit flow:
 2. collect baseline context from project/page fields,
 3. collect mutable context from current request,
 4. build conversation contents,
-5. call image provider with conversation payload,
+5. call image provider with provider-agnostic conversation payload (Gemini adapter uses native `contents[]`; unsupported adapters use legacy path),
 6. save output with existing versioning pipeline.
 
 Non-restyle path remains unchanged.
@@ -154,6 +157,7 @@ Non-restyle path remains unchanged.
 ## 9.3 Provider Capability And Retry Semantics
 
 1. Capability source: image provider interface exposes `supports_conversation_contents` (static per provider/model config for a process lifecycle).
+2. Current rollout scope: Gemini adapter sets `supports_conversation_contents=true`; other adapters default to `false` unless explicitly implemented.
 2. Conversation mode is attempted only when:
    - project is `restyle`, and
    - provider reports `supports_conversation_contents=true`.
@@ -164,17 +168,22 @@ Non-restyle path remains unchanged.
 
 To avoid runaway payload size and latency:
 
-1. Define `RESTYLE_EDIT_MAX_IMAGES` with default `6`; this cap is mandatory and applies to both conversation mode and legacy flattened mode.
-2. Conversation mode pruning rules:
-   - if both structural sources are available, both are non-prunable anchors: `original slide` and `current selected version`,
-   - if only one structural source is available, that single source is non-prunable and request enters degrade mode,
-   - keep at least one style ref if any style refs exist,
-   - keep latest current extra ref if any current extras exist,
-   - then prune remaining style refs from tail,
-   - then prune remaining current extra refs from oldest-first.
-3. Legacy flattened mode uses the same cap and same keep/prune priorities.
-4. If both structural sources are unavailable due to missing files, fail per Section 11.2.
-5. text trimming priority:
+1. Define `RESTYLE_EDIT_MAX_PRUNABLE_IMAGES` with default `6`; this cap applies to prunable refs only (`style refs` + `current extra refs`).
+2. Define `RESTYLE_EDIT_MAX_TOTAL_IMAGES` with default `8`; this cap applies to the final assembled image set (anchors + prunable refs).
+3. Structural anchors are outside the prunable cap and are always retained when available:
+   - `original slide`,
+   - `current selected version`.
+4. Effective total cap per request is `min(RESTYLE_EDIT_MAX_TOTAL_IMAGES, provider.max_images_per_request if exposed else RESTYLE_EDIT_MAX_TOTAL_IMAGES)`.
+5. Deterministic pruning algorithm:
+   - keep structural anchors first,
+   - reserve at least one style-ref slot if style refs exist,
+   - add remaining style refs in source order until prunable budget is exhausted,
+   - if prunable budget remains, add current extra refs newest-first,
+   - if no prunable budget remains after style-ref reservation, current extra refs are dropped entirely.
+6. If assembled set still exceeds effective total cap after pruning, fail fast with recoverable error `CONTEXT_IMAGE_LIMIT_EXCEEDED` (no blind provider call).
+7. Legacy flattened mode uses exactly the same selected image set and same selection algorithm.
+8. If both structural sources are unavailable due to missing files, fail per Section 11.2.
+9. text trimming priority:
    - keep `restyle_base_prompt_snapshot` intact first,
    - trim secondary explanatory text blocks,
    - never remove current `edit_instruction`.
@@ -184,7 +193,12 @@ To avoid runaway payload size and latency:
 ## 11.1 Missing Baseline Snapshot
 
 If `restyle_base_prompt_snapshot` is null:
-1. reconstruct baseline prompt by calling the same first-pass prompt builder contract (`get_restyle_prompt(page_index, total_pages, num_style_refs, custom_prompt)`), using current persisted arguments,
+1. reconstruct baseline prompt by calling the same first-pass prompt builder contract (`get_restyle_prompt(page_index, total_pages, num_style_refs, custom_prompt)`), using best-effort current metadata,
+2. reconstruction argument sources are fixed:
+   - `page_index = page.order_index + 1`,
+   - `total_pages = count(project.pages)`,
+   - `num_style_refs = max(1, len(project.style_ref_image_paths))` (fallback keeps `IMAGE 1/IMAGE 2` label contract in prompt template even when refs are currently missing),
+   - `custom_prompt = project.restyle_prompt or ""`,
 2. byte-for-byte equivalence with historical first-pass prompt is not required,
 3. mark `degraded_context=true` in logs,
 4. continue request (no hard fail).
@@ -215,6 +229,7 @@ Add structured logging fields in restyle edit generation path:
 4. `degraded_context`
 5. `provider_fallback`
 6. `snapshot_present`
+7. `conversation_attempted`
 
 These fields are required to diagnose drift and fallback frequency.
 
@@ -245,13 +260,17 @@ These fields are required to diagnose drift and fallback frequency.
 
 ## 14. Acceptance Criteria
 
+Eligible-call definition for this section:
+1. project type is `restyle`,
+2. at least one structural source image is available,
+3. provider reports `supports_conversation_contents=true`.
+
 1. For restyle edits, each request includes immutable baseline context and mutable current context by protocol.
 2. Snapshot field is persisted for newly generated restyle pages.
 3. Old restyle projects without snapshot remain editable via degrade path.
 4. Non-restyle edit flow has no behavior regression.
-5. In QA runs covering at least 3 restyle slides × 5 sequential edits each, conversation-mode requests are observed in logs for all eligible calls (`context_mode=restyle_conversation` unless fallback/degrade is triggered).
-6. In the same QA runs, no more than 1 of 15 outputs is marked as style drift by both reviewers using this rubric: at least 2 of 3 conditions hold (`palette mismatch`, `typography language mismatch`, `decorative/layout language mismatch`) versus original slide/style refs baseline.
-7. Logs provide enough evidence to verify context mode and fallback/degrade conditions.
+5. In QA runs covering at least 3 restyle slides × 5 sequential edits each, every eligible call logs `conversation_attempted=true` and first-attempt mode `context_mode=restyle_conversation`; fallback completions must log `provider_fallback=true`.
+6. Logs provide enough evidence to verify context mode and fallback/degrade conditions.
 
 ## 15. Risks And Mitigations
 
@@ -267,4 +286,5 @@ These fields are required to diagnose drift and fallback frequency.
 1. Phase R1: schema + snapshot persistence in first-pass restyle generation.
 2. Phase R2: restyle edit conversation builder + provider interface extension.
 3. Phase R3: fallback path + logging + tests.
-4. Phase R4: manual QA for multi-round drift and production observation.
+4. Phase R4: manual QA for multi-round drift and production observation (non-blocking quality metric):
+   - In 3 restyle slides × 5 sequential edits, target no more than 1/15 outputs marked as style drift by both reviewers using rubric (at least 2 of 3: `palette mismatch`, `typography language mismatch`, `decorative/layout language mismatch`) versus original baseline.
