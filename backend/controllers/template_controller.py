@@ -4,7 +4,7 @@ Template Controller - handles template-related endpoints
 import logging
 from flask import Blueprint, request, current_app
 from models import db, Project, UserTemplate
-from utils import success_response, error_response, not_found, bad_request, allowed_file
+from utils import success_response, error_response, not_found, bad_request, allowed_file, get_current_user_id, require_auth_response
 from services import FileService
 from datetime import datetime
 
@@ -12,6 +12,16 @@ logger = logging.getLogger(__name__)
 
 template_bp = Blueprint('templates', __name__, url_prefix='/api/projects')
 user_template_bp = Blueprint('user_templates', __name__, url_prefix='/api/user-templates')
+
+
+@template_bp.before_request
+def _template_auth_guard():
+    return require_auth_response()
+
+
+@user_template_bp.before_request
+def _user_template_auth_guard():
+    return require_auth_response()
 
 
 @template_bp.route('/<project_id>/template', methods=['POST'])
@@ -23,7 +33,7 @@ def upload_template(project_id):
     Form: template_image=@file.png
     """
     try:
-        project = Project.query.get(project_id)
+        project = Project.query.filter_by(id=project_id, owner_id=get_current_user_id()).first()
         
         if not project:
             return not_found('Project')
@@ -66,7 +76,7 @@ def delete_template(project_id):
     DELETE /api/projects/{project_id}/template - Delete template
     """
     try:
-        project = Project.query.get(project_id)
+        project = Project.query.filter_by(id=project_id, owner_id=get_current_user_id()).first()
         
         if not project:
             return not_found('Project')
@@ -153,6 +163,7 @@ def upload_user_template():
         # Create template record with file_path already set
         template = UserTemplate(
             id=template_id,
+            owner_id=get_current_user_id(),
             name=name,
             file_path=file_path,
             thumb_path=thumb_path,
@@ -181,7 +192,7 @@ def list_user_templates():
     GET /api/user-templates - Get list of user templates
     """
     try:
-        templates = UserTemplate.query.order_by(UserTemplate.created_at.desc()).all()
+        templates = UserTemplate.query.filter_by(owner_id=get_current_user_id()).order_by(UserTemplate.created_at.desc()).all()
         
         return success_response({
             'templates': [template.to_dict() for template in templates]
@@ -197,7 +208,7 @@ def delete_user_template(template_id):
     DELETE /api/user-templates/{template_id} - Delete user template
     """
     try:
-        template = UserTemplate.query.get(template_id)
+        template = UserTemplate.query.filter_by(id=template_id, owner_id=get_current_user_id()).first()
         
         if not template:
             return not_found('UserTemplate')
@@ -215,4 +226,3 @@ def delete_user_template(template_id):
     except Exception as e:
         db.session.rollback()
         return error_response('SERVER_ERROR', str(e), 500)
-

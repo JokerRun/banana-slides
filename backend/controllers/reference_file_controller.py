@@ -15,11 +15,17 @@ import threading
 
 from models import db, ReferenceFile, Project
 from utils.response import success_response, error_response, bad_request, not_found
+from utils.auth import get_current_user_id, require_auth_response
 from services.file_parser_service import FileParserService
 
 logger = logging.getLogger(__name__)
 
 reference_file_bp = Blueprint('reference_file', __name__)
+
+
+@reference_file_bp.before_request
+def _reference_auth_guard():
+    return require_auth_response()
 
 
 def _allowed_file(filename: str, allowed_extensions: set) -> bool:
@@ -74,6 +80,7 @@ def _parse_file_async(file_id: str, file_path: str, filename: str, app):
             
             # Update database
             reference_file.mineru_batch_id = batch_id
+            reference_file.mineru_extract_id = extract_id
             if error_message:
                 reference_file.parse_status = 'failed'
                 reference_file.error_message = error_message
@@ -153,7 +160,7 @@ def upload_reference_file():
             project_id = None
         else:
             # Verify project exists
-            project = Project.query.get(project_id)
+            project = Project.query.filter_by(id=project_id, owner_id=get_current_user_id()).first()
             if not project:
                 return not_found('Project')
         
@@ -187,6 +194,7 @@ def upload_reference_file():
         
         # Create database record
         reference_file = ReferenceFile(
+            owner_id=get_current_user_id(),
             project_id=project_id,
             filename=original_filename,
             file_path=str(file_path.relative_to(upload_folder)),
@@ -219,7 +227,7 @@ def get_reference_file(file_id):
         Reference file information including parse status
     """
     try:
-        reference_file = ReferenceFile.query.get(file_id)
+        reference_file = ReferenceFile.query.filter_by(id=file_id, owner_id=get_current_user_id()).first()
         if not reference_file:
             return not_found('Reference file')
         
@@ -240,7 +248,7 @@ def delete_reference_file(file_id):
         Success message
     """
     try:
-        reference_file = ReferenceFile.query.get(file_id)
+        reference_file = ReferenceFile.query.filter_by(id=file_id, owner_id=get_current_user_id()).first()
         if not reference_file:
             return not_found('Reference file')
         
@@ -283,17 +291,17 @@ def list_project_reference_files(project_id):
     try:
         # Special case: 'all' means list all files
         if project_id == 'all':
-            reference_files = ReferenceFile.query.all()
+            reference_files = ReferenceFile.query.filter_by(owner_id=get_current_user_id()).all()
         # Special case: 'global' or 'none' means list global files (not associated with any project)
         elif project_id in ['global', 'none']:
-            reference_files = ReferenceFile.query.filter_by(project_id=None).all()
+            reference_files = ReferenceFile.query.filter_by(project_id=None, owner_id=get_current_user_id()).all()
         else:
             # Verify project exists
-            project = Project.query.get(project_id)
+            project = Project.query.filter_by(id=project_id, owner_id=get_current_user_id()).first()
             if not project:
                 return not_found('Project')
             
-            reference_files = ReferenceFile.query.filter_by(project_id=project_id).all()
+            reference_files = ReferenceFile.query.filter_by(project_id=project_id, owner_id=get_current_user_id()).all()
         
         # 列表查询时不包含 markdown_content 和失败计数，加快响应速度
         return success_response({
@@ -314,7 +322,7 @@ def trigger_file_parse(file_id):
         Updated reference file information
     """
     try:
-        reference_file = ReferenceFile.query.get(file_id)
+        reference_file = ReferenceFile.query.filter_by(id=file_id, owner_id=get_current_user_id()).first()
         if not reference_file:
             return not_found('Reference file')
         
@@ -332,6 +340,7 @@ def trigger_file_parse(file_id):
             # 清空之前的解析结果，以便重新解析
             reference_file.markdown_content = None
             reference_file.mineru_batch_id = None
+            reference_file.mineru_extract_id = None
             db.session.commit()
         
         # 获取文件路径
@@ -375,7 +384,7 @@ def associate_file_to_project(file_id):
         Updated reference file information
     """
     try:
-        reference_file = ReferenceFile.query.get(file_id)
+        reference_file = ReferenceFile.query.filter_by(id=file_id, owner_id=get_current_user_id()).first()
         if not reference_file:
             return not_found('Reference file')
         
@@ -386,7 +395,7 @@ def associate_file_to_project(file_id):
             return bad_request("project_id is required")
         
         # Verify project exists
-        project = Project.query.get(project_id)
+        project = Project.query.filter_by(id=project_id, owner_id=get_current_user_id()).first()
         if not project:
             return not_found('Project')
         
@@ -416,7 +425,7 @@ def dissociate_file_from_project(file_id):
         Updated reference file information
     """
     try:
-        reference_file = ReferenceFile.query.get(file_id)
+        reference_file = ReferenceFile.query.filter_by(id=file_id, owner_id=get_current_user_id()).first()
         if not reference_file:
             return not_found('Reference file')
         
@@ -432,4 +441,3 @@ def dissociate_file_from_project(file_id):
     except Exception as e:
         logger.error(f"Error dissociating reference file: {str(e)}", exc_info=True)
         return error_response('SERVER_ERROR', str(e), 500)
-

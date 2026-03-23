@@ -169,7 +169,10 @@ No longer restricted by complex menu buttons; issue modification commands direct
 
 5. **Why is the API Key not taking effect after setting it in .env?**
     - After editing `.env` during runtime, you must restart the Docker container to apply the changes.
-    - If you have configured parameters in the web settings page, they will override the parameters in `.env`. You can restore the `.env` settings by clicking "Restore Default Settings."
+
+6. **Where is the settings page? Why can't I find it?**
+    - The current version uses env-only configuration mode, and the frontend settings page has been removed.
+    - All global configuration must be changed via `.env` / deployment secrets, then applied by restarting the service.
 
 ## 🗺️ Roadmap
 

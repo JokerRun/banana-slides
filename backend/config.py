@@ -78,8 +78,8 @@ class Config:
     MAX_IMAGE_WORKERS = int(os.getenv('MAX_IMAGE_WORKERS', '8'))
     
     # 图片生成配置
-    DEFAULT_ASPECT_RATIO = "16:9"
-    DEFAULT_RESOLUTION = "2K"
+    DEFAULT_ASPECT_RATIO = os.getenv('DEFAULT_ASPECT_RATIO', '16:9')
+    DEFAULT_RESOLUTION = os.getenv('DEFAULT_RESOLUTION', '2K')
     
     # 日志配置
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
@@ -111,6 +111,30 @@ class Config:
 
     # 百度 API 配置（用于 OCR 和图像修复）
     BAIDU_OCR_API_KEY = os.getenv('BAIDU_OCR_API_KEY', '')
+
+    # Frontend URL (used for OAuth callback redirects in dev where ports differ)
+    FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
+
+    # OAuth providers
+    GITHUB_CLIENT_ID = os.getenv('GITHUB_CLIENT_ID', '')
+    GITHUB_CLIENT_SECRET = os.getenv('GITHUB_CLIENT_SECRET', '')
+    GITHUB_REDIRECT_URI = os.getenv('GITHUB_REDIRECT_URI', '')
+
+    AZURE_CLIENT_ID = os.getenv('AZURE_CLIENT_ID', '')
+    AZURE_CLIENT_SECRET = os.getenv('AZURE_CLIENT_SECRET', '')
+    AZURE_AUTH_URL = os.getenv(
+        'AZURE_AUTH_URL',
+        'https://login.partner.microsoftonline.cn/common/oauth2/v2.0/authorize',
+    )
+    AZURE_TOKEN_URL = os.getenv(
+        'AZURE_TOKEN_URL',
+        'https://login.partner.microsoftonline.cn/common/oauth2/v2.0/token',
+    )
+    AZURE_USER_INFO_URL = os.getenv(
+        'AZURE_USER_INFO_URL',
+        'https://microsoftgraph.chinacloudapi.cn/v1.0/me',
+    )
+    AZURE_REDIRECT_URI = os.getenv('AZURE_REDIRECT_URI', '')
 
 
 class DevelopmentConfig(Config):

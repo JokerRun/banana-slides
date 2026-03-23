@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Sparkles, FileText, FileEdit, ImagePlus, Paperclip, Palette, Lightbulb, Search, Settings, FolderOpen, HelpCircle, Sun, Moon, Globe, Monitor, ChevronDown, RefreshCw, Upload } from 'lucide-react';
+import { Sparkles, FileText, FileEdit, ImagePlus, Paperclip, Palette, Lightbulb, Search, FolderOpen, HelpCircle, Sun, Moon, Globe, Monitor, ChevronDown, RefreshCw, Upload, LogOut } from 'lucide-react';
 import { Button, Textarea, Card, useToast, MaterialGeneratorModal, MaterialCenterModal, ReferenceFileList, ReferenceFileSelector, FilePreviewModal, HelpModal, Footer, GithubRepoCard } from '@/components/shared';
 import { MarkdownTextarea, type MarkdownTextareaRef } from '@/components/shared/MarkdownTextarea';
 import { TemplateSelector, getTemplateFile } from '@/components/shared/TemplateSelector';
-import { listUserTemplates, type UserTemplate, uploadReferenceFile, type ReferenceFile, associateFileToProject, triggerFileParse, associateMaterialsToProject, createRestyleProject } from '@/api/endpoints';
+import { getAuthMe, listUserTemplates, type UserTemplate, uploadReferenceFile, type ReferenceFile, associateFileToProject, triggerFileParse, associateMaterialsToProject, createRestyleProject, logoutAuth } from '@/api/endpoints';
 import { useProjectStore } from '@/store/useProjectStore';
 import { useTheme } from '@/hooks/useTheme';
 import { useImagePaste } from '@/hooks/useImagePaste';
@@ -20,7 +20,7 @@ const homeI18n = {
   zh: {
     nav: {
       materialGenerate: '素材生成', materialCenter: '素材中心',
-      history: '历史项目', settings: '设置', help: '帮助'
+      history: '历史项目', help: '帮助', logout: '退出登录', loggedIn: '已登录：{{name}}'
     },
     settings: {
       language: { label: '界面语言' },
@@ -123,7 +123,6 @@ const homeI18n = {
         pptTip: '提示：建议将PPT转换为PDF格式上传，可获得更好的解析效果',
         filesAdded: '已添加 {{count}} 个参考文件',
         imageRemoved: '已移除图片',
-        serviceTestTip: '建议先到设置页底部进行服务测试，避免后续功能异常',
         restyleSourceRequired: '请上传 PPT/PDF 源文件',
         restyleStyleRefRequired: '请至少上传一张风格参考图',
         restylePresetApplied: '预制模板已应用（包含 prompt + 参照图）',
@@ -136,7 +135,7 @@ const homeI18n = {
   en: {
     nav: {
       materialGenerate: 'Generate Material', materialCenter: 'Material Center',
-      history: 'History', settings: 'Settings', help: 'Help'
+      history: 'History', help: 'Help', logout: 'Logout', loggedIn: 'Signed in: {{name}}'
     },
     settings: {
       language: { label: 'Interface Language' },
@@ -239,7 +238,6 @@ const homeI18n = {
         pptTip: 'Tip: Convert PPT to PDF for better parsing results',
         filesAdded: 'Added {{count}} reference file(s)',
         imageRemoved: 'Image removed',
-        serviceTestTip: 'Test services in Settings first to avoid issues',
         restyleSourceRequired: 'Please upload a PPT/PDF source file',
         restyleStyleRefRequired: 'At least one style reference image is required',
         restylePresetApplied: 'Preset applied (prompt + style reference image)',
@@ -283,6 +281,7 @@ export const Home: React.FC = () => {
   const [restylePrompt, setRestylePrompt] = useState('');
   const [isApplyingRestylePreset, setIsApplyingRestylePreset] = useState(false);
   const [isRestyleSubmitting, setIsRestyleSubmitting] = useState(false);
+  const [authUserName, setAuthUserName] = useState('');
   const restyleSourceInputRef = useRef<HTMLInputElement>(null);
   const restyleStyleRefInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -304,7 +303,27 @@ export const Home: React.FC = () => {
         console.error('加载用户模板失败:', error);
       }
     };
+
+    const loadAuthUser = async () => {
+      try {
+        const response = await getAuthMe();
+        const user = response.data?.user;
+        const displayName = user?.display_name?.trim();
+        if (displayName) {
+          setAuthUserName(displayName);
+          return;
+        }
+
+        if (user?.id) {
+          setAuthUserName(`User-${user.id.slice(0, 6)}`);
+        }
+      } catch (error) {
+        console.error('加载登录用户失败:', error);
+      }
+    };
+
     loadTemplates();
+    loadAuthUser();
   }, []);
 
   // 首次访问自动弹出帮助模态框
@@ -833,15 +852,6 @@ export const Home: React.FC = () => {
             <Button
               variant="ghost"
               size="sm"
-              icon={<Settings size={16} className="md:w-[18px] md:h-[18px]" />}
-              onClick={() => navigate('/settings')}
-              className="text-xs md:text-sm hover:bg-banana-100/60 hover:shadow-sm hover:scale-105 transition-all duration-200 font-medium"
-            >
-              <span className="hidden md:inline">{t('nav.settings')}</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
               onClick={() => setIsHelpModalOpen(true)}
               className="hidden md:inline-flex hover:bg-banana-50/50"
             >
@@ -912,6 +922,27 @@ export const Home: React.FC = () => {
             {/* GitHub 仓库卡片 */}
             <GithubRepoCard />
             {/* 分隔线 */}
+            <div className="h-5 w-px bg-gray-300 dark:bg-border-primary mx-1" />
+            {/* 登录态 */}
+            {authUserName && (
+              <span
+                className="hidden md:inline-flex items-center max-w-[180px] truncate px-2 py-1 text-xs text-gray-600 dark:text-foreground-tertiary bg-gray-50 dark:bg-background-elevated border border-gray-200 dark:border-border-primary rounded-md"
+                title={t('nav.loggedIn', { name: authUserName })}
+              >
+                {t('nav.loggedIn', { name: authUserName })}
+              </span>
+            )}
+            {/* 退出登录 */}
+            <button
+              onClick={async () => {
+                try { await logoutAuth(); } catch { /* ignore */ }
+                window.location.assign('/login');
+              }}
+              className="flex items-center gap-1 p-1.5 text-gray-600 dark:text-foreground-tertiary hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-all"
+              title={t('nav.logout')}
+            >
+              <LogOut size={16} />
+            </button>
           </div>
         </div>
       </nav>

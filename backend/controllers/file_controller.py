@@ -4,11 +4,18 @@ File Controller - handles static file serving
 from flask import Blueprint, send_from_directory, current_app
 from utils import error_response, not_found
 from utils.path_utils import find_file_with_prefix
+from utils.auth import require_auth_response, get_current_user_id
 import os
 from pathlib import Path
 from werkzeug.utils import secure_filename
+from models import Project, UserTemplate, Material, ReferenceFile
 
 file_bp = Blueprint('files', __name__, url_prefix='/files')
+
+
+@file_bp.before_request
+def _file_auth_guard():
+    return require_auth_response()
 
 
 @file_bp.route('/<project_id>/<file_type>/<path:subpath>', methods=['GET'])
@@ -24,6 +31,10 @@ def serve_file(project_id, file_type, subpath):
         subpath: File path (may include subdirectories)
     """
     try:
+        project = Project.query.filter_by(id=project_id, owner_id=get_current_user_id()).first()
+        if not project:
+            return not_found('File')
+
         if file_type not in ['template', 'pages', 'materials', 'exports', 'style_refs']:
             return not_found('File')
         
@@ -59,6 +70,10 @@ def serve_user_template(template_id, filename):
         filename: File name
     """
     try:
+        template = UserTemplate.query.filter_by(id=template_id, owner_id=get_current_user_id()).first()
+        if not template:
+            return not_found('File')
+
         # Construct file path
         file_dir = os.path.join(
             current_app.config['UPLOAD_FOLDER'],
@@ -92,6 +107,10 @@ def serve_global_material(filename):
     """
     try:
         safe_filename = secure_filename(filename)
+        material = Material.query.filter_by(filename=safe_filename, owner_id=get_current_user_id()).first()
+        if not material:
+            return not_found('File')
+
         # Construct file path
         file_dir = os.path.join(
             current_app.config['UPLOAD_FOLDER'],
@@ -124,6 +143,13 @@ def serve_mineru_file(extract_id, filepath):
         filepath: Relative file path within the extract
     """
     try:
+        reference_file = ReferenceFile.query.filter_by(
+            mineru_extract_id=extract_id,
+            owner_id=get_current_user_id(),
+        ).first()
+        if not reference_file:
+            return not_found('File')
+
         root_dir = os.path.join(current_app.config['UPLOAD_FOLDER'], 'mineru_files', extract_id)
         full_path = Path(root_dir) / filepath
 
@@ -160,4 +186,3 @@ def serve_mineru_file(extract_id, filepath):
         return not_found('File')
     except Exception as e:
         return error_response('SERVER_ERROR', str(e), 500)
-

@@ -9,7 +9,7 @@ from contextlib import contextmanager
 from flask import Blueprint, request, current_app
 from PIL import Image
 from models import db, Settings, Task
-from utils import success_response, error_response, bad_request
+from utils import success_response, error_response, bad_request, get_current_user_id, require_auth_response
 from config import Config, PROJECT_ROOT
 from services.ai_service import AIService
 from services.file_parser_service import FileParserService
@@ -22,6 +22,23 @@ logger = logging.getLogger(__name__)
 settings_bp = Blueprint(
     "settings", __name__, url_prefix="/api/settings"
 )
+
+
+@settings_bp.before_request
+def _settings_auth_guard():
+    auth_error = require_auth_response()
+    if auth_error is not None:
+        return auth_error
+    return _settings_locked_response()
+
+
+def _settings_locked_response():
+    """统一返回 env-only 模式下 settings 锁定响应。"""
+    return error_response(
+        'SETTINGS_LOCKED',
+        'This instance is env-managed. Edit .env and restart service.',
+        403,
+    )
 
 
 @contextmanager
@@ -113,301 +130,22 @@ def temporary_settings_override(settings_override: dict):
 
 @settings_bp.route("/", methods=["GET"], strict_slashes=False)
 def get_settings():
-    """
-    GET /api/settings - Get application settings
-    """
-    try:
-        settings = Settings.get_settings()
-        return success_response(settings.to_dict())
-    except Exception as e:
-        logger.error(f"Error getting settings: {str(e)}")
-        return error_response(
-            "GET_SETTINGS_ERROR",
-            f"Failed to get settings: {str(e)}",
-            500,
-        )
+    return _settings_locked_response()
 
 
 @settings_bp.route("/", methods=["PUT"], strict_slashes=False)
 def update_settings():
-    """
-    PUT /api/settings - Update application settings
-
-    Request Body:
-        {
-            "api_base_url": "https://api.example.com",
-            "api_key": "your-api-key",
-            "image_resolution": "2K",
-            "image_aspect_ratio": "16:9"
-        }
-    """
-    try:
-        data = request.get_json()
-        if not data:
-            return bad_request("Request body is required")
-
-        settings = Settings.get_settings()
-
-        # Update AI provider format configuration
-        if "ai_provider_format" in data:
-            provider_format = data["ai_provider_format"]
-            if provider_format not in ["openai", "gemini"]:
-                return bad_request("AI provider format must be 'openai' or 'gemini'")
-            settings.ai_provider_format = provider_format
-
-        # Update API configuration
-        if "api_base_url" in data:
-            raw_base_url = data["api_base_url"]
-            # Empty string from frontend means "clear override, fall back to env/default"
-            if raw_base_url is None:
-                settings.api_base_url = None
-            else:
-                value = str(raw_base_url).strip()
-                settings.api_base_url = value if value != "" else None
-
-        if "api_key" in data:
-            settings.api_key = data["api_key"]
-
-        # Update image generation configuration
-        if "image_resolution" in data:
-            resolution = data["image_resolution"]
-            if resolution not in ["1K", "2K", "4K"]:
-                return bad_request("Resolution must be 1K, 2K, or 4K")
-            settings.image_resolution = resolution
-
-        if "image_aspect_ratio" in data:
-            aspect_ratio = data["image_aspect_ratio"]
-            settings.image_aspect_ratio = aspect_ratio
-
-        # Update worker configuration
-        if "max_description_workers" in data:
-            workers = int(data["max_description_workers"])
-            if workers < 1 or workers > 20:
-                return bad_request(
-                    "Max description workers must be between 1 and 20"
-                )
-            settings.max_description_workers = workers
-
-        if "max_image_workers" in data:
-            workers = int(data["max_image_workers"])
-            if workers < 1 or workers > 20:
-                return bad_request(
-                    "Max image workers must be between 1 and 20"
-                )
-            settings.max_image_workers = workers
-
-        # Update model & MinerU configuration (optional, empty values fall back to Config)
-        if "text_model" in data:
-            settings.text_model = (data["text_model"] or "").strip() or None
-
-        if "image_model" in data:
-            settings.image_model = (data["image_model"] or "").strip() or None
-
-        if "mineru_api_base" in data:
-            settings.mineru_api_base = (data["mineru_api_base"] or "").strip() or None
-
-        if "mineru_token" in data:
-            settings.mineru_token = data["mineru_token"]
-
-        if "image_caption_model" in data:
-            settings.image_caption_model = (data["image_caption_model"] or "").strip() or None
-
-        if "output_language" in data:
-            language = data["output_language"]
-            if language in ["zh", "en", "ja", "auto"]:
-                settings.output_language = language
-            else:
-                return bad_request("Output language must be 'zh', 'en', 'ja', or 'auto'")
-
-        # Update reasoning mode configuration (separate for text and image)
-        if "enable_text_reasoning" in data:
-            settings.enable_text_reasoning = bool(data["enable_text_reasoning"])
-        
-        if "text_thinking_budget" in data:
-            budget = int(data["text_thinking_budget"])
-            if budget < 1 or budget > 8192:
-                return bad_request("Text thinking budget must be between 1 and 8192")
-            settings.text_thinking_budget = budget
-        
-        if "image_thinking_level" in data:
-            level = str(data["image_thinking_level"]).lower()
-            if level not in ('none', 'minimal', 'high'):
-                return bad_request("Image thinking level must be 'none', 'minimal', or 'high'")
-            settings.image_thinking_level = level
-
-        # Update Baidu OCR configuration
-        if "baidu_ocr_api_key" in data:
-            settings.baidu_ocr_api_key = data["baidu_ocr_api_key"] or None
-
-        settings.updated_at = datetime.now(timezone.utc)
-        db.session.commit()
-
-        # Sync to app.config
-        _sync_settings_to_config(settings)
-
-        logger.info("Settings updated successfully")
-        return success_response(
-            settings.to_dict(), "Settings updated successfully"
-        )
-
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error updating settings: {str(e)}")
-        return error_response(
-            "UPDATE_SETTINGS_ERROR",
-            f"Failed to update settings: {str(e)}",
-            500,
-        )
+    return _settings_locked_response()
 
 
 @settings_bp.route("/reset", methods=["POST"], strict_slashes=False)
 def reset_settings():
-    """
-    POST /api/settings/reset - Reset settings to default values
-    """
-    try:
-        settings = Settings.get_settings()
-
-        # Reset to default values from Config / .env
-        # Priority logic:
-        # - Check AI_PROVIDER_FORMAT
-        # - If "openai" -> use OPENAI_API_BASE / OPENAI_API_KEY
-        # - Otherwise (default "gemini") -> use GOOGLE_API_BASE / GOOGLE_API_KEY
-        settings.ai_provider_format = Config.AI_PROVIDER_FORMAT
-
-        if (Config.AI_PROVIDER_FORMAT or "").lower() == "openai":
-            default_api_base = Config.OPENAI_API_BASE or None
-            default_api_key = Config.OPENAI_API_KEY or None
-        else:
-            default_api_base = Config.GOOGLE_API_BASE or None
-            default_api_key = Config.GOOGLE_API_KEY or None
-
-        settings.api_base_url = default_api_base
-        settings.api_key = default_api_key
-        settings.text_model = Config.TEXT_MODEL
-        settings.image_model = Config.IMAGE_MODEL
-        settings.mineru_api_base = Config.MINERU_API_BASE
-        settings.mineru_token = Config.MINERU_TOKEN
-        settings.image_caption_model = Config.IMAGE_CAPTION_MODEL
-        settings.output_language = 'zh'  # 重置为默认中文
-        # 重置推理模式配置
-        settings.enable_text_reasoning = False
-        settings.text_thinking_budget = 1024
-        settings.image_thinking_level = 'none'
-        settings.baidu_ocr_api_key = Config.BAIDU_OCR_API_KEY or None
-        settings.image_resolution = Config.DEFAULT_RESOLUTION
-        settings.image_aspect_ratio = Config.DEFAULT_ASPECT_RATIO
-        settings.max_description_workers = Config.MAX_DESCRIPTION_WORKERS
-        settings.max_image_workers = Config.MAX_IMAGE_WORKERS
-        settings.updated_at = datetime.now(timezone.utc)
-
-        db.session.commit()
-
-        # Sync to app.config
-        _sync_settings_to_config(settings)
-
-        logger.info("Settings reset to defaults")
-        return success_response(
-            settings.to_dict(), "Settings reset to defaults"
-        )
-
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Error resetting settings: {str(e)}")
-        return error_response(
-            "RESET_SETTINGS_ERROR",
-            f"Failed to reset settings: {str(e)}",
-            500,
-        )
+    return _settings_locked_response()
 
 
 @settings_bp.route("/verify", methods=["POST"], strict_slashes=False)
 def verify_api_key():
-    """
-    POST /api/settings/verify - 验证API key是否可用
-    通过调用一个轻量的gemini-3-flash-preview测试请求（思考budget=0）来判断
-
-    Returns:
-        {
-            "data": {
-                "available": true/false,
-                "message": "提示信息"
-            }
-        }
-    """
-    try:
-        # 获取当前设置
-        settings = Settings.get_settings()
-        if not settings:
-            return success_response({
-                "available": False,
-                "message": "用户设置未找到"
-            })
-
-        # 准备设置覆盖字典
-        settings_override = {}
-        if settings.api_key:
-            settings_override["api_key"] = settings.api_key
-        if settings.api_base_url:
-            settings_override["api_base_url"] = settings.api_base_url
-        if settings.ai_provider_format:
-            settings_override["ai_provider_format"] = settings.ai_provider_format
-
-        # 使用上下文管理器临时应用用户配置进行验证
-        with temporary_settings_override(settings_override):
-            from services.ai_providers import get_text_provider
-
-            # 使用 gemini-3-flash-preview 模型进行验证（思考budget=0，最小开销）
-            verification_model = "gemini-3-flash-preview"
-
-            # 尝试创建provider并调用一个简单的测试请求
-            try:
-                provider = get_text_provider(model=verification_model)
-                # 调用一个简单的测试请求（思考budget=0，最小开销）
-                response = provider.generate_text("Hello", thinking_budget=0)
-
-                logger.info("API key verification successful")
-                return success_response({
-                    "available": True,
-                    "message": "API key 可用"
-                })
-
-            except ValueError as ve:
-                # API key未配置
-                logger.warning(f"API key not configured: {str(ve)}")
-                return success_response({
-                    "available": False,
-                    "message": "API key 未配置，请在设置中配置 API key 和 API Base URL"
-                })
-            except Exception as e:
-                # API调用失败（可能是key无效、余额不足等）
-                error_msg = str(e)
-                logger.warning(f"API key verification failed: {error_msg}")
-
-                # 根据错误信息判断具体原因
-                if "401" in error_msg or "unauthorized" in error_msg.lower() or "invalid" in error_msg.lower():
-                    message = "API key 无效或已过期，请在设置中检查 API key 配置"
-                elif "429" in error_msg or "quota" in error_msg.lower() or "limit" in error_msg.lower():
-                    message = "API 调用超限或余额不足，请在设置中检查配置"
-                elif "403" in error_msg or "forbidden" in error_msg.lower():
-                    message = "API 访问被拒绝，请在设置中检查 API key 权限"
-                elif "timeout" in error_msg.lower():
-                    message = "API 调用超时，请在设置中检查网络连接和 API Base URL"
-                else:
-                    message = f"API 调用失败，请在设置中检查配置: {error_msg}"
-
-                return success_response({
-                    "available": False,
-                    "message": message
-                })
-
-    except Exception as e:
-        logger.error(f"Error verifying API key: {str(e)}")
-        return error_response(
-            "VERIFY_API_KEY_ERROR",
-            f"验证 API key 时出错: {str(e)}",
-            500,
-        )
+    return _settings_locked_response()
 
 
 def _sync_settings_to_config(settings: Settings):
@@ -770,143 +508,9 @@ def _run_test_async(task_id: str, test_name: str, test_settings: dict, app):
 
 @settings_bp.route("/tests/<test_name>", methods=["POST"], strict_slashes=False)
 def run_settings_test(test_name: str):
-    """
-    POST /api/settings/tests/<test_name> - 启动异步服务测试
-
-    Request Body (optional):
-        可选的设置覆盖参数，用于测试未保存的配置
-        {
-            "api_key": "test-key",
-            "api_base_url": "https://test.api.com",
-            "text_model": "test-model",
-            ...
-        }
-
-    Returns:
-        {
-            "data": {
-                "task_id": "uuid",
-                "status": "PENDING"
-            }
-        }
-    """
-    try:
-        # 从数据库加载已保存的全局设置作为基础
-        global_settings = Settings.get_settings()
-
-        # 构建基础测试设置（使用数据库中已保存的值）
-        test_settings = {}
-        if global_settings.api_key:
-            test_settings["api_key"] = global_settings.api_key
-        if global_settings.api_base_url:
-            test_settings["api_base_url"] = global_settings.api_base_url
-        if global_settings.ai_provider_format:
-            test_settings["ai_provider_format"] = global_settings.ai_provider_format
-        if global_settings.text_model:
-            test_settings["text_model"] = global_settings.text_model
-        if global_settings.image_model:
-            test_settings["image_model"] = global_settings.image_model
-        if global_settings.image_caption_model:
-            test_settings["image_caption_model"] = global_settings.image_caption_model
-        if global_settings.mineru_api_base:
-            test_settings["mineru_api_base"] = global_settings.mineru_api_base
-        if global_settings.mineru_token:
-            test_settings["mineru_token"] = global_settings.mineru_token
-        if global_settings.baidu_ocr_api_key:
-            test_settings["baidu_ocr_api_key"] = global_settings.baidu_ocr_api_key
-        if global_settings.image_resolution:
-            test_settings["image_resolution"] = global_settings.image_resolution
-        # 推理模式设置
-        test_settings["enable_text_reasoning"] = global_settings.enable_text_reasoning
-        test_settings["text_thinking_budget"] = global_settings.text_thinking_budget
-        test_settings["image_thinking_level"] = global_settings.image_thinking_level
-
-        # 应用前端发送的覆盖参数（如果有的话，用于测试未保存的配置）
-        override_settings = request.get_json() or {}
-        if override_settings:
-            logger.info(f"Applying test setting overrides: {list(override_settings.keys())}")
-            test_settings.update(override_settings)
-
-        # 创建任务记录（使用特殊的 project_id='settings-test'）
-        task = Task(
-            project_id='settings-test',  # 特殊标记，表示这是设置测试任务
-            task_type=f'TEST_{test_name.upper().replace("-", "_")}',
-            status='PENDING'
-        )
-        db.session.add(task)
-        db.session.commit()
-
-        task_id = task.id
-
-        # 使用 TaskManager 提交后台任务
-        task_manager.submit_task(
-            task_id,
-            _run_test_async,
-            test_name,
-            test_settings,
-            current_app._get_current_object()
-        )
-
-        logger.info(f"Started test task {task_id} for {test_name}")
-
-        return success_response({
-            'task_id': task_id,
-            'status': 'PENDING'
-        }, '测试任务已启动')
-
-    except Exception as e:
-        logger.error(f"Failed to start test: {str(e)}", exc_info=True)
-        return error_response(
-            "SETTINGS_TEST_ERROR",
-            f"启动测试失败: {str(e)}",
-            500
-        )
+    return _settings_locked_response()
 
 
 @settings_bp.route("/tests/<task_id>/status", methods=["GET"], strict_slashes=False)
 def get_test_status(task_id: str):
-    """
-    GET /api/settings/tests/<task_id>/status - 查询测试任务状态
-
-    Returns:
-        {
-            "data": {
-                "status": "PENDING|PROCESSING|COMPLETED|FAILED",
-                "result": {...},  # 仅当 status=COMPLETED 时存在
-                "error": "...",   # 仅当 status=FAILED 时存在
-                "message": "..."
-            }
-        }
-    """
-    try:
-        task = Task.query.get(task_id)
-        if not task:
-            return error_response("TASK_NOT_FOUND", "测试任务不存在", 404)
-
-        # 构建响应数据
-        response_data = {
-            'status': task.status,
-            'task_type': task.task_type,
-            'created_at': task.created_at.isoformat() if task.created_at else None,
-            'completed_at': task.completed_at.isoformat() if task.completed_at else None,
-        }
-
-        # 如果任务完成，包含结果和消息
-        if task.status == 'COMPLETED':
-            progress = task.get_progress()
-            response_data['result'] = progress.get('result', {})
-            response_data['message'] = progress.get('message', '测试完成')
-
-        # 如果任务失败，包含错误信息
-        elif task.status == 'FAILED':
-            response_data['error'] = task.error_message
-
-        return success_response(response_data)
-
-    except Exception as e:
-        logger.error(f"Failed to get test status: {str(e)}", exc_info=True)
-        return error_response(
-            "GET_TEST_STATUS_ERROR",
-            f"获取测试状态失败: {str(e)}",
-            500
-        )
+    return _settings_locked_response()

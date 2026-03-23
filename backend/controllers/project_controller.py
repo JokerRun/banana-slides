@@ -22,7 +22,7 @@ from services.task_manager import (
 )
 from utils import (
     success_response, error_response, not_found, bad_request,
-    parse_page_ids_from_body, get_filtered_pages
+    parse_page_ids_from_body, get_filtered_pages, get_current_user_id, require_auth_response
 )
 
 logger = logging.getLogger(__name__)
@@ -125,6 +125,11 @@ def list_projects():
     - offset: offset for pagination (default: 0)
     """
     try:
+        auth_error = require_auth_response()
+        if auth_error is not None:
+            return auth_error
+
+        current_user_id = get_current_user_id()
         # Parameter validation
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
@@ -137,6 +142,7 @@ def list_projects():
         # This avoids a second database query
         projects_with_extra = Project.query\
             .options(joinedload(Project.pages))\
+            .filter(Project.owner_id == current_user_id)\
             .order_by(desc(Project.updated_at))\
             .limit(limit + 1)\
             .offset(offset)\
@@ -174,6 +180,10 @@ def create_project():
     }
     """
     try:
+        auth_error = require_auth_response()
+        if auth_error is not None:
+            return auth_error
+
         data = request.get_json()
         
         if not data:
@@ -190,6 +200,7 @@ def create_project():
         
         # Create project
         project = Project(
+            owner_id=get_current_user_id(),
             creation_type=creation_type,
             idea_prompt=data.get('idea_prompt'),
             outline_text=data.get('outline_text'),
@@ -226,10 +237,14 @@ def get_project(project_id):
     GET /api/projects/{project_id} - Get project details
     """
     try:
+        auth_error = require_auth_response()
+        if auth_error is not None:
+            return auth_error
+
         # Use eager loading to load project and related pages
         project = Project.query\
             .options(joinedload(Project.pages))\
-            .filter(Project.id == project_id)\
+            .filter(Project.id == project_id, Project.owner_id == get_current_user_id())\
             .first()
         
         if not project:
@@ -254,10 +269,14 @@ def update_project(project_id):
     }
     """
     try:
+        auth_error = require_auth_response()
+        if auth_error is not None:
+            return auth_error
+
         # Use eager loading to load project and pages (for page order updates)
         project = Project.query\
             .options(joinedload(Project.pages))\
-            .filter(Project.id == project_id)\
+            .filter(Project.id == project_id, Project.owner_id == get_current_user_id())\
             .first()
         
         if not project:
@@ -325,7 +344,11 @@ def delete_project(project_id):
     DELETE /api/projects/{project_id} - Delete project
     """
     try:
-        project = Project.query.get(project_id)
+        auth_error = require_auth_response()
+        if auth_error is not None:
+            return auth_error
+
+        project = Project.query.filter_by(id=project_id, owner_id=get_current_user_id()).first()
         
         if not project:
             return not_found('Project')
@@ -363,7 +386,11 @@ def generate_outline(project_id):
     }
     """
     try:
-        project = Project.query.get(project_id)
+        auth_error = require_auth_response()
+        if auth_error is not None:
+            return auth_error
+
+        project = Project.query.filter_by(id=project_id, owner_id=get_current_user_id()).first()
         
         if not project:
             return not_found('Project')
@@ -477,7 +504,11 @@ def generate_from_description(project_id):
     """
     
     try:
-        project = Project.query.get(project_id)
+        auth_error = require_auth_response()
+        if auth_error is not None:
+            return auth_error
+
+        project = Project.query.filter_by(id=project_id, owner_id=get_current_user_id()).first()
         
         if not project:
             return not_found('Project')
@@ -587,7 +618,12 @@ def generate_descriptions(project_id):
     }
     """
     try:
-        project = Project.query.get(project_id)
+        auth_error = require_auth_response()
+        if auth_error is not None:
+            return auth_error
+
+        current_user_id = get_current_user_id()
+        project = Project.query.filter_by(id=project_id, owner_id=current_user_id).first()
         
         if not project:
             return not_found('Project')
@@ -615,6 +651,7 @@ def generate_descriptions(project_id):
         # Create task
         task = Task(
             project_id=project_id,
+            owner_id=get_current_user_id(),
             task_type='GENERATE_DESCRIPTIONS',
             status='PENDING'
         )
@@ -680,7 +717,12 @@ def generate_images(project_id):
     }
     """
     try:
-        project = Project.query.get(project_id)
+        auth_error = require_auth_response()
+        if auth_error is not None:
+            return auth_error
+
+        current_user_id = get_current_user_id()
+        project = Project.query.filter_by(id=project_id, owner_id=current_user_id).first()
         
         if not project:
             return not_found('Project')
@@ -730,6 +772,7 @@ def generate_images(project_id):
         task_type = 'RESTYLE_IMAGES' if project.creation_type == 'restyle' else 'GENERATE_IMAGES'
         task = Task(
             project_id=project_id,
+            owner_id=get_current_user_id(),
             task_type=task_type,
             status='PENDING'
         )
@@ -810,9 +853,13 @@ def get_task_status(project_id, task_id):
     GET /api/projects/{project_id}/tasks/{task_id} - Get task status
     """
     try:
-        task = Task.query.get(task_id)
+        auth_error = require_auth_response()
+        if auth_error is not None:
+            return auth_error
+
+        task = Task.query.filter_by(id=task_id, project_id=project_id, owner_id=get_current_user_id()).first()
         
-        if not task or task.project_id != project_id:
+        if not task:
             return not_found('Task')
         
         return success_response(task.to_dict())
@@ -834,7 +881,11 @@ def refine_outline(project_id):
     }
     """
     try:
-        project = Project.query.get(project_id)
+        auth_error = require_auth_response()
+        if auth_error is not None:
+            return auth_error
+
+        project = Project.query.filter_by(id=project_id, owner_id=get_current_user_id()).first()
         
         if not project:
             return not_found('Project')
@@ -988,7 +1039,11 @@ def refine_descriptions(project_id):
     }
     """
     try:
-        project = Project.query.get(project_id)
+        auth_error = require_auth_response()
+        if auth_error is not None:
+            return auth_error
+
+        project = Project.query.filter_by(id=project_id, owner_id=get_current_user_id()).first()
         
         if not project:
             return not_found('Project')

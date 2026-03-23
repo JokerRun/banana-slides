@@ -23,7 +23,20 @@ from .user_template import UserTemplate
 from .page_image_version import PageImageVersion
 from .material import Material
 from .reference_file import ReferenceFile
+from .user import User
+from .user_oauth_account import UserOAuthAccount
 from .settings import Settings
 
-__all__ = ['db', 'Project', 'Page', 'Task', 'UserTemplate', 'PageImageVersion', 'Material', 'ReferenceFile', 'Settings']
-
+__all__ = [
+    'db',
+    'Project',
+    'Page',
+    'Task',
+    'UserTemplate',
+    'PageImageVersion',
+    'Material',
+    'ReferenceFile',
+    'User',
+    'UserOAuthAccount',
+    'Settings',
+]

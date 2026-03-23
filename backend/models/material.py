@@ -13,6 +13,7 @@ class Material(db.Model):
     __tablename__ = 'materials'
     
     id = db.Column(db.String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
+    owner_id = db.Column(db.String(36), db.ForeignKey('users.id'), nullable=False, index=True)
     project_id = db.Column(db.String(36), db.ForeignKey('projects.id'), nullable=True)  # Can be null, for global materials not belonging to a project
     filename = db.Column(db.String(500), nullable=False)
     relative_path = db.Column(db.String(500), nullable=False)  # Path relative to the upload_folder
@@ -22,6 +23,7 @@ class Material(db.Model):
     
     # Relationships
     project = db.relationship('Project', back_populates='materials')
+    owner = db.relationship('User', back_populates='materials', lazy='select')
     
     def to_dict(self):
         """Convert to dictionary"""
@@ -37,4 +39,3 @@ class Material(db.Model):
     
     def __repr__(self):
         return f'<Material {self.id}: {self.filename} (project={self.project_id or "None"})>'
-

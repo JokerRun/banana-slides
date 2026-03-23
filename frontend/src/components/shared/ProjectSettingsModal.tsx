@@ -1,17 +1,15 @@
 import React, { useState } from 'react';
-import { X, FileText, Settings as SettingsIcon, Download, Sparkles, AlertTriangle } from 'lucide-react';
+import { X, FileText, Download, Sparkles, AlertTriangle } from 'lucide-react';
 import { Button, Textarea } from '@/components/shared';
 import { useT } from '@/hooks/useT';
-import { Settings } from '@/pages/Settings';
 import type { ExportExtractorMethod, ExportInpaintMethod } from '@/types';
 
 // ProjectSettings 组件自包含翻译
 const projectSettingsI18n = {
   zh: {
     projectSettings: {
-      title: "设置", projectConfig: "项目设置", exportConfig: "导出设置", globalConfig: "全局设置",
+      title: "设置", projectConfig: "项目设置", exportConfig: "导出设置",
       projectConfigTitle: "项目级配置", projectConfigDesc: "这些设置仅应用于当前项目，不影响其他项目",
-      globalConfigTitle: "全局设置", globalConfigDesc: "这些设置应用于所有项目",
       extraRequirements: "额外要求", extraRequirementsDesc: "在生成每个页面时，AI 会参考这些额外要求",
       extraRequirementsPlaceholder: "例如：使用紧凑的布局，顶部展示一级大纲标题，加入更丰富的PPT插图...",
       saveExtraRequirements: "保存额外要求",
@@ -39,9 +37,8 @@ const projectSettingsI18n = {
   },
   en: {
     projectSettings: {
-      title: "Settings", projectConfig: "Project Settings", exportConfig: "Export Settings", globalConfig: "Global Settings",
+      title: "Settings", projectConfig: "Project Settings", exportConfig: "Export Settings",
       projectConfigTitle: "Project-level Configuration", projectConfigDesc: "These settings only apply to the current project",
-      globalConfigTitle: "Global Settings", globalConfigDesc: "These settings apply to all projects",
       extraRequirements: "Extra Requirements", extraRequirementsDesc: "AI will reference these extra requirements when generating each page",
       extraRequirementsPlaceholder: "e.g., Use compact layout, show first-level outline title at top, add richer PPT illustrations...",
       saveExtraRequirements: "Save Extra Requirements",
@@ -90,7 +87,7 @@ interface ProjectSettingsModalProps {
   isSavingExportSettings?: boolean;
 }
 
-type SettingsTab = 'project' | 'global' | 'export';
+type SettingsTab = 'project' | 'export';
 
 export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
   isOpen,
@@ -166,17 +163,6 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
               >
                 <Download size={20} />
                 <span className="font-medium">{t('projectSettings.exportConfig')}</span>
-              </button>
-              <button
-                onClick={() => setActiveTab('global')}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-                  activeTab === 'global'
-                    ? 'bg-banana-500 text-white shadow-md'
-                    : 'bg-white dark:bg-background-secondary text-gray-700 dark:text-foreground-secondary hover:bg-gray-100 dark:hover:bg-background-hover'
-                }`}
-              >
-                <SettingsIcon size={20} />
-                <span className="font-medium">{t('projectSettings.globalConfig')}</span>
               </button>
             </nav>
           </aside>
@@ -380,17 +366,7 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
                   </div>
                 )}
               </div>
-            ) : (
-              <div className="max-w-4xl">
-                <div className="mb-6">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-foreground-primary mb-2">{t('projectSettings.globalConfigTitle')}</h3>
-                  <p className="text-sm text-gray-600 dark:text-foreground-tertiary">
-                    {t('projectSettings.globalConfigDesc')}
-                  </p>
-                </div>
-                <Settings />
-              </div>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

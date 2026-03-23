@@ -45,7 +45,7 @@ const previewI18n = {
       uploadingTemplate: "正在上传模板...",
       resolution1KWarning: "1K分辨率警告",
       resolution1KWarningText: "当前使用 1K 分辨率 生成图片，可能导致渲染的文字乱码或模糊。",
-      resolution1KWarningHint: "建议在「项目设置 → 全局设置」中切换到 2K 或 4K 分辨率以获得更清晰的效果。",
+      resolution1KWarningHint: "建议通过部署环境变量将分辨率切换到 2K 或 4K，以获得更清晰的效果。",
       dontShowAgain: "不再提示", generateAnyway: "仍然生成",
       messages: {
         exportSuccess: "导出成功", exportFailed: "导出失败",
@@ -100,7 +100,7 @@ const previewI18n = {
       uploadingTemplate: "Uploading template...",
       resolution1KWarning: "1K Resolution Warning",
       resolution1KWarningText: "Currently using 1K resolution for image generation, which may cause garbled or blurry text.",
-      resolution1KWarningHint: "It's recommended to switch to 2K or 4K resolution in \"Project Settings → Global Settings\" for clearer results.",
+      resolution1KWarningHint: "It's recommended to switch the resolution to 2K or 4K via deployment environment variables for clearer results.",
       dontShowAgain: "Don't show again", generateAnyway: "Generate Anyway",
       messages: {
         exportSuccess: "Export successful", exportFailed: "Export failed",
@@ -148,7 +148,7 @@ import { SlideCard } from '@/components/preview/SlideCard';
 import { useProjectStore } from '@/store/useProjectStore';
 import { useExportTasksStore, type ExportTaskType } from '@/store/useExportTasksStore';
 import { getImageUrl } from '@/api/client';
-import { getPageImageVersions, setCurrentImageVersion, updateProject, uploadTemplate, exportPPTX as apiExportPPTX, exportPDF as apiExportPDF, exportEditablePPTX as apiExportEditablePPTX, getSettings } from '@/api/endpoints';
+import { getPageImageVersions, setCurrentImageVersion, updateProject, uploadTemplate, exportPPTX as apiExportPPTX, exportPDF as apiExportPDF, exportEditablePPTX as apiExportEditablePPTX } from '@/api/endpoints';
 import type { ImageVersion, DescriptionContent, ExportExtractorMethod, ExportInpaintMethod, Page } from '@/types';
 import { normalizeErrorMessage } from '@/utils';
 
@@ -372,33 +372,9 @@ export const SlidePreview: React.FC = () => {
     loadVersions();
   }, [currentProject, selectedIndex, projectId]);
 
-  // 检查是否需要显示1K分辨率警告
+  // 在 env-only 模式下不再查询 settings，直接执行生成动作
   const checkResolutionAndExecute = useCallback(async (action: () => Promise<void>) => {
-    // 检查 localStorage 中是否已跳过警告
-    const skipWarning = localStorage.getItem('skip1KResolutionWarning') === 'true';
-    if (skipWarning) {
-      await action();
-      return;
-    }
-
-    try {
-      const response = await getSettings();
-      const resolution = response.data?.image_resolution;
-
-      // 如果是1K分辨率，显示警告对话框
-      if (resolution === '1K') {
-        setPending1KAction(() => action);
-        setSkip1KWarningChecked(false);
-        setShow1KWarningDialog(true);
-      } else {
-        // 不是1K分辨率，直接执行
-        await action();
-      }
-    } catch (error) {
-      console.error('获取设置失败:', error);
-      // 获取设置失败时，直接执行（不阻塞用户）
-      await action();
-    }
+    await action();
   }, []);
 
   // 确认1K分辨率警告后执行

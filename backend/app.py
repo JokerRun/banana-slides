@@ -4,6 +4,7 @@ Simplified Flask Application Entry Point
 import os
 import sys
 import logging
+from datetime import timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 from sqlalchemy import event
@@ -24,7 +25,7 @@ from config import Config
 from controllers.material_controller import material_bp, material_global_bp
 from controllers.reference_file_controller import reference_file_bp
 from controllers.settings_controller import settings_bp
-from controllers import project_bp, page_bp, template_bp, user_template_bp, export_bp, file_bp, restyle_bp
+from controllers import project_bp, page_bp, template_bp, user_template_bp, export_bp, file_bp, restyle_bp, auth_bp, task_bp
 
 
 # Enable SQLite WAL mode for all connections
@@ -51,6 +52,8 @@ def set_sqlite_pragma(dbapi_conn, connection_record):
 def create_app():
     """Application factory"""
     app = Flask(__name__)
+
+    _preflight_env_or_raise()
     
     # Load configuration from Config class
     app.config.from_object(Config)
@@ -76,6 +79,11 @@ def create_app():
     else:
         cors_origins = [o.strip() for o in raw_cors.split(',') if o.strip()]
     app.config['CORS_ORIGINS'] = cors_origins
+
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+    app.config['SESSION_COOKIE_SECURE'] = os.getenv('SESSION_COOKIE_SECURE', 'false').lower() in ('1', 'true', 'yes')
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
     
     # Initialize logging (log to stdout so Docker can capture it)
     log_level = getattr(logging, app.config['LOG_LEVEL'], logging.INFO)
@@ -94,7 +102,12 @@ def create_app():
 
     # Initialize extensions
     db.init_app(app)
-    CORS(app, origins=cors_origins)
+    supports_credentials = True
+    if supports_credentials and cors_origins == '*':
+        logging.warning('CORS_ORIGINS="*" is invalid when credentials are enabled, fallback to http://localhost:3000')
+        cors_origins = ['http://localhost:3000']
+        app.config['CORS_ORIGINS'] = cors_origins
+    CORS(app, origins=cors_origins, supports_credentials=supports_credentials)
     # Database migrations (Alembic via Flask-Migrate)
     Migrate(app, db)
     
@@ -110,10 +123,8 @@ def create_app():
     app.register_blueprint(reference_file_bp, url_prefix='/api/reference-files')
     app.register_blueprint(settings_bp)
     app.register_blueprint(restyle_bp)
-
-    with app.app_context():
-        # Load settings from database and sync to app.config
-        _load_settings_to_config(app)
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(task_bp)
 
     # Health check endpoint
     @app.route('/health')
@@ -123,17 +134,8 @@ def create_app():
     # Output language endpoint
     @app.route('/api/output-language', methods=['GET'])
     def get_output_language():
-        """
-        获取用户的输出语言偏好（从数据库 Settings 读取）
-        返回: zh, ja, en, auto
-        """
-        from models import Settings
-        try:
-            settings = Settings.get_settings()
-            return {'data': {'language': settings.output_language}}
-        except SQLAlchemyError as db_error:
-            logging.warning(f"Failed to load output language from settings: {db_error}")
-            return {'data': {'language': Config.OUTPUT_LANGUAGE}}  # 默认中文
+        """Return output language from current runtime config (env-managed)."""
+        return {'data': {'language': app.config.get('OUTPUT_LANGUAGE', Config.OUTPUT_LANGUAGE)}}
 
     # Root endpoint
     @app.route('/')
@@ -235,6 +237,20 @@ def _load_settings_to_config(app):
 
     except Exception as e:
         logging.warning(f"Could not load settings from database: {e}")
+
+
+def _preflight_env_or_raise() -> None:
+    """Fail fast on invalid required envs for env-only mode."""
+    provider = (os.getenv('AI_PROVIDER_FORMAT') or '').strip().lower()
+    if provider not in {'openai', 'gemini'}:
+        raise ValueError('AI_PROVIDER_FORMAT must be set to "openai" or "gemini"')
+
+    if provider == 'openai':
+        if not (os.getenv('OPENAI_API_KEY') or '').strip():
+            raise ValueError('OPENAI_API_KEY is required when AI_PROVIDER_FORMAT=openai')
+    else:
+        if not (os.getenv('GOOGLE_API_KEY') or '').strip():
+            raise ValueError('GOOGLE_API_KEY is required when AI_PROVIDER_FORMAT=gemini')
 
 
 # Create app instance

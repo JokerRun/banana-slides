@@ -12,6 +12,7 @@ from .validators import validate_project_status, validate_page_status, allowed_f
 from .path_utils import convert_mineru_path_to_local, find_mineru_file_with_prefix, find_file_with_prefix
 from .pptx_builder import PPTXBuilder
 from .page_utils import parse_page_ids_from_query, parse_page_ids_from_body, get_filtered_pages
+from .auth import require_auth, get_current_user, get_current_user_id, require_auth_response
 
 __all__ = [
     'success_response',
@@ -30,6 +31,9 @@ __all__ = [
     'PPTXBuilder',
     'parse_page_ids_from_query',
     'parse_page_ids_from_body',
-    'get_filtered_pages'
+    'get_filtered_pages',
+    'require_auth',
+    'get_current_user',
+    'get_current_user_id',
+    'require_auth_response',
 ]
-

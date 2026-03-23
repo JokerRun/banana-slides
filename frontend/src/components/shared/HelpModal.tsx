@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Sparkles, FileText, Palette, MessageSquare, Download, ChevronLeft, ChevronRight, ExternalLink, Settings, Check } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Sparkles, FileText, Palette, MessageSquare, Download, ChevronLeft, ChevronRight, ExternalLink, Check } from 'lucide-react';
 import { Modal } from './Modal';
 import { Button } from './Button';
 import { useT } from '@/hooks/useT';
@@ -12,12 +11,12 @@ const helpI18n = {
       featuresIntro: "功能介绍", featuresIntroDesc: "探索如何使用 AI 快速创建精美 PPT",
       showcases: "结果案例", showcasesDesc: "以下是使用蕉幻生成的 PPT 案例展示", viewMoreCases: "查看更多使用案例",
       welcome: "欢迎使用蕉幻！", welcomeDesc: "在开始前，让我们先完成基础配置",
-      step1Title: "配置 API Key", step1Desc: "前往设置页面，配置项目需要使用的API服务，包括：",
+      step1Title: "检查环境变量", step1Desc: "在部署环境中配置项目运行所需的 env（无需在应用内设置），包括：",
       step1Items: { apiConfig: "您的 AI 服务提供商的 API Base 和 API Key", modelConfig: "配置文本、图像生成模型(banana pro)和图像描述模型", mineruConfig: "若需要文件解析功能，请配置 MinerU Token", editableExport: "若需要可编辑导出功能，请配置MinerU TOKEN 和 Baidu API KEY" },
-      step2Title: "保存并测试", step2Desc: "配置完成后，务必点击「保存设置」按钮，然后在页面底部进行服务测试，确保各项服务正常工作。",
+      step2Title: "重启并验证", step2Desc: "修改 env 后重启服务，然后创建一个示例项目验证生成链路是否正常。",
       step3Title: "开始创作", step3Desc: "配置成功后，返回首页即可开始使用 AI 生成精美的 PPT！",
       step4Title: "*问题反馈", step4Desc: "若使用过程中遇到问题，可在github issue提出",
-      goToGithubIssue: "前往Github issue", goToSettings: "前往设置页面",
+      goToGithubIssue: "前往Github issue",
       tip: "提示", tipContent: "如果您还没有 API Key，可以前往对应服务商官网注册获取。配置完成后，建议先进行服务测试，避免后续使用出现问题。",
       prevPage: "上一页", nextPage: "下一页", guidePage: "引导页",
       showcaseTitles: { softwareDev: "软件开发最佳实践", deepseek: "DeepSeek-V3.2技术展示", prefabFood: "预制菜智能产线装备研发和产业化", moneyHistory: "钱的演变：从贝壳到纸币的旅程" },
@@ -35,12 +34,12 @@ const helpI18n = {
       featuresIntro: "Features", featuresIntroDesc: "Explore how to use AI to quickly create beautiful PPT",
       showcases: "Showcases", showcasesDesc: "Here are PPT examples generated with Banana Slides", viewMoreCases: "View more examples",
       welcome: "Welcome to Banana Slides!", welcomeDesc: "Let's complete the basic configuration before you start",
-      step1Title: "Configure API Key", step1Desc: "Go to settings page to configure the API services needed for the project, including:",
+      step1Title: "Check Environment Variables", step1Desc: "Configure required runtime env values in your deployment (no in-app settings), including:",
       step1Items: { apiConfig: "Your AI service provider's API Base and API Key", modelConfig: "Configure text, image generation model (banana pro) and image caption model", mineruConfig: "If you need file parsing, configure MinerU Token", editableExport: "If you need editable export, configure MinerU TOKEN and Baidu API KEY" },
-      step2Title: "Save and Test", step2Desc: "After configuration, be sure to click \"Save Settings\" button, then test services at the bottom of the page to ensure everything works properly.",
+      step2Title: "Restart and Verify", step2Desc: "After updating env, restart the service and create a sample project to verify the generation flow.",
       step3Title: "Start Creating", step3Desc: "After successful configuration, return to home page to start using AI to generate beautiful PPT!",
       step4Title: "*Feedback", step4Desc: "If you encounter issues while using, please raise them on GitHub issues",
-      goToGithubIssue: "Go to GitHub Issues", goToSettings: "Go to Settings",
+      goToGithubIssue: "Go to GitHub Issues",
       tip: "Tip", tipContent: "If you don't have an API Key yet, you can register on the corresponding service provider's website. After configuration, it's recommended to test services first to avoid issues later.",
       prevPage: "Previous", nextPage: "Next", guidePage: "Guide",
       showcaseTitles: { softwareDev: "Software Development Best Practices", deepseek: "DeepSeek-V3.2 Technical Showcase", prefabFood: "Prefab Food Intelligent Production Line R&D", moneyHistory: "The Evolution of Money: From Shells to Paper" },
@@ -78,7 +77,6 @@ const featureIcons = [
 
 export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
   const t = useT(helpI18n);
-  const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(0);
   const [currentShowcase, setCurrentShowcase] = useState(0);
   const [expandedFeature, setExpandedFeature] = useState<number | null>(null);
@@ -103,11 +101,6 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
     if (currentPage < totalPages - 1) {
       setCurrentPage(currentPage + 1);
     }
-  };
-
-  const handleGoToSettings = () => {
-    onClose();
-    navigate('/settings');
   };
 
   const renderGuidePage = () => (
@@ -185,16 +178,6 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
           <ExternalLink size={14} />
           {t('help.goToGithubIssue')}
         </a>
-      </div>
-
-      <div className="flex justify-center pt-2">
-        <Button
-          onClick={handleGoToSettings}
-          className="bg-banana-500 hover:bg-banana-600 text-black dark:text-white shadow-lg"
-          icon={<Settings size={18} />}
-        >
-          {t('help.goToSettings')}
-        </Button>
       </div>
 
       <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-3">

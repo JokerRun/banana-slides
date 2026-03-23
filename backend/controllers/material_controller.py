@@ -3,7 +3,7 @@ Material Controller - handles standalone material image generation
 """
 from flask import Blueprint, request, current_app, send_file
 from models import db, Project, Material, Task
-from utils import success_response, error_response, not_found, bad_request
+from utils import success_response, error_response, not_found, bad_request, get_current_user_id, require_auth_response
 from services import FileService
 from services.ai_service_manager import get_ai_service
 from services.task_manager import task_manager, generate_material_image_task
@@ -24,6 +24,16 @@ material_bp = Blueprint('materials', __name__, url_prefix='/api/projects')
 material_global_bp = Blueprint('materials_global', __name__, url_prefix='/api/materials')
 
 ALLOWED_MATERIAL_EXTENSIONS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.svg'}
+
+
+@material_bp.before_request
+def _material_auth_guard():
+    return require_auth_response()
+
+
+@material_global_bp.before_request
+def _material_global_auth_guard():
+    return require_auth_response()
 
 
 def _generate_image_caption(filepath: str) -> str:
@@ -107,11 +117,11 @@ def _build_material_query(filter_project_id: str):
     if filter_project_id == 'none':
         return query.filter(Material.project_id.is_(None)), None
 
-    project = Project.query.get(filter_project_id)
+    project = Project.query.filter_by(id=filter_project_id, owner_id=get_current_user_id()).first()
     if not project:
         return None, not_found('Project')
 
-    return query.filter(Material.project_id == filter_project_id), None
+    return query.filter(Material.project_id == filter_project_id, Material.owner_id == get_current_user_id()), None
 
 
 def _get_materials_list(filter_project_id: str):
@@ -174,7 +184,7 @@ def _resolve_target_project_id(raw_project_id: Optional[str], allow_none: bool =
         return None, bad_request("project_id cannot be 'all' when uploading materials")
 
     if raw_project_id:
-        project = Project.query.get(raw_project_id)
+        project = Project.query.filter_by(id=raw_project_id, owner_id=get_current_user_id()).first()
         if not project:
             return None, not_found('Project')
 
@@ -212,6 +222,7 @@ def _save_material_file(file, target_project_id: Optional[str]):
         image_url = f"/files/materials/{unique_filename}"
 
     material = Material(
+        owner_id=get_current_user_id(),
         project_id=target_project_id,
         filename=unique_filename,
         relative_path=relative_path,
@@ -242,7 +253,7 @@ def generate_material_image(project_id):
     try:
         # 支持 'none' 作为特殊值，表示生成全局素材
         if project_id != 'none':
-            project = Project.query.get(project_id)
+            project = Project.query.filter_by(id=project_id, owner_id=get_current_user_id()).first()
             if not project:
                 return not_found('Project')
         else:
@@ -270,7 +281,7 @@ def generate_material_image(project_id):
         
         # 验证project_id（如果不是'global'）
         if task_project_id != 'global':
-            project = Project.query.get(task_project_id)
+            project = Project.query.filter_by(id=task_project_id, owner_id=get_current_user_id()).first()
             if not project:
                 return not_found('Project')
 
@@ -306,6 +317,7 @@ def generate_material_image(project_id):
             # Create async task for material generation
             task = Task(
                 project_id=task_project_id,
+                owner_id=get_current_user_id(),
                 task_type='GENERATE_MATERIAL',
                 status='PENDING'
             )
@@ -406,6 +418,24 @@ def list_all_materials():
     """
     try:
         filter_project_id = request.args.get('project_id', 'all')
+        current_user_id = get_current_user_id()
+        if filter_project_id == 'all':
+            materials = Material.query.filter_by(owner_id=current_user_id).order_by(Material.created_at.desc()).all()
+            materials_list = [material.to_dict() for material in materials]
+            return success_response({
+                "materials": materials_list,
+                "count": len(materials_list)
+            })
+        if filter_project_id == 'none':
+            materials = Material.query.filter(
+                Material.owner_id == current_user_id,
+                Material.project_id.is_(None),
+            ).order_by(Material.created_at.desc()).all()
+            materials_list = [material.to_dict() for material in materials]
+            return success_response({
+                "materials": materials_list,
+                "count": len(materials_list)
+            })
         materials_list, error = _get_materials_list(filter_project_id)
         if error:
             return error
@@ -440,7 +470,7 @@ def delete_material(material_id):
     DELETE /api/materials/{material_id} - Delete a material and its file
     """
     try:
-        material = Material.query.get(material_id)
+        material = Material.query.filter_by(id=material_id, owner_id=get_current_user_id()).first()
         if not material:
             return not_found('Material')
 
@@ -491,7 +521,7 @@ def associate_materials_to_project():
             return bad_request("material_urls must be a non-empty array")
 
         # Validate project exists
-        project = Project.query.get(project_id)
+        project = Project.query.filter_by(id=project_id, owner_id=get_current_user_id()).first()
         if not project:
             return not_found('Project')
 
@@ -499,7 +529,8 @@ def associate_materials_to_project():
         updated_ids = []
         materials_to_update = Material.query.filter(
             Material.url.in_(material_urls),
-            Material.project_id.is_(None)
+            Material.project_id.is_(None),
+            Material.owner_id == get_current_user_id(),
         ).all()
         for material in materials_to_update:
             material.project_id = project_id
@@ -538,7 +569,10 @@ def download_materials_zip():
             return bad_request("material_ids must be a non-empty array")
 
         # Query materials
-        materials = Material.query.filter(Material.id.in_(material_ids)).all()
+        materials = Material.query.filter(
+            Material.id.in_(material_ids),
+            Material.owner_id == get_current_user_id(),
+        ).all()
 
         if not materials:
             return not_found('Materials')
@@ -576,4 +610,3 @@ def download_materials_zip():
 
     except Exception as e:
         return error_response('SERVER_ERROR', str(e), 500)
-
