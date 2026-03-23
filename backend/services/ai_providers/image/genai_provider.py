@@ -21,6 +21,8 @@ logger = logging.getLogger(__name__)
 class GenAIImageProvider(ImageProvider):
     """Image generation using Google GenAI SDK (supports both AI Studio and Vertex AI)"""
 
+    supports_conversation_contents = True
+
     def __init__(
         self,
         api_key: str = None,
@@ -65,6 +67,82 @@ class GenAIImageProvider(ImageProvider):
             )
 
         self.model = model
+
+    def _build_generate_config(self, aspect_ratio: str, resolution: str, thinking_level: str) -> 'types.GenerateContentConfig':
+        """Build GenerateContentConfig for image generation requests."""
+        config_params = {
+            'response_modalities': ['TEXT', 'IMAGE'],
+            'image_config': types.ImageConfig(
+                aspect_ratio=aspect_ratio,
+                image_size=resolution
+            )
+        }
+
+        # Add thinking config if a valid level is specified
+        # Gemini 3.1 Flash Image only supports "minimal" (default) and "high"
+        # See: https://ai.google.dev/gemini-api/docs/image-generation#thinking-process
+        level_map = {
+            'minimal': 'MINIMAL',
+            'high': 'HIGH',
+        }
+        if thinking_level.lower() in level_map:
+            config_params['thinking_config'] = types.ThinkingConfig(
+                thinking_level=level_map[thinking_level.lower()],
+                include_thoughts=True
+            )
+
+        return types.GenerateContentConfig(**config_params)
+
+    def _extract_last_image(self, response) -> Optional[Image.Image]:
+        """
+        Extract the last (highest quality) image from a GenAI response.
+        
+        Earlier images are usually low resolution drafts in thinking chain scenarios,
+        so we always return the last image found.
+        """
+        total_parts = len(response.parts) if response.parts else 0
+        logger.info(f"📨 GenAI response: {total_parts} parts")
+
+        last_image = None
+        image_count = 0
+
+        for i, part in enumerate(response.parts):
+            if part.text is not None:
+                text_preview = part.text[:150] + "..." if len(part.text) > 150 else part.text
+                part_label = "💭 Thought" if getattr(part, 'thought', False) else "💬 Text"
+                logger.info(f"  Part {i}: {part_label} - {text_preview}")
+            else:
+                try:
+                    image = part.as_image()
+                    if image:
+                        # as_image() should return PIL Image directly (official SDK)
+                        # But proxy may return custom Image object, so we need fallbacks
+                        if isinstance(image, Image.Image):
+                            last_image = image
+                        elif hasattr(image, 'image_bytes') and image.image_bytes:
+                            last_image = Image.open(BytesIO(image.image_bytes))
+                        elif hasattr(image, '_pil_image') and image._pil_image:
+                            last_image = image._pil_image
+                        else:
+                            logger.warning(f"  Part {i}: ⚠️ Image object type {type(image)} has no usable conversion method")
+                            continue
+                        image_count += 1
+                        logger.info(f"  Part {i}: 🖼️ Image {image_count} extracted ({last_image.size[0]}x{last_image.size[1]})")
+                except Exception as e:
+                    logger.warning(f"  Part {i}: ⚠️ Failed to extract image - {type(e).__name__}: {str(e)}")
+
+        if last_image:
+            logger.info(f"✅ Final image selected: image {image_count}/{image_count} ({last_image.size[0]}x{last_image.size[1]})")
+            return last_image
+
+        # No image found in response
+        error_msg = "No image found in API response. "
+        if response.parts:
+            error_msg += f"Response had {len(response.parts)} parts but none contained valid images."
+        else:
+            error_msg += "Response had no parts."
+
+        raise ValueError(error_msg)
 
     @retry(
         stop=stop_after_attempt(get_config().GENAI_MAX_RETRIES + 1),
@@ -111,83 +189,62 @@ class GenAIImageProvider(ImageProvider):
                         f"aspect_ratio={aspect_ratio}, resolution={resolution}, thinking_level={thinking_level}")
             logger.info(f"📝 Prompt ({len(prompt)} chars): {prompt_preview}")
             
-            # Build config
-            config_params = {
-                'response_modalities': ['TEXT', 'IMAGE'],
-                'image_config': types.ImageConfig(
-                    aspect_ratio=aspect_ratio,
-                    image_size=resolution
-                )
-            }
-            
-            # Add thinking config if a valid level is specified
-            # Gemini 3.1 Flash Image only supports "minimal" (default) and "high"
-            # See: https://ai.google.dev/gemini-api/docs/image-generation#thinking-process
-            level_map = {
-                'minimal': 'MINIMAL',
-                'high': 'HIGH',
-            }
-            if thinking_level.lower() in level_map:
-                config_params['thinking_config'] = types.ThinkingConfig(
-                    thinking_level=level_map[thinking_level.lower()],
-                    include_thoughts=True
-                )
-            
+            config = self._build_generate_config(aspect_ratio, resolution, thinking_level)
+
             response = self.client.models.generate_content(
                 model=self.model,
                 contents=contents,
-                config=types.GenerateContentConfig(**config_params)
+                config=config
             )
             
-            total_parts = len(response.parts) if response.parts else 0
-            logger.info(f"📨 GenAI response: {total_parts} parts")
-            
-            # Extract the final image from the response.
-            # Earlier images are usually low resolution drafts 
-            # Therefore, always use the last image found.
-            last_image = None
-            image_count = 0
-            
-            for i, part in enumerate(response.parts):
-                if part.text is not None:
-                    text_preview = part.text[:150] + "..." if len(part.text) > 150 else part.text
-                    part_label = "💭 Thought" if getattr(part, 'thought', False) else "💬 Text"
-                    logger.info(f"  Part {i}: {part_label} - {text_preview}")
-                else:
-                    try:
-                        image = part.as_image()
-                        if image:
-                            # as_image() should return PIL Image directly (official SDK)
-                            # But proxy may return custom Image object, so we need fallbacks
-                            if isinstance(image, Image.Image):
-                                last_image = image
-                            elif hasattr(image, 'image_bytes') and image.image_bytes:
-                                last_image = Image.open(BytesIO(image.image_bytes))
-                            elif hasattr(image, '_pil_image') and image._pil_image:
-                                last_image = image._pil_image
-                            else:
-                                logger.warning(f"  Part {i}: ⚠️ Image object type {type(image)} has no usable conversion method")
-                                continue
-                            image_count += 1
-                            logger.info(f"  Part {i}: 🖼️ Image {image_count} extracted ({last_image.size[0]}x{last_image.size[1]})")
-                    except Exception as e:
-                        logger.warning(f"  Part {i}: ⚠️ Failed to extract image - {type(e).__name__}: {str(e)}")
-            
-            # Return the last image found (highest quality in thinking chain scenarios)
-            if last_image:
-                logger.info(f"✅ Final image selected: image {image_count}/{image_count} ({last_image.size[0]}x{last_image.size[1]})")
-                return last_image
-            
-            # No image found in response
-            error_msg = "No image found in API response. "
-            if response.parts:
-                error_msg += f"Response had {len(response.parts)} parts but none contained valid images."
-            else:
-                error_msg += "Response had no parts."
-            
-            raise ValueError(error_msg)
+            return self._extract_last_image(response)
             
         except Exception as e:
             error_detail = f"Error generating image with GenAI: {type(e).__name__}: {str(e)}"
+            logger.error(error_detail, exc_info=True)
+            raise Exception(error_detail) from e
+
+    def generate_image_from_conversation(
+        self,
+        contents: list,
+        aspect_ratio: str = "16:9",
+        resolution: str = "2K",
+        thinking_level: str = "none"
+    ) -> Optional[Image.Image]:
+        """
+        Generate image from multi-turn conversation contents.
+        
+        Used for restyle edit requests where baseline context and current delta
+        are encoded as separate conversation turns.
+        
+        Note: No @retry decorator — retry is managed at the caller level
+        for conversation mode (with fallback to legacy path).
+        
+        Args:
+            contents: Multi-turn conversation contents for Gemini API
+            aspect_ratio: Image aspect ratio
+            resolution: Image resolution
+            thinking_level: Thinking level for supported models
+            
+        Returns:
+            Generated PIL Image object, or None if failed
+        """
+        try:
+            logger.info(f"🌐 GenAI conversation request: model={self.model}, "
+                        f"turns={len(contents)}, "
+                        f"aspect_ratio={aspect_ratio}, resolution={resolution}, thinking_level={thinking_level}")
+
+            config = self._build_generate_config(aspect_ratio, resolution, thinking_level)
+
+            response = self.client.models.generate_content(
+                model=self.model,
+                contents=contents,
+                config=config
+            )
+
+            return self._extract_last_image(response)
+
+        except Exception as e:
+            error_detail = f"Error generating image with GenAI conversation: {type(e).__name__}: {str(e)}"
             logger.error(error_detail, exc_info=True)
             raise Exception(error_detail) from e
