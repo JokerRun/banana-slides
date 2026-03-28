@@ -254,6 +254,8 @@ Retry guidance：
 - 如果任务失败，不要立刻怀疑 skill 步骤错了
 - 重新打开 edit modal，重新输入/确认 prompt，再提交一次
 - 重试时重新 snapshot，不复用失败前的 modal refs
+- 如果同一页连续失败 `2+` 次，先切到另一页做一次 edit，确认整条链路是否仍然通；必要时等待 `5-10 min` 再回头重试原页
+- Edit 失败不会抹掉之前成功的 restyle/version；旧版本仍在 DB 和历史版本里，可继续查看或切换
 
 ### Phase 6: 验证 Debug Artifacts
 
@@ -364,6 +366,10 @@ Schema gotchas：
 7. **container path vs host path**
    - debug artifacts 里常见 `/app/uploads/...`
    - 宿主机对应 `data/uploads/...`
+
+8. **edit failure semantics**
+   - edit 失败后，页面 UI 状态可能显示“失败”，但这不等于之前成功的 restyle 结果丢失
+   - 判断是否真的丢结果，要看 `page_image_versions`、历史版本按钮、以及旧图片文件是否仍存在
 
 ## Bundled Scripts
 
