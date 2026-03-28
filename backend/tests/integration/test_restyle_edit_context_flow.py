@@ -314,6 +314,7 @@ class TestAIServiceRestyleEdit:
         with app.app_context():
             from services.ai_service import AIService
             from services.restyle_edit_context import RestyleEditContext
+            from config import get_config
 
             mock_text = MagicMock()
             mock_image = MagicMock()
@@ -325,6 +326,9 @@ class TestAIServiceRestyleEdit:
             mock_image.generate_image.return_value = result_img
 
             ai = AIService(text_provider=mock_text, image_provider=mock_image)
+            debug_dir = tempfile.mkdtemp()
+            config = get_config()
+            original_debug_dir = getattr(config, 'RESTYLE_EDIT_DEBUG_DIR', None)
 
             ctx = RestyleEditContext(
                 conversation_contents=[
@@ -337,11 +341,28 @@ class TestAIServiceRestyleEdit:
                 current_images_count=1,
             )
 
-            result = ai.edit_restyle_image_with_context(ctx, '16:9', '2K')
+            try:
+                config.RESTYLE_EDIT_DEBUG_DIR = debug_dir
+                result = ai.edit_restyle_image_with_context(
+                    ctx,
+                    '16:9',
+                    '2K',
+                    trace_context={'task_id': 'task-1', 'project_id': 'project-1', 'page_id': 'page-1'},
+                )
+            finally:
+                if original_debug_dir is None and hasattr(config, 'RESTYLE_EDIT_DEBUG_DIR'):
+                    delattr(config, 'RESTYLE_EDIT_DEBUG_DIR')
+                elif original_debug_dir is not None:
+                    config.RESTYLE_EDIT_DEBUG_DIR = original_debug_dir
 
             assert result == result_img
             mock_image.generate_image_from_conversation.assert_called_once()
             mock_image.generate_image.assert_called_once()
+            fallback_artifact = Path(debug_dir) / 'task-1' / 'provider_fallback.json'
+            assert fallback_artifact.exists()
+            payload = json.loads(fallback_artifact.read_text())
+            assert payload['trace']['task_id'] == 'task-1'
+            assert payload['event']['provider_fallback'] is True
 
     def test_conversation_non_retryable_error_raises(self, app):
         """Non-retryable error (timeout/5xx) → should NOT fall back, should raise."""

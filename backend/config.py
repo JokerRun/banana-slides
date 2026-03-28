@@ -84,6 +84,11 @@ class Config:
     # Restyle 编辑上下文图片上限
     RESTYLE_EDIT_MAX_PRUNABLE_IMAGES = int(os.getenv('RESTYLE_EDIT_MAX_PRUNABLE_IMAGES', '6'))
     RESTYLE_EDIT_MAX_TOTAL_IMAGES = int(os.getenv('RESTYLE_EDIT_MAX_TOTAL_IMAGES', '8'))
+    DEBUG_RESTYLE_CONTEXT = os.getenv('DEBUG_RESTYLE_CONTEXT', 'false').lower() in ('true', '1', 'yes')
+    RESTYLE_EDIT_DEBUG_DIR = os.getenv(
+        'RESTYLE_EDIT_DEBUG_DIR',
+        os.path.join(PROJECT_ROOT, 'debug', 'restyle-context')
+    )
     
     # 日志配置
     LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()

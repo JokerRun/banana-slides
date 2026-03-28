@@ -60,10 +60,25 @@ class TestBuildRestyleEditContext:
         assert ctx.degraded_context is False
         assert ctx.baseline_images_count >= 1
         assert ctx.current_images_count >= 1
-        # 4 turns: baseline text, baseline images, model output, delta
+        # 4 turns: baseline text, baseline images, current selected image, delta
         assert len(ctx.conversation_contents) == 4
         assert ctx.conversation_contents[0]['role'] == 'user'
-        assert ctx.conversation_contents[2]['role'] == 'model'
+        assert ctx.conversation_contents[2]['role'] == 'user'
+        assert ctx.snapshot_source == 'persisted'
+        assert len(ctx.turns_summary) == 4
+        assert ctx.turns_summary[1]['image_count'] == 3
+        assert any(
+            item['kind'] == 'original_slide' and item['selected'] is True
+            for item in ctx.image_manifest
+        )
+        assert any(
+            item['kind'] == 'style_ref' and item['selected'] is True
+            for item in ctx.image_manifest
+        )
+        assert any(
+            item['kind'] == 'current_selected' and item['selected'] is True
+            for item in ctx.image_manifest
+        )
 
     def test_minimum_executable_original_only(self):
         ctx = build_restyle_edit_context(
@@ -159,6 +174,9 @@ class TestBuildRestyleEditContext:
         assert '/fake/new.png' in selected_extras
         assert '/fake/mid.png' in selected_extras
         assert '/fake/old.png' not in selected_extras
+        old_extra = next(item for item in ctx.image_manifest if item['path'] == '/fake/old.png')
+        assert old_extra['selected'] is False
+        assert old_extra['selection_reason'] == 'pruned_budget'
 
     def test_legacy_ref_images_deterministic_order(self):
         """Legacy images follow: original, style refs, current selected, extras"""
@@ -211,7 +229,7 @@ class TestBuildRestyleEditContext:
         assert any('make it red' in t for t in text_parts)
 
     def test_no_current_selected_skips_turn3(self):
-        """When current selected is missing, conversation has 3 turns (skip model turn)"""
+        """When current selected is missing, conversation has 3 turns (skip current-image turn)"""
         ctx = build_restyle_edit_context(
             original_slide_path='/fake/orig.png',
             style_ref_paths=['/fake/ref.png'],
@@ -220,9 +238,23 @@ class TestBuildRestyleEditContext:
             current_selected_path=None,
             edit_instruction='edit me',
         )
-        # No model turn
+        # No synthetic model turn
         roles = [t['role'] for t in ctx.conversation_contents]
         assert 'model' not in roles
+
+    def test_current_selected_image_is_user_context_not_model_history(self):
+        """Current selected version should be provided as user context, not fake model output."""
+        ctx = build_restyle_edit_context(
+            original_slide_path='/fake/orig.png',
+            style_ref_paths=['/fake/ref.png'],
+            restyle_base_prompt_snapshot='SNAP',
+            restyle_prompt='',
+            current_selected_path='/fake/cur.png',
+            edit_instruction='edit me',
+        )
+        current_turn = ctx.conversation_contents[2]
+        assert current_turn['role'] == 'user'
+        assert current_turn['parts'] == [{'image_path': '/fake/cur.png'}]
 
     def test_no_original_slide_skips_from_turn2(self):
         """When original slide missing, Turn 2 only has style refs"""
@@ -280,6 +312,7 @@ class TestSnapshotFallbackInContext:
         )
         assert ctx.degraded_context is True
         assert len(ctx.conversation_contents) >= 3
+        assert ctx.snapshot_source == 'reconstructed'
 
 
 class TestRetryableConversationError:

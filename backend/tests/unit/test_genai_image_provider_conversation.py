@@ -2,6 +2,7 @@
 Tests for image provider conversation capability and Gemini conversation adapter
 """
 import pytest
+from google.genai import types as genai_types
 from unittest.mock import patch, MagicMock
 from PIL import Image
 import sys
@@ -37,7 +38,7 @@ class TestGenAIConversationAdapter:
     """Test GenAI generate_image_from_conversation method"""
 
     def test_generate_image_from_conversation_calls_generate_content(self):
-        """Should call client.models.generate_content with contents"""
+        """Should serialize conversation contents into SDK typed content objects."""
         with patch('services.ai_providers.image.genai_provider.genai'):
             from services.ai_providers.image.genai_provider import GenAIImageProvider
             provider = GenAIImageProvider(api_key='test-key')
@@ -53,8 +54,14 @@ class TestGenAIConversationAdapter:
             provider.client.models.generate_content.return_value = mock_response
 
             contents = [
-                {'role': 'user', 'parts': [{'text': 'restyle this'}]},
-                {'role': 'model', 'parts': [{'text': 'ok'}]},
+                {
+                    'role': 'user',
+                    'parts': [
+                        'restyle this',
+                        Image.new('RGB', (32, 24), 'blue'),
+                    ],
+                },
+                {'role': 'model', 'parts': ['ok']},
             ]
             result = provider.generate_image_from_conversation(
                 contents=contents,
@@ -65,6 +72,12 @@ class TestGenAIConversationAdapter:
             assert result is not None
             assert isinstance(result, Image.Image)
             provider.client.models.generate_content.assert_called_once()
+            serialized_contents = provider.client.models.generate_content.call_args.kwargs['contents']
+            assert isinstance(serialized_contents[0], genai_types.UserContent)
+            assert isinstance(serialized_contents[1], genai_types.ModelContent)
+            assert serialized_contents[0].parts[0].text == 'restyle this'
+            assert serialized_contents[0].parts[1].inline_data.mime_type == 'image/png'
+            assert serialized_contents[1].parts[0].text == 'ok'
 
     def test_generate_image_from_conversation_returns_last_image(self):
         """Should return the last image when multiple images in response"""
@@ -117,36 +130,30 @@ class TestGenAIConversationAdapter:
     def test_generate_image_from_conversation_passes_config(self):
         """Should pass aspect_ratio, resolution, thinking_level to config"""
         with patch('services.ai_providers.image.genai_provider.genai'):
-            with patch('services.ai_providers.image.genai_provider.types') as mock_types:
-                from services.ai_providers.image.genai_provider import GenAIImageProvider
-                provider = GenAIImageProvider(api_key='test-key')
+            from services.ai_providers.image.genai_provider import GenAIImageProvider
+            provider = GenAIImageProvider(api_key='test-key')
 
-                fake_image = Image.new('RGB', (100, 100), 'red')
-                mock_part = MagicMock()
-                mock_part.text = None
-                mock_part.as_image.return_value = fake_image
-                mock_response = MagicMock()
-                mock_response.parts = [mock_part]
+            fake_image = Image.new('RGB', (100, 100), 'red')
+            mock_part = MagicMock()
+            mock_part.text = None
+            mock_part.as_image.return_value = fake_image
+            mock_response = MagicMock()
+            mock_response.parts = [mock_part]
 
-                provider.client.models.generate_content.return_value = mock_response
+            provider.client.models.generate_content.return_value = mock_response
 
-                provider.generate_image_from_conversation(
-                    contents=[{'role': 'user', 'parts': [{'text': 'x'}]}],
-                    aspect_ratio='4:3',
-                    resolution='4K',
-                    thinking_level='high'
-                )
+            provider.generate_image_from_conversation(
+                contents=[{'role': 'user', 'parts': [{'text': 'x'}]}],
+                aspect_ratio='4:3',
+                resolution='4K',
+                thinking_level='high'
+            )
 
-                # Verify ImageConfig was called with correct params
-                mock_types.ImageConfig.assert_called_with(
-                    aspect_ratio='4:3',
-                    image_size='4K'
-                )
-                # Verify ThinkingConfig was called for 'high' level
-                mock_types.ThinkingConfig.assert_called_with(
-                    thinking_level='HIGH',
-                    include_thoughts=True
-                )
+            config = provider.client.models.generate_content.call_args.kwargs['config']
+            assert config.image_config.aspect_ratio == '4:3'
+            assert config.image_config.image_size == '4K'
+            assert str(config.thinking_config.thinking_level) == 'ThinkingLevel.HIGH'
+            assert config.thinking_config.include_thoughts is True
 
     def test_base_provider_conversation_raises_not_implemented(self):
         """Base provider generate_image_from_conversation should raise NotImplementedError"""

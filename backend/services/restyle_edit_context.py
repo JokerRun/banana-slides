@@ -36,6 +36,9 @@ class RestyleEditContext:
     degraded_context: bool               # True if any baseline component missing
     baseline_images_count: int           # Images from baseline bucket
     current_images_count: int            # Images from current round bucket
+    snapshot_source: str = 'persisted'   # persisted | reconstructed
+    turns_summary: list = field(default_factory=list)
+    image_manifest: list = field(default_factory=list)
 
 
 # ── Snapshot reconstruction ───────────────────────────────────
@@ -72,7 +75,7 @@ def _select_images(
     """
     Deterministic image selection with pruning.
 
-    Returns (anchors, selected_style_refs, selected_extras, baseline_count, current_count).
+    Returns (anchors, selected_style_refs, selected_extras, baseline_count, current_count, image_manifest).
     Raises MissingStructuralImagesError / ContextImageLimitExceeded on violations.
     """
     # Structural anchors — always retained when available
@@ -121,7 +124,93 @@ def _select_images(
     baseline_count = (1 if original_slide_path else 0) + len(selected_style_refs)
     current_count = (1 if current_selected_path else 0) + len(selected_extras)
 
-    return anchors, selected_style_refs, selected_extras, baseline_count, current_count
+    image_manifest = _build_image_manifest(
+        original_slide_path=original_slide_path,
+        style_ref_paths=style_ref_paths,
+        current_selected_path=current_selected_path,
+        current_extra_ref_paths=current_extra_ref_paths,
+        selected_style_refs=selected_style_refs,
+        selected_extras=selected_extras,
+    )
+
+    return anchors, selected_style_refs, selected_extras, baseline_count, current_count, image_manifest
+
+
+def _build_image_manifest(
+    *,
+    original_slide_path: Optional[str],
+    style_ref_paths: List[str],
+    current_selected_path: Optional[str],
+    current_extra_ref_paths: List[str],
+    selected_style_refs: List[str],
+    selected_extras: List[str],
+) -> List[dict]:
+    """Build a deterministic manifest describing selected and pruned images."""
+    manifest: List[dict] = []
+
+    if original_slide_path:
+        manifest.append({
+            'kind': 'original_slide',
+            'bucket': 'baseline',
+            'path': original_slide_path,
+            'selected': True,
+            'selection_reason': 'anchor',
+        })
+
+    for idx, path in enumerate(style_ref_paths):
+        manifest.append({
+            'kind': 'style_ref',
+            'bucket': 'baseline',
+            'path': path,
+            'selected': path in selected_style_refs,
+            'selection_reason': (
+                'reserved_style_ref'
+                if path in selected_style_refs and idx == 0
+                else 'kept_style_ref'
+                if path in selected_style_refs
+                else 'pruned_budget'
+            ),
+        })
+
+    if current_selected_path:
+        manifest.append({
+            'kind': 'current_selected',
+            'bucket': 'current',
+            'path': current_selected_path,
+            'selected': True,
+            'selection_reason': 'anchor',
+        })
+
+    for path in current_extra_ref_paths:
+        manifest.append({
+            'kind': 'current_extra_ref',
+            'bucket': 'current',
+            'path': path,
+            'selected': path in selected_extras,
+            'selection_reason': 'current_extra_ref' if path in selected_extras else 'pruned_budget',
+        })
+
+    return manifest
+
+
+def _build_turns_summary(contents: List[dict]) -> List[dict]:
+    """Summarize turns for fast inspection/logging."""
+    summary = []
+    for index, turn in enumerate(contents, 1):
+        text_len = 0
+        image_count = 0
+        for part in turn.get('parts', []):
+            if 'text' in part:
+                text_len += len(part['text'])
+            if 'image_path' in part:
+                image_count += 1
+        summary.append({
+            'index': index,
+            'role': turn.get('role'),
+            'text_len': text_len,
+            'image_count': image_count,
+        })
+    return summary
 
 
 # ── Conversation contents builder ─────────────────────────────
@@ -161,10 +250,13 @@ def _build_conversation_contents(
     if turn2_parts:
         turns.append({'role': 'user', 'parts': turn2_parts})
 
-    # Turn 3 (model, image): current selected slide version
+    # Turn 3 (user, image): current selected slide version.
+    # This is user-supplied context, not a prior SDK model response. Using a
+    # synthetic model turn with Gemini 3 image models triggers thought-signature
+    # validation, because only real model outputs carry those signatures.
     if current_selected_path:
         turns.append({
-            'role': 'model',
+            'role': 'user',
             'parts': [{'image_path': current_selected_path}],
         })
 
@@ -232,6 +324,7 @@ def build_restyle_edit_context(
     """
     extras = current_extra_ref_paths or []
     degraded = False
+    snapshot_source = 'persisted'
 
     # Snapshot resolution
     snapshot = restyle_base_prompt_snapshot
@@ -243,6 +336,7 @@ def build_restyle_edit_context(
             custom_prompt=restyle_prompt,
         )
         degraded = True
+        snapshot_source = 'reconstructed'
         logger.info("restyle_edit_context: snapshot missing, using reconstruction",
                      extra={'degraded_context': True})
 
@@ -255,7 +349,7 @@ def build_restyle_edit_context(
         degraded = True
 
     # Image selection + pruning
-    anchors, selected_style_refs, selected_extras, baseline_count, current_count = (
+    anchors, selected_style_refs, selected_extras, baseline_count, current_count, image_manifest = (
         _select_images(
             original_slide_path=original_slide_path,
             style_ref_paths=style_ref_paths,
@@ -291,6 +385,7 @@ def build_restyle_edit_context(
         current_selected_path=current_selected_path,
         selected_extras=selected_extras,
     )
+    turns_summary = _build_turns_summary(conversation)
 
     return RestyleEditContext(
         conversation_contents=conversation,
@@ -299,6 +394,9 @@ def build_restyle_edit_context(
         degraded_context=degraded,
         baseline_images_count=baseline_count,
         current_images_count=current_count,
+        snapshot_source=snapshot_source,
+        turns_summary=turns_summary,
+        image_manifest=image_manifest,
     )
 
 

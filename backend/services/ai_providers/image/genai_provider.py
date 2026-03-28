@@ -68,6 +68,52 @@ class GenAIImageProvider(ImageProvider):
 
         self.model = model
 
+    @staticmethod
+    def _image_to_part(image: Image.Image) -> 'types.Part':
+        """Serialize a PIL image into the inline-data format expected by the SDK."""
+        image_bytes = BytesIO()
+        image_format = (image.format or 'PNG').upper()
+        image.save(image_bytes, format=image_format)
+        mime_type = {
+            'PNG': 'image/png',
+            'JPEG': 'image/jpeg',
+            'JPG': 'image/jpeg',
+            'WEBP': 'image/webp',
+            'GIF': 'image/gif',
+        }.get(image_format, 'image/png')
+        return types.Part.from_bytes(data=image_bytes.getvalue(), mime_type=mime_type)
+
+    def _conversation_part_to_sdk(self, part) -> 'types.Part':
+        """Convert a provider-agnostic conversation part into an SDK Part."""
+        if isinstance(part, types.Part):
+            return part
+        if isinstance(part, str):
+            return types.Part.from_text(text=part)
+        if isinstance(part, Image.Image):
+            return self._image_to_part(part)
+        if isinstance(part, dict):
+            if 'text' in part:
+                return types.Part.from_text(text=part['text'])
+            if 'image' in part and isinstance(part['image'], Image.Image):
+                return self._image_to_part(part['image'])
+
+        raise ValueError(f"Unsupported conversation part type: {type(part)}")
+
+    def _conversation_turn_to_sdk(self, turn) -> 'types.Content':
+        """Convert a provider-agnostic turn dict into SDK typed content."""
+        role = turn.get('role', 'user')
+        sdk_parts = [self._conversation_part_to_sdk(part) for part in turn.get('parts', [])]
+
+        if role == 'user':
+            return types.UserContent(parts=sdk_parts)
+        if role == 'model':
+            return types.ModelContent(parts=sdk_parts)
+        return types.Content(role=role, parts=sdk_parts)
+
+    def _serialize_conversation_contents(self, contents: list) -> list:
+        """Convert conversation contents into the typed structure required by google-genai."""
+        return [self._conversation_turn_to_sdk(turn) for turn in contents]
+
     def _build_generate_config(self, aspect_ratio: str, resolution: str, thinking_level: str) -> 'types.GenerateContentConfig':
         """Build GenerateContentConfig for image generation requests."""
         config_params = {
@@ -235,10 +281,11 @@ class GenAIImageProvider(ImageProvider):
                         f"aspect_ratio={aspect_ratio}, resolution={resolution}, thinking_level={thinking_level}")
 
             config = self._build_generate_config(aspect_ratio, resolution, thinking_level)
+            sdk_contents = self._serialize_conversation_contents(contents)
 
             response = self.client.models.generate_content(
                 model=self.model,
-                contents=contents,
+                contents=sdk_contents,
                 config=config
             )
 

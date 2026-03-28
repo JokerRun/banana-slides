@@ -560,7 +560,7 @@ class AIService:
         )
         return self.generate_image(edit_instruction, current_image_path, aspect_ratio, resolution, additional_ref_images)
     
-    def edit_restyle_image_with_context(self, context, aspect_ratio='16:9', resolution='2K'):
+    def edit_restyle_image_with_context(self, context, aspect_ratio='16:9', resolution='2K', trace_context=None):
         """
         Edit restyle image using conversation context with single fallback.
         
@@ -572,21 +572,60 @@ class AIService:
         Returns:
             PIL Image or raises
         """
+        from config import get_config
         from .restyle_edit_context import is_retryable_conversation_error
-        
+        from .restyle_edit_debug import (
+            enrich_image_manifest,
+            log_restyle_edit_event,
+            maybe_write_debug_artifact,
+            serialize_conversation_contents,
+        )
+
+        config = get_config()
+        trace = trace_context or {}
         conversation_attempted = False
         provider_fallback = False
         conversation_supported = getattr(self.image_provider, 'supports_conversation_contents', False)
-        snapshot_present = not context.degraded_context or bool(context.conversation_contents)
-        
-        logger.info("restyle_edit_context: capability decision", extra={
+        snapshot_present = context.snapshot_source == 'persisted'
+        provider_name = type(self.image_provider).__name__
+        provider_model = getattr(self.image_provider, 'model', None)
+        decision_event = {
             'conversation_supported': conversation_supported,
             'snapshot_present': snapshot_present,
             'degraded_context': context.degraded_context,
-        })
+            'provider': provider_name,
+            'model': provider_model,
+        }
+        log_restyle_edit_event('restyle_edit_provider_decision', trace, decision_event)
+        maybe_write_debug_artifact(
+            config,
+            event_name='provider_decision',
+            trace=trace,
+            payload=decision_event,
+            degraded_context=context.degraded_context,
+        )
         
         if conversation_supported:
             conversation_attempted = True
+            conversation_request_event = {
+                'context_mode': 'restyle_conversation',
+                'turns_summary': context.turns_summary,
+                'snapshot_source': context.snapshot_source,
+                'image_manifest': enrich_image_manifest(context.image_manifest),
+                'conversation_contents': serialize_conversation_contents(context.conversation_contents),
+            }
+            log_restyle_edit_event('restyle_edit_provider_request', trace, {
+                'context_mode': 'restyle_conversation',
+                'turns_summary': context.turns_summary,
+                'snapshot_source': context.snapshot_source,
+            })
+            maybe_write_debug_artifact(
+                config,
+                event_name='provider_request',
+                trace=trace,
+                payload=conversation_request_event,
+                degraded_context=context.degraded_context,
+            )
             try:
                 resolved_contents = self._resolve_conversation_images(context.conversation_contents)
                 result = self.image_provider.generate_image_from_conversation(
@@ -596,7 +635,7 @@ class AIService:
                     thinking_level=self._get_image_thinking_level()
                 )
                 if result:
-                    logger.info("restyle_edit_context: conversation mode success", extra={
+                    result_event = {
                         'context_mode': 'restyle_conversation',
                         'conversation_attempted': True,
                         'provider_fallback': False,
@@ -604,16 +643,85 @@ class AIService:
                         'baseline_images_count': context.baseline_images_count,
                         'current_images_count': context.current_images_count,
                         'snapshot_present': snapshot_present,
-                    })
+                        'provider': provider_name,
+                        'model': provider_model,
+                    }
+                    log_restyle_edit_event('restyle_edit_provider_result', trace, result_event)
+                    maybe_write_debug_artifact(
+                        config,
+                        event_name='provider_result',
+                        trace=trace,
+                        payload=result_event,
+                        degraded_context=context.degraded_context,
+                    )
                     return result
             except Exception as e:
                 if is_retryable_conversation_error(e):
                     logger.warning(f"Conversation mode failed with retryable error, falling back to legacy: {e}")
                     provider_fallback = True
+                    fallback_event = {
+                        'from_mode': 'restyle_conversation',
+                        'to_mode': 'legacy_flattened',
+                        'provider_fallback': True,
+                        'classified_retryable': True,
+                        'error_message': str(e),
+                        'provider': provider_name,
+                        'model': provider_model,
+                    }
+                    log_restyle_edit_event('restyle_edit_provider_fallback', trace, fallback_event)
+                    maybe_write_debug_artifact(
+                        config,
+                        event_name='provider_fallback',
+                        trace=trace,
+                        payload=fallback_event,
+                        provider_fallback=True,
+                        error=True,
+                    )
                 else:
+                    error_event = {
+                        'context_mode': 'restyle_conversation',
+                        'provider_fallback': False,
+                        'classified_retryable': False,
+                        'error_message': str(e),
+                        'provider': provider_name,
+                        'model': provider_model,
+                    }
+                    log_restyle_edit_event('restyle_edit_provider_result', trace, error_event)
+                    maybe_write_debug_artifact(
+                        config,
+                        event_name='provider_result',
+                        trace=trace,
+                        payload=error_event,
+                        error=True,
+                    )
                     raise
         
         # Legacy fallback path
+        legacy_request_event = {
+            'context_mode': 'legacy_flattened',
+            'conversation_attempted': conversation_attempted,
+            'provider_fallback': provider_fallback,
+            'snapshot_source': context.snapshot_source,
+            'prompt': context.legacy_prompt,
+            'prompt_len': len(context.legacy_prompt),
+            'legacy_ref_images': context.legacy_ref_images,
+            'image_manifest': enrich_image_manifest(context.image_manifest),
+        }
+        log_restyle_edit_event('restyle_edit_provider_request', trace, {
+            'context_mode': 'legacy_flattened',
+            'conversation_attempted': conversation_attempted,
+            'provider_fallback': provider_fallback,
+            'prompt_len': len(context.legacy_prompt),
+            'ref_image_count': len(context.legacy_ref_images),
+        })
+        maybe_write_debug_artifact(
+            config,
+            event_name='provider_request',
+            trace=trace,
+            payload=legacy_request_event,
+            degraded_context=context.degraded_context,
+            provider_fallback=provider_fallback,
+        )
         ref_images = self._resolve_ref_image_paths(context.legacy_ref_images)
         result = self.image_provider.generate_image(
             prompt=context.legacy_prompt,
@@ -622,8 +730,8 @@ class AIService:
             resolution=resolution,
             thinking_level=self._get_image_thinking_level()
         )
-        
-        logger.info("restyle_edit_context: legacy mode", extra={
+
+        result_event = {
             'context_mode': 'legacy_flattened',
             'conversation_attempted': conversation_attempted,
             'provider_fallback': provider_fallback,
@@ -631,7 +739,18 @@ class AIService:
             'baseline_images_count': context.baseline_images_count,
             'current_images_count': context.current_images_count,
             'snapshot_present': snapshot_present,
-        })
+            'provider': provider_name,
+            'model': provider_model,
+        }
+        log_restyle_edit_event('restyle_edit_provider_result', trace, result_event)
+        maybe_write_debug_artifact(
+            config,
+            event_name='provider_result',
+            trace=trace,
+            payload=result_event,
+            degraded_context=context.degraded_context,
+            provider_fallback=provider_fallback,
+        )
         
         return result
     
@@ -763,4 +882,3 @@ class AIService:
             return [str(desc) for desc in descriptions]
         else:
             raise ValueError("Expected a list of page descriptions, but got: " + str(type(descriptions)))
-
