@@ -9,6 +9,7 @@ Restyle 端到端集成测试
 """
 
 import io
+import json
 import os
 import pytest
 import tempfile
@@ -515,3 +516,209 @@ class TestRestyleSnapshotPersistence:
 
             import shutil
             shutil.rmtree(tmp_dir)
+
+
+class TestRestyleDebugArtifacts:
+    """Test first-pass restyle debug artifacts."""
+
+    def test_restyle_all_pages_failed_marks_task_failed_and_summary_failed(self, app, db_session):
+        with app.app_context():
+            from config import get_config
+            from models import db, Project, Page, Task, User
+            from services.task_manager import restyle_images_task
+            from PIL import Image as PILImage
+
+            user = User(display_name='Test', is_active=True)
+            db.session.add(user)
+            db.session.commit()
+
+            project = Project(
+                idea_prompt='t', creation_type='restyle',
+                owner_id=user.id, restyle_prompt='dark theme',
+            )
+            db.session.add(project)
+            db.session.commit()
+
+            tmp_dir = tempfile.mkdtemp()
+            debug_dir = tempfile.mkdtemp()
+
+            style_img = PILImage.new('RGB', (100, 100), 'blue')
+            style_path = os.path.join(tmp_dir, 'style.png')
+            style_img.save(style_path)
+
+            project.set_style_ref_image_paths([style_path])
+            db.session.commit()
+
+            page_ids = []
+            for index in range(2):
+                orig_img = PILImage.new('RGB', (1920, 1080), 'red')
+                orig_path = os.path.join(tmp_dir, f'original-{index}.png')
+                orig_img.save(orig_path)
+
+                page = Page(
+                    project_id=project.id,
+                    order_index=index,
+                    original_slide_image_path=orig_path,
+                    status='DRAFT',
+                )
+                db.session.add(page)
+                db.session.commit()
+                page_ids.append(page.id)
+
+            task = Task(
+                project_id=project.id,
+                owner_id=user.id,
+                task_type='RESTYLE_IMAGES',
+                status='PENDING',
+            )
+            db.session.add(task)
+            db.session.commit()
+
+            mock_ai = MagicMock()
+            mock_ai.image_provider.generate_image.side_effect = RuntimeError('provider exploded')
+            mock_ai._get_image_thinking_level.return_value = 'none'
+
+            mock_fs = MagicMock()
+            mock_fs.get_absolute_path.side_effect = lambda p: p
+
+            config = get_config()
+            original_debug_dir = getattr(config, 'RESTYLE_EDIT_DEBUG_DIR', None)
+
+            try:
+                config.RESTYLE_EDIT_DEBUG_DIR = debug_dir
+                with patch('services.ai_service_manager.get_ai_service', return_value=mock_ai):
+                    restyle_images_task(
+                        task.id,
+                        project.id,
+                        mock_ai,
+                        mock_fs,
+                        max_workers=1,
+                        aspect_ratio='16:9',
+                        resolution='2K',
+                        app=app,
+                    )
+
+                db.session.expire_all()
+                task = Task.query.get(task.id)
+                assert task.status == 'FAILED'
+                assert task.error_message == '2/2 pages failed during restyle generation'
+
+                progress = task.get_progress()
+                assert progress['completed'] == 0
+                assert progress['failed'] == 2
+
+                summary = json.loads((Path(debug_dir) / task.id / 'task' / 'summary.json').read_text())
+                assert summary['event']['status'] == 'FAILED'
+                assert summary['event']['completed'] == 0
+                assert summary['event']['failed'] == 2
+            finally:
+                if original_debug_dir is None and hasattr(config, 'RESTYLE_EDIT_DEBUG_DIR'):
+                    delattr(config, 'RESTYLE_EDIT_DEBUG_DIR')
+                elif original_debug_dir is not None:
+                    config.RESTYLE_EDIT_DEBUG_DIR = original_debug_dir
+
+                import shutil
+                shutil.rmtree(tmp_dir)
+                shutil.rmtree(debug_dir)
+
+    def test_restyle_single_page_writes_task_and_page_debug_artifacts(self, app, db_session):
+        with app.app_context():
+            from config import get_config
+            from models import db, Project, Page, Task, User
+            from services.task_manager import restyle_images_task
+            from PIL import Image as PILImage
+
+            user = User(display_name='Test', is_active=True)
+            db.session.add(user)
+            db.session.commit()
+
+            project = Project(
+                idea_prompt='t', creation_type='restyle',
+                owner_id=user.id, restyle_prompt='dark theme',
+            )
+            db.session.add(project)
+            db.session.commit()
+
+            tmp_dir = tempfile.mkdtemp()
+            debug_dir = tempfile.mkdtemp()
+
+            orig_img = PILImage.new('RGB', (1920, 1080), 'red')
+            orig_path = os.path.join(tmp_dir, 'original.png')
+            orig_img.save(orig_path)
+
+            style_img = PILImage.new('RGB', (100, 100), 'blue')
+            style_path = os.path.join(tmp_dir, 'style.png')
+            style_img.save(style_path)
+
+            project.set_style_ref_image_paths([style_path])
+            db.session.commit()
+
+            page = Page(
+                project_id=project.id,
+                order_index=0,
+                original_slide_image_path=orig_path,
+                status='DRAFT',
+            )
+            db.session.add(page)
+            db.session.commit()
+
+            task = Task(
+                project_id=project.id,
+                owner_id=user.id,
+                task_type='RESTYLE_IMAGES',
+                status='PENDING',
+            )
+            db.session.add(task)
+            db.session.commit()
+
+            mock_ai = MagicMock()
+            result_img = PILImage.new('RGB', (1920, 1080), 'green')
+            mock_ai.image_provider.generate_image.return_value = result_img
+            mock_ai._get_image_thinking_level.return_value = 'none'
+
+            mock_fs = MagicMock()
+            mock_fs.get_absolute_path.side_effect = lambda p: p
+
+            config = get_config()
+            original_debug_dir = getattr(config, 'RESTYLE_EDIT_DEBUG_DIR', None)
+
+            try:
+                config.RESTYLE_EDIT_DEBUG_DIR = debug_dir
+                with patch('services.task_manager.save_image_with_version', return_value=(orig_path, 1)), \
+                     patch('services.ai_service_manager.get_ai_service', return_value=mock_ai):
+                    restyle_images_task(
+                        task.id,
+                        project.id,
+                        mock_ai,
+                        mock_fs,
+                        page_ids=[page.id],
+                        max_workers=1,
+                        aspect_ratio='16:9',
+                        resolution='2K',
+                        app=app,
+                    )
+
+                task_dir = Path(debug_dir) / task.id
+                page_dir = task_dir / 'pages' / f'page-001-{page.id}'
+
+                assert (task_dir / 'task' / 'started.json').exists()
+                assert (task_dir / 'task' / 'summary.json').exists()
+                assert (page_dir / 'context_built.json').exists()
+                assert (page_dir / 'provider_decision.json').exists()
+                assert (page_dir / 'provider_request.json').exists()
+                assert (page_dir / 'provider_result.json').exists()
+                assert (page_dir / 'saved_version.json').exists()
+
+                saved_version = json.loads((page_dir / 'saved_version.json').read_text())
+                assert saved_version['trace']['task_id'] == task.id
+                assert saved_version['trace']['page_id'] == page.id
+                assert saved_version['event']['version_number'] == 1
+            finally:
+                if original_debug_dir is None and hasattr(config, 'RESTYLE_EDIT_DEBUG_DIR'):
+                    delattr(config, 'RESTYLE_EDIT_DEBUG_DIR')
+                elif original_debug_dir is not None:
+                    config.RESTYLE_EDIT_DEBUG_DIR = original_debug_dir
+
+                import shutil
+                shutil.rmtree(tmp_dir)
+                shutil.rmtree(debug_dir)

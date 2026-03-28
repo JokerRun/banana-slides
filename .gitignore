@@ -49,6 +49,7 @@ generate-example.py
 *.pdf
 .cursor/worktrees.json
 uploads/
+!data/
 !assets/*
 
 # 镜像源配置脚本的备份文件
@@ -63,3 +64,13 @@ _local_backup/
 .worktrees/
 *.zip
 .agents/references/md.md
+!/data/debug/README.md
+!/data/
+/data/*
+!/data/debug/
+/data/debug/*
+!/data/debug/README.md
+!/data/debug/export_restyle_debug_excel.py
+!/data/debug/restyle-context/
+/data/debug/restyle-context/*
+!/data/debug/restyle-context/README.md

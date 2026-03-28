@@ -676,20 +676,41 @@ def edit_page_image_task(task_id: str, project_id: str, page_id: str,
             
             # Edit image
             logger.info(f"🎨 Editing image for page {page_id}...")
+            is_restyle_project = False
+            trace = None
             try:
                 # Check if this is a restyle project
                 from models import Project
                 project = Project.query.get(project_id)
                 
                 if project and project.creation_type == 'restyle':
+                    is_restyle_project = True
                     # Use conversation context for restyle edits
                     from services.restyle_edit_context import (
                         build_restyle_edit_context,
                         MissingStructuralImagesError,
                         ContextImageLimitExceeded,
                     )
+                    from services.restyle_edit_debug import (
+                        enrich_image_manifest,
+                        log_restyle_edit_event,
+                        maybe_write_debug_artifact,
+                    )
                     from config import get_config
                     config = get_config()
+                    current_version = PageImageVersion.query.filter_by(
+                        page_id=page_id,
+                        is_current=True,
+                    ).first()
+                    trace = {
+                        'task_id': task_id,
+                        'project_id': project_id,
+                        'page_id': page_id,
+                        'flow_kind': 'edit_restyle',
+                        'page_order_index': page.order_index + 1,
+                        'source_version_number': current_version.version_number if current_version else None,
+                        'page_version_number': None,
+                    }
                     
                     # Validate structural image availability (DB path → abs → readable)
                     original_slide_abs = None
@@ -751,8 +772,24 @@ def edit_page_image_task(task_id: str, project_id: str, page_id: str,
                             prunable_cap=config.RESTYLE_EDIT_MAX_PRUNABLE_IMAGES,
                             total_cap=config.RESTYLE_EDIT_MAX_TOTAL_IMAGES,
                         )
+                        context_event = {
+                            'snapshot_source': ctx.snapshot_source,
+                            'degraded_context': ctx.degraded_context,
+                            'baseline_images_count': ctx.baseline_images_count,
+                            'current_images_count': ctx.current_images_count,
+                            'turns_summary': ctx.turns_summary,
+                            'image_manifest': enrich_image_manifest(ctx.image_manifest),
+                        }
+                        log_restyle_edit_event('restyle_edit_context_built', trace, context_event)
+                        maybe_write_debug_artifact(
+                            config,
+                            event_name='context_built',
+                            trace=trace,
+                            payload=context_event,
+                            degraded_context=ctx.degraded_context,
+                        )
                         image = ai_service.edit_restyle_image_with_context(
-                            ctx, aspect_ratio, resolution
+                            ctx, aspect_ratio, resolution, trace_context=trace
                         )
                     except (MissingStructuralImagesError, ContextImageLimitExceeded) as e:
                         raise ValueError(f"Restyle edit context error: {e}")
@@ -782,6 +819,23 @@ def edit_page_image_task(task_id: str, project_id: str, page_id: str,
             image_path, next_version = save_image_with_version(
                 image, project_id, page_id, file_service, page_obj=page
             )
+
+            if is_restyle_project and trace:
+                saved_trace = {
+                    **trace,
+                    'page_version_number': next_version,
+                }
+                saved_event = {
+                    'image_path': image_path,
+                    'version_number': next_version,
+                    'page_order_index': page.order_index + 1,
+                }
+                maybe_write_debug_artifact(
+                    config,
+                    event_name='saved_version',
+                    trace=saved_trace,
+                    payload=saved_event,
+                )
             
             # Mark task as completed
             task.status = 'COMPLETED'
@@ -1200,8 +1254,18 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
 
     with app.app_context():
         try:
+            from config import get_config
             from models import Project
             from services.prompts import get_restyle_prompt
+            from services.restyle_edit_debug import (
+                build_page_artifact_path_components,
+                build_task_artifact_path_components,
+                enrich_image_manifest,
+                log_restyle_edit_event,
+                maybe_write_debug_artifact,
+            )
+
+            config = get_config()
 
             # Update task status
             task = Task.query.get(task_id)
@@ -1230,12 +1294,46 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
                         f"style_refs={len(style_ref_paths)}, prompt={'yes' if restyle_prompt else 'no'}, "
                         f"aspect_ratio={aspect_ratio}, resolution={resolution}, max_workers={max_workers}")
 
+            task_trace = {
+                'project_id': project_id,
+                'task_id': task_id,
+                'flow_kind': 'first_pass_restyle',
+                'page_count': total_pages,
+            }
+            task_started_event = {
+                'project_id': project_id,
+                'selected_page_ids': page_ids or [page.id for page in pages],
+                'total_pages': total_pages,
+                'style_ref_count': len(style_ref_paths),
+                'restyle_prompt_present': bool(restyle_prompt),
+                'restyle_prompt_len': len(restyle_prompt),
+                'aspect_ratio': aspect_ratio,
+                'resolution': resolution,
+                'max_workers': max_workers,
+            }
+            log_restyle_edit_event('restyle_first_pass_task_started', task_trace, task_started_event)
+            maybe_write_debug_artifact(
+                config,
+                event_name='started',
+                trace=task_trace,
+                payload=task_started_event,
+                path_components=build_task_artifact_path_components(),
+            )
+
             # Load style ref images as PIL Images
             # Note: Image.open() is lazy — must .copy() to force load into memory
             # before sharing across threads, otherwise file handles may conflict
             style_ref_images = []
+            style_ref_manifest = []
             for ref_path in style_ref_paths:
                 abs_path = file_service.get_absolute_path(ref_path)
+                style_ref_manifest.append({
+                    'kind': 'style_ref',
+                    'bucket': 'baseline',
+                    'path': abs_path,
+                    'selected': os.path.exists(abs_path),
+                    'selection_reason': 'first_pass_style_ref',
+                })
                 if os.path.exists(abs_path):
                     img = Image.open(abs_path)
                     img.load()  # Force decode into memory
@@ -1257,10 +1355,15 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
 
             completed = 0
             failed = 0
+            page_results = []
 
             def restyle_single_page(page_id, page_index):
                 """Restyle a single page"""
                 with app.app_context():
+                    page_obj = None
+                    page_trace = None
+                    page_artifact_path = None
+                    error_stage = 'page_setup'
                     try:
                         from services.ai_service_manager import get_ai_service
                         ai_svc = get_ai_service()
@@ -1271,6 +1374,24 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
 
                         page_obj.status = 'GENERATING'
                         db.session.commit()
+
+                        source_version = PageImageVersion.query.filter_by(
+                            page_id=page_id,
+                            is_current=True,
+                        ).first()
+                        page_trace = {
+                            'project_id': project_id,
+                            'task_id': task_id,
+                            'flow_kind': 'first_pass_restyle',
+                            'page_id': page_id,
+                            'page_order_index': page_obj.order_index + 1,
+                            'source_version_number': source_version.version_number if source_version else None,
+                            'page_version_number': None,
+                        }
+                        page_artifact_path = build_page_artifact_path_components(
+                            page_number=page_obj.order_index + 1,
+                            page_id=page_id,
+                        )
 
                         # Get original slide image
                         if not page_obj.original_slide_image_path:
@@ -1291,16 +1412,83 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
                             custom_prompt=restyle_prompt
                         )
 
+                        context_event = {
+                            'page_index': page_index,
+                            'page_order_index': page_obj.order_index + 1,
+                            'total_pages': total_pages,
+                            'prompt_len': len(prompt),
+                            'snapshot_present': bool(page_obj.restyle_base_prompt_snapshot),
+                            'image_manifest': enrich_image_manifest([
+                                {
+                                    'kind': 'original_slide',
+                                    'bucket': 'baseline',
+                                    'path': original_path,
+                                    'selected': True,
+                                    'selection_reason': 'first_pass_original_slide',
+                                },
+                                *style_ref_manifest,
+                            ]),
+                        }
+                        log_restyle_edit_event('restyle_first_pass_context_built', page_trace, context_event)
+                        maybe_write_debug_artifact(
+                            config,
+                            event_name='context_built',
+                            trace=page_trace,
+                            payload=context_event,
+                            path_components=page_artifact_path,
+                        )
+
                         # Build ref_images: original slide first, then style refs
                         ref_images = [original_image] + list(style_ref_images)
 
                         # Generate restyled image via AIService
                         thinking_level = ai_svc._get_image_thinking_level()
+                        provider_name = type(ai_svc.image_provider).__name__
+                        provider_model = getattr(ai_svc.image_provider, 'model', None)
+                        decision_event = {
+                            'provider': provider_name,
+                            'model': provider_model,
+                            'thinking_level': thinking_level,
+                            'ref_image_count': len(ref_images),
+                        }
+                        log_restyle_edit_event('restyle_first_pass_provider_decision', page_trace, decision_event)
+                        maybe_write_debug_artifact(
+                            config,
+                            event_name='provider_decision',
+                            trace=page_trace,
+                            payload=decision_event,
+                            path_components=page_artifact_path,
+                        )
+
+                        request_event = {
+                            'provider': provider_name,
+                            'model': provider_model,
+                            'prompt': prompt,
+                            'prompt_len': len(prompt),
+                            'aspect_ratio': aspect_ratio,
+                            'resolution': resolution,
+                            'thinking_level': thinking_level,
+                            'ref_image_paths': [original_path, *[item['path'] for item in style_ref_manifest if item['selected']]],
+                        }
+                        log_restyle_edit_event('restyle_first_pass_provider_request', page_trace, {
+                            'provider': provider_name,
+                            'model': provider_model,
+                            'prompt_len': len(prompt),
+                            'ref_image_count': len(ref_images),
+                        })
+                        maybe_write_debug_artifact(
+                            config,
+                            event_name='provider_request',
+                            trace=page_trace,
+                            payload=request_event,
+                            path_components=page_artifact_path,
+                        )
                         logger.info(f"🎨 Restyling page {page_index}/{total_pages} (page_id={page_id}): "
                                     f"original={original_path} ({original_image.size[0]}x{original_image.size[1]}), "
                                     f"ref_images={len(ref_images)}, thinking_level={thinking_level}")
 
                         t0 = time.time()
+                        error_stage = 'provider_request'
                         image = ai_svc.image_provider.generate_image(
                             prompt=prompt,
                             ref_images=ref_images,
@@ -1313,24 +1501,102 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
                         if not image:
                             raise ValueError("Failed to generate restyled image")
 
+                        provider_result_event = {
+                            'provider': provider_name,
+                            'model': provider_model,
+                            'elapsed_seconds': round(elapsed, 3),
+                            'result_image_size': list(image.size),
+                            'error_stage': None,
+                        }
+                        log_restyle_edit_event('restyle_first_pass_provider_result', page_trace, provider_result_event)
+                        maybe_write_debug_artifact(
+                            config,
+                            event_name='provider_result',
+                            trace=page_trace,
+                            payload=provider_result_event,
+                            path_components=page_artifact_path,
+                        )
+
                         # Save with version management
+                        error_stage = 'persist_result'
                         image_path, version = save_image_with_version(
                             image, project_id, page_id, file_service, page_obj=page_obj
                         )
 
                         # Persist first-pass prompt snapshot (write-once)
+                        snapshot_persisted = False
                         if not page_obj.restyle_base_prompt_snapshot:
                             page_obj.restyle_base_prompt_snapshot = prompt
                             db.session.commit()
+                            snapshot_persisted = True
                             logger.info(f"📝 Snapshot persisted for page {page_id}")
 
+                        saved_trace = {
+                            **page_trace,
+                            'page_version_number': version,
+                        }
+                        saved_event = {
+                            'image_path': image_path,
+                            'version_number': version,
+                            'snapshot_persisted': snapshot_persisted,
+                            'snapshot_present_after_save': bool(page_obj.restyle_base_prompt_snapshot),
+                        }
+                        log_restyle_edit_event('restyle_first_pass_saved_version', saved_trace, saved_event)
+                        maybe_write_debug_artifact(
+                            config,
+                            event_name='saved_version',
+                            trace=saved_trace,
+                            payload=saved_event,
+                            path_components=page_artifact_path,
+                        )
+
                         logger.info(f"✅ Restyle page {page_index}/{total_pages} completed in {elapsed:.1f}s → {image_path} ({image.size[0]}x{image.size[1]})")
-                        return (page_id, image_path, None)
+                        return {
+                            'page_id': page_id,
+                            'page_order_index': page_obj.order_index + 1,
+                            'image_path': image_path,
+                            'version_number': version,
+                            'error': None,
+                        }
 
                     except Exception as e:
                         import traceback
+                        if page_trace is None:
+                            page_trace = {
+                                'project_id': project_id,
+                                'task_id': task_id,
+                                'flow_kind': 'first_pass_restyle',
+                                'page_id': page_id,
+                                'page_order_index': page_index,
+                                'source_version_number': None,
+                                'page_version_number': None,
+                            }
+                        if page_artifact_path is None:
+                            page_artifact_path = build_page_artifact_path_components(
+                                page_number=page_index,
+                                page_id=page_id,
+                            )
+                        error_event = {
+                            'error_message': str(e),
+                            'error_stage': error_stage,
+                        }
+                        log_restyle_edit_event('restyle_first_pass_provider_result', page_trace, error_event)
+                        maybe_write_debug_artifact(
+                            config,
+                            event_name='provider_result',
+                            trace=page_trace,
+                            payload=error_event,
+                            path_components=page_artifact_path,
+                            error=True,
+                        )
                         logger.error(f"Failed to restyle page {page_id}: {traceback.format_exc()}")
-                        return (page_id, None, str(e))
+                        return {
+                            'page_id': page_id,
+                            'page_order_index': page_obj.order_index + 1 if page_obj else page_index,
+                            'image_path': None,
+                            'version_number': None,
+                            'error': str(e),
+                        }
 
             # Parallel execution
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -1340,7 +1606,10 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
                 ]
 
                 for future in as_completed(futures):
-                    page_id, image_path, error = future.result()
+                    page_result = future.result()
+                    page_id = page_result['page_id']
+                    error = page_result['error']
+                    page_results.append(page_result)
 
                     db.session.expire_all()
                     page = Page.query.get(page_id)
@@ -1360,13 +1629,37 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
                         db.session.commit()
                         logger.info(f"📊 Restyle progress: {completed}/{total_pages} completed, {failed} failed")
 
-            # Mark task as completed
+            # If every page failed, surface the batch as failed so polling/UI can
+            # stop on an error state instead of pretending the run completed.
             task = Task.query.get(task_id)
             if task:
-                task.status = 'COMPLETED'
+                all_pages_failed = failed == total_pages and total_pages > 0
+                task_status = 'FAILED' if all_pages_failed else 'COMPLETED'
+                task_error_message = None
+                if all_pages_failed:
+                    task_error_message = f'{failed}/{total_pages} pages failed during restyle generation'
+
+                task.status = task_status
+                task.error_message = task_error_message
                 task.completed_at = datetime.utcnow()
                 db.session.commit()
-                logger.info(f"🏁 Restyle task {task_id} COMPLETED - {completed}/{total_pages} pages restyled, {failed} failed")
+                logger.info(f"🏁 Restyle task {task_id} {task_status} - {completed}/{total_pages} pages restyled, {failed} failed")
+                summary_event = {
+                    'status': task_status,
+                    'total_pages': total_pages,
+                    'completed': completed,
+                    'failed': failed,
+                    'page_results': page_results,
+                }
+                log_restyle_edit_event('restyle_first_pass_task_summary', task_trace, summary_event)
+                maybe_write_debug_artifact(
+                    config,
+                    event_name='summary',
+                    trace=task_trace,
+                    payload=summary_event,
+                    path_components=build_task_artifact_path_components(),
+                    error=failed > 0,
+                )
 
             # Update project status
             project = Project.query.get(project_id)
@@ -1381,3 +1674,21 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
                 task.error_message = str(e)
                 task.completed_at = datetime.utcnow()
                 db.session.commit()
+            failure_trace = {
+                'project_id': project_id,
+                'task_id': task_id,
+                'flow_kind': 'first_pass_restyle',
+            }
+            failure_event = {
+                'status': 'FAILED',
+                'error_message': str(e),
+            }
+            log_restyle_edit_event('restyle_first_pass_task_summary', failure_trace, failure_event)
+            maybe_write_debug_artifact(
+                get_config(),
+                event_name='summary',
+                trace=failure_trace,
+                payload=failure_event,
+                path_components=build_task_artifact_path_components(),
+                error=True,
+            )

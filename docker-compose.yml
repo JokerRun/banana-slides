@@ -20,10 +20,10 @@ services:
     # environment:
     #   - GOOGLE_APPLICATION_CREDENTIALS=/app/gcp-service-account.json
     volumes:
-      # 持久化数据库
-      - ./backend/instance:/app/backend/instance
-      # 持久化上传的文件
-      - ./uploads:/app/uploads
+      # Persist mutable runtime data under one host directory tree.
+      - ./data/instance:/app/backend/instance
+      - ./data/uploads:/app/uploads
+      - ./data/debug:/app/debug
       # GCP 服务账户文件（仅 Vertex AI 用户需要取消下一行注释）
       # - ./gcp-service-account.json:/app/gcp-service-account.json:ro
     restart: unless-stopped
@@ -59,8 +59,3 @@ services:
 networks:
   banana-slides-network:
     driver: bridge
-
-volumes:
-  backend-data:
-  uploads-data:
-
