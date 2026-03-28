@@ -1,0 +1,22 @@
+# Banana Slides Agent Notes
+- Setup：先在 repo root 跑 `uv sync --extra test`，再 `cd frontend && npm install`；Python tooling 用 `uv`，Node 版本要求 `>=18`。
+- Dev：`npm run dev` 启动 docker compose；本地分离开发用 `npm run dev:backend` 和 `npm run dev:frontend`。
+- Build：`npm run build` 构建 Docker images；仅检查前端生产构建可用 `cd frontend && npm run build:check`。
+- Lint：统一入口是 `npm run lint`；backend 用 `npm run lint:backend`，frontend 用 `npm run lint:frontend`。
+- Tests：常用命令有 `npm run test`、`npm run test:backend`、`npm run test:frontend`、`npm run test:e2e`、`npm run quick-check`。
+- Single backend test：`uv run pytest backend/tests/unit/test_api_health.py`；按用例过滤可用 `uv run pytest backend/tests/unit/test_api_health.py -k health_check`。
+- Single frontend test：`cd frontend && npm run test:run -- src/tests/components/Button.test.tsx -t "renders"`；单个 E2E 用 `cd frontend && npm run test:e2e -- e2e/ui-full-flow.spec.ts`。
+- Verify：结束前优先跑最小相关 lint/test 范围；如果同时改了前后端，再跑 `npm run quick-check`。
+- Repo shape：根目录负责 Docker 和统一 scripts；`backend/` 是 Flask API，`frontend/` 是 React 18 + Vite，`docs/` 放 plans/specs，`.github/workflows/` 定义 CI。
+- Backend architecture：`backend/app.py` 是 app factory，负责接 CORS、cookie auth、SQLite WAL、Flask-Migrate 和各类 blueprints。
+- Backend layers：`controllers/` 暴露 `/api/*`；`services/` 放 AI、export、auth、task、material、restyle 逻辑；`models/` 是 SQLAlchemy models；`utils/` 放 response/auth 等共享 helpers。
+- Data/storage：SQLite DB 在 `backend/instance/database.db`；Alembic migrations 在 `backend/migrations`；上传和生成文件放 `uploads/`，通过 `/files/*` 提供访问。
+- Key backend APIs：项目和页面生成主流程在 `/api/projects`；认证在 `/api/auth`；设置在 `/api/settings`；素材在 `/api/materials`；参考文件在 `/api/reference-files`；任务轮询在 `/api/tasks`。
+- Async model：长耗时 AI 任务通过 `backend/services/task_manager.py` 里的 `ThreadPoolExecutor` 执行；frontend 轮询 task endpoints 并同步 Zustand store。
+- Frontend architecture：路由页面在 `frontend/src/pages`；复用 UI 在 `components/`；API 封装在 `api/`；全局状态在 `store/`；hooks/types/utils 各自独立目录。
+- Frontend conventions：使用 strict TypeScript、路径别名 `@/*`、type-only import 用 `import type`；组件/页面名用 PascalCase，hooks/stores 用 `useX`，局部变量和函数用 camelCase。
+- Backend conventions：controller 保持 thin，把业务逻辑下沉到 `services/`；Python 命名用 snake_case；ORM models 和 JSON payload key 尽量保持现有 API shape 一致。
+- Error handling：backend 优先复用 `success_response` / `error_response` helpers，并记录带上下文的异常日志；frontend 依赖 axios interceptors、store 层错误归一化、以及 toast-friendly 用户提示。
+- Formatting/types：保持现有风格，不做无关重排；frontend ESLint 允许 `_ignored` 形式的 unused params，`any` 仅在难以避免时使用；backend 没有强制 formatter，改动应尽量小且贴合上下文。
+- Auth/config：frontend 使用相对 API URL 且启用 `withCredentials`；不要重新引入 `VITE_API_BASE_URL`；运行时配置主要来自 `.env` / Docker，少量 settings/OAuth 字段会持久化到 DB。
+- Rule files：生成本文件时，仓库内未发现 repo-local `AGENT.md`、Cursor、Claude、Windsurf、Cline、Goose 或 Copilot instruction files。
