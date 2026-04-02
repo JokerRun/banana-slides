@@ -789,16 +789,14 @@ export const Home: React.FC = () => {
       <nav className="relative z-50 h-16 md:h-18 bg-white/40 dark:bg-background-primary backdrop-blur-2xl dark:backdrop-blur-none dark:border-b dark:border-border-primary">
 
         <div className="max-w-7xl mx-auto px-4 md:px-6 h-full flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center">
-              <img
-                src="/logo.png"
-                alt="DDI PPT助手 Logo"
-                className="h-10 md:h-12 w-auto rounded-lg object-contain"
-              />
-            </div>
-            <span className="text-xl md:text-2xl font-bold bg-gradient-to-r from-banana-600 via-orange-500 to-pink-500 bg-clip-text text-transparent">
-              DDI PPT助手
+          <div className="flex items-center gap-2.5">
+            <img
+              src="/logo.png"
+              alt="DDI Logo"
+              className="h-7 md:h-8 w-auto object-contain"
+            />
+            <span className="text-base md:text-lg font-bold text-slate-800 dark:text-foreground-primary tracking-tight">
+              PPT 助手
             </span>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
