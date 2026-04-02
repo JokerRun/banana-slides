@@ -1,0 +1,9 @@
+[submodule ".agents/references/autoresearch/karpathy-autoresearch"]
+	path = .agents/references/autoresearch/karpathy-autoresearch
+	url = https://github.com/karpathy/autoresearch.git
+[submodule ".agents/references/autoresearch/wecoai-awesome-autoresearch"]
+	path = .agents/references/autoresearch/wecoai-awesome-autoresearch
+	url = https://github.com/WecoAI/awesome-autoresearch.git
+[submodule ".agents/references/autoresearch/davebcn87-pi-autoresearch"]
+	path = .agents/references/autoresearch/davebcn87-pi-autoresearch
+	url = https://github.com/davebcn87/pi-autoresearch.git
