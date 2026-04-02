@@ -61,9 +61,9 @@ const homeI18n = {
       },
     },
     home: {
-      title: '蕉幻',
-      subtitle: 'Vibe your PPT like vibing code',
-      tagline: '基于 nano banana pro🍌 的原生 AI PPT 生成器',
+      title: 'DDI PPT助手',
+      subtitle: '像聊天一样写PPT',
+      tagline: '基于 banana pro🍌 的原生 AI PPT 生成器',
       features: {
         oneClick: '一句话生成 PPT',
         naturalEdit: '自然语言修改',
@@ -72,15 +72,15 @@ const homeI18n = {
       },
       tabs: {
         idea: '一句话生成',
-        outline: '从大纲生成',
-        description: '从描述生成',
-        restyle: '风格转换',
+        outline: '大纲生成',
+        description: '定稿文案生成',
+        restyle: '美化现有PPT',
       },
       tabDescriptions: {
         idea: '输入你的想法，AI 将为你生成完整的 PPT',
         outline: '已有大纲？直接粘贴，AI 将自动切分为结构化大纲',
         description: '已有完整描述？AI 将自动解析并直接生成图片，跳过大纲步骤',
-        restyle: '上传已有 PPT/PDF，提供风格参考图，AI 将逐页重绘为新风格',
+        restyle: '上传已有 PPT/PDF，提供风格参考，AI 将逐页重绘为新风格',
       },
       placeholders: {
         idea: '例如：生成一份关于 AI 发展史的演讲 PPT',
@@ -176,9 +176,9 @@ const homeI18n = {
       },
     },
     home: {
-      title: 'Banana Slides',
-      subtitle: 'Vibe your PPT like vibing code',
-      tagline: 'AI-native PPT generator powered by nano banana pro🍌',
+      title: 'DDI PPT Assistant',
+      subtitle: 'Vibe your PPT like chatting',
+      tagline: 'AI-native PPT generator powered by banana pro🍌',
       features: {
         oneClick: 'One-click PPT generation',
         naturalEdit: 'Natural language editing',
@@ -189,13 +189,13 @@ const homeI18n = {
         idea: 'From Idea',
         outline: 'From Outline',
         description: 'From Description',
-        restyle: 'Restyle',
+        restyle: 'Beautify Existing PPT',
       },
       tabDescriptions: {
         idea: 'Enter your idea, AI will generate a complete PPT for you',
         outline: 'Have an outline? Paste it directly, AI will split it into a structured outline',
         description: 'Have detailed descriptions? AI will parse and generate images directly, skipping the outline step',
-        restyle: 'Upload existing PPT/PDF with style references, AI will restyle each slide',
+        restyle: 'Upload existing PPT/PDF, provide style references, AI will restyle each slide',
       },
       placeholders: {
         idea: 'e.g., Generate a presentation about the history of AI',
@@ -257,7 +257,7 @@ export const Home: React.FC = () => {
   const { initializeProject, isGlobalLoading } = useProjectStore();
   const { show, ToastContainer } = useToast();
   
-  const [activeTab, setActiveTab] = useState<CreationType>('idea');
+  const [activeTab, setActiveTab] = useState<CreationType>('restyle');
   const [content, setContent] = useState('');
   const [selectedTemplate, setSelectedTemplate] = useState<File | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
@@ -716,7 +716,7 @@ export const Home: React.FC = () => {
         .filter(f => f.parse_status === 'completed')
         .map(f => f.id);
 
-      await initializeProject(activeTab, content, templateFile || undefined, styleDesc, refFileIds.length > 0 ? refFileIds : undefined);
+      await initializeProject(activeTab as 'idea' | 'outline' | 'description' | 'restyle', content, templateFile || undefined, styleDesc, refFileIds.length > 0 ? refFileIds : undefined);
       
       // 根据类型跳转到不同页面
       const projectId = localStorage.getItem('currentProjectId');
@@ -764,7 +764,7 @@ export const Home: React.FC = () => {
         console.log('No materials to associate');
       }
       
-      if (activeTab === 'idea' || activeTab === 'outline') {
+      if (activeTab === 'idea' || activeTab === 'outline' || activeTab === 'restyle') {
         navigate(`/project/${projectId}/outline`);
       } else if (activeTab === 'description') {
         // 从描述生成：直接跳到描述生成页（因为已经自动生成了大纲和描述）
@@ -793,12 +793,12 @@ export const Home: React.FC = () => {
             <div className="flex items-center">
               <img
                 src="/logo.png"
-                alt="蕉幻 Banana Slides Logo"
+                alt="DDI PPT助手 Logo"
                 className="h-10 md:h-12 w-auto rounded-lg object-contain"
               />
             </div>
             <span className="text-xl md:text-2xl font-bold bg-gradient-to-r from-banana-600 via-orange-500 to-pink-500 bg-clip-text text-transparent">
-              蕉幻
+              DDI PPT助手
             </span>
           </div>
           <div className="flex items-center gap-2 md:gap-3">
@@ -961,7 +961,7 @@ export const Home: React.FC = () => {
               backgroundSize: '200% auto',
               animation: 'gradient 3s ease infinite',
             }}>
-              {i18n.language?.startsWith('zh') ? `${t('home.title')} · Banana Slides` : 'Banana Slides'}
+              {i18n.language?.startsWith('zh') ? `${t('home.title')}` : 'DDI PPT Assistant'}
             </span>
           </h1>
 
@@ -992,25 +992,53 @@ export const Home: React.FC = () => {
         {/* 创建卡片 */}
         <Card className="p-4 md:p-10 bg-white/90 dark:bg-background-secondary backdrop-blur-xl dark:backdrop-blur-none shadow-2xl dark:shadow-none border-0 dark:border dark:border-border-primary hover:shadow-3xl dark:hover:shadow-none transition-all duration-300 dark:rounded-2xl">
           {/* 选项卡 */}
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-6 md:mb-8">
-            {(Object.keys(tabConfig) as CreationType[]).map((type) => {
-              const config = tabConfig[type];
-              return (
-                <button
-                  key={type}
-                  onClick={() => setActiveTab(type)}
-                  className={`flex-1 flex items-center justify-center gap-1.5 md:gap-2 px-3 md:px-6 py-2.5 md:py-3 rounded-lg dark:rounded-xl font-medium transition-all text-sm md:text-base touch-manipulation ${
-                    activeTab === type
-                      ? 'bg-gradient-to-r from-banana-500 to-banana-600 dark:from-banana dark:to-banana text-black shadow-yellow dark:shadow-lg dark:shadow-banana/20'
-                      : 'bg-white dark:bg-background-elevated border border-gray-200 dark:border-border-primary text-gray-700 dark:text-foreground-secondary hover:bg-banana-50 dark:hover:bg-background-hover active:bg-banana-100'
-                  }`}
-                >
-                  <span className="scale-90 md:scale-100">{config.icon}</span>
-                  <span className="truncate">{config.label}</span>
-                </button>
-              );
-            })}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 md:mb-8">
+            <div 
+              onClick={() => setActiveTab('restyle')}
+              className={`p-6 rounded-xl cursor-pointer shadow-sm relative overflow-hidden transition-all text-left ${activeTab === 'restyle' ? 'bg-[#FFC000] scale-[1.02]' : 'bg-white dark:bg-background-elevated border border-slate-200 hover:border-[#FFC000]'}`}
+            >
+              <h3 className={`text-lg font-bold mb-1 ${activeTab === 'restyle' ? 'text-slate-900' : 'text-slate-700 dark:text-foreground-primary'}`}>{tabConfig['restyle'].label}</h3>
+              <p className={`text-xs ${activeTab === 'restyle' ? 'text-slate-800' : 'text-slate-500 dark:text-foreground-tertiary'}`}>{tabConfig['restyle'].description}</p>
+            </div>
+
+            <div 
+              onClick={() => setActiveTab('idea')}
+              className={`p-6 rounded-xl cursor-pointer shadow-sm relative overflow-hidden transition-all text-left ${['idea', 'outline', 'description'].includes(activeTab) ? 'bg-[#FFC000] scale-[1.02]' : 'bg-white dark:bg-background-elevated border border-slate-200 hover:border-[#FFC000]'}`}
+            >
+              <h3 className={`text-lg font-bold mb-1 ${['idea', 'outline', 'description'].includes(activeTab) ? 'text-slate-900' : 'text-slate-700 dark:text-foreground-primary'}`}>生成新PPT</h3>
+              <p className={`text-xs ${['idea', 'outline', 'description'].includes(activeTab) ? 'text-slate-800' : 'text-slate-500 dark:text-foreground-tertiary'}`}>输入想法/大纲/描述，快速出稿</p>
+            </div>
+
+            <div className="bg-white dark:bg-background-elevated border border-slate-100 p-6 rounded-xl cursor-not-allowed opacity-60 relative md:col-span-2 text-left">
+              <div className="absolute top-3 right-3 flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded text-[10px] font-bold text-slate-400 border border-slate-200">
+                敬请期待
+              </div>
+              <h3 className="text-lg font-bold text-slate-400 mb-1">多语言翻译</h3>
+              <p className="text-xs text-slate-400">精准翻译，锁定排版保真</p>
+            </div>
           </div>
+          
+          {['idea', 'outline', 'description'].includes(activeTab) && (
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mb-6 md:mb-8">
+              {(['idea', 'outline', 'description'] as CreationType[]).map((type) => {
+                const config = tabConfig[type];
+                return (
+                  <button
+                    key={type}
+                    onClick={() => setActiveTab(type)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 md:gap-2 px-3 md:px-6 py-2.5 md:py-3 rounded-lg dark:rounded-xl font-medium transition-all text-sm md:text-base touch-manipulation border-2 ${
+                      activeTab === type
+                        ? 'bg-[#FFC000] border-[#FFC000] text-slate-900 shadow-md'
+                        : 'bg-white dark:bg-background-elevated border-slate-100 text-slate-500 hover:border-slate-300'
+                    }`}
+                  >
+                    <span className="scale-90 md:scale-100">{config.icon}</span>
+                    <span className="truncate">{config.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
 
           {/* 描述 */}
           <div className="relative">

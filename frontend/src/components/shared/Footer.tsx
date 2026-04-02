@@ -15,7 +15,7 @@ export const Footer: React.FC = () => {
           <div className="flex items-center gap-1.5">
             <span>© {currentYear}</span>
             <span className="font-medium bg-gradient-to-r from-banana-600 to-orange-500 bg-clip-text text-transparent">
-              蕉幻 Banana Slides
+              DDI PPT助手
             </span>
           </div>
 

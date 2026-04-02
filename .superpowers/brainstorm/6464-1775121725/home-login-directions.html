@@ -1,0 +1,148 @@
+<h2>Choose a Direction</h2>
+<p class="subtitle">Scope: Home + Login only, brand as DDI PPT助手, module names aligned to the prototype</p>
+
+<div class="section" style="margin-top: 20px;">
+  <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom: 14px;">
+    <span class="label">My recommendation</span>
+    <span style="display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border-radius:999px; background:#14213d; color:#f8fafc; font-size:12px; font-weight:700;">B · Best balance of brand, clarity, and implementation cost</span>
+  </div>
+</div>
+
+<div class="cards" style="grid-template-columns: repeat(3, minmax(0, 1fr));">
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#f7f8fb; padding:18px;">
+      <div class="mockup" style="margin:0; border-radius:16px; overflow:hidden; border:1px solid #dbe3f0; box-shadow:0 18px 50px rgba(15,23,42,.08); background:#fff;">
+        <div class="mockup-body" style="padding:0;">
+          <div style="display:flex; min-height:250px;">
+            <aside style="width:84px; background:#f1f5f9; border-right:1px solid #e2e8f0; padding:12px 10px; display:flex; flex-direction:column; gap:10px; align-items:center;">
+              <div style="width:46px; height:46px; border-radius:14px; background:#ffffff; border:1px solid #d6deea; display:flex; align-items:center; justify-content:center; font-size:10px; font-weight:800; color:#0f172a;">DDI</div>
+              <div style="width:100%; height:34px; border-radius:12px; background:#ffffff; border:1px solid #d6deea;"></div>
+              <div style="width:100%; height:34px; border-radius:12px; background:#ffffff; border:1px solid #d6deea;"></div>
+              <div style="width:100%; height:34px; border-radius:12px; background:#ffffff; border:1px solid #d6deea;"></div>
+            </aside>
+            <main style="flex:1; padding:18px; background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%);">
+              <div style="height:20px; width:160px; background:#0f172a; border-radius:999px; opacity:.08; margin-bottom:14px;"></div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">
+                <div style="height:98px; border-radius:18px; background:#ffffff; border:1px solid #dbe3f0;"></div>
+                <div style="height:98px; border-radius:18px; background:#ffffff; border:1px solid #dbe3f0;"></div>
+              </div>
+              <div style="height:120px; border-radius:18px; background:#ffffff; border:1px solid #dbe3f0;"></div>
+            </main>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A. Safe Reskin</h3>
+      <p>Keep the current product structure, replace the top nav with a light left rail, and restyle cards/forms with DDI branding.</p>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Lowest implementation risk</li><li>Fastest to land</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Feels less like the Gemini reference</li><li>Hierarchy improvement is limited</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#eef3f8; padding:18px;">
+      <div class="mockup" style="margin:0; border-radius:16px; overflow:hidden; border:1px solid #d9e4ef; box-shadow:0 18px 50px rgba(15,23,42,.10); background:#fff;">
+        <div class="mockup-body" style="padding:0;">
+          <div style="display:flex; min-height:250px;">
+            <aside style="width:104px; background:#f8fafc; border-right:1px solid #e2e8f0; padding:14px 12px; display:flex; flex-direction:column; gap:10px; align-items:center;">
+              <div style="width:58px; height:58px; border-radius:18px; background:#ffffff; border:1px solid #d6deea; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:900; color:#0f172a;">DDI</div>
+              <div style="width:100%; height:38px; border-radius:14px; background:#dbeafe; border:1px solid #bfdbfe;"></div>
+              <div style="width:100%; height:38px; border-radius:14px; background:#ffffff; border:1px solid #d6deea;"></div>
+              <div style="width:100%; height:38px; border-radius:14px; background:#ffffff; border:1px solid #d6deea;"></div>
+            </aside>
+            <main style="flex:1; padding:20px; background:radial-gradient(circle at top right,#e0f2fe 0%,#f8fafc 30%,#ffffff 65%);">
+              <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:14px;">
+                <div>
+                  <div style="height:18px; width:180px; background:#0f172a; border-radius:999px; opacity:.1; margin-bottom:10px;"></div>
+                  <div style="height:10px; width:240px; background:#0f172a; border-radius:999px; opacity:.06;"></div>
+                </div>
+                <div style="width:84px; height:30px; border-radius:999px; background:#0f172a;"></div>
+              </div>
+              <div style="display:grid; grid-template-columns:1.2fr .8fr; gap:14px;">
+                <div style="border-radius:22px; background:#ffffff; border:1px solid #dbe3f0; padding:14px; min-height:150px;">
+                  <div style="display:flex; gap:8px; margin-bottom:12px;">
+                    <div style="height:34px; width:96px; border-radius:12px; background:#0f172a;"></div>
+                    <div style="height:34px; width:96px; border-radius:12px; background:#e2e8f0;"></div>
+                    <div style="height:34px; width:96px; border-radius:12px; background:#e2e8f0;"></div>
+                  </div>
+                  <div style="height:74px; border-radius:16px; background:#f8fafc; border:1px dashed #cbd5e1; margin-bottom:12px;"></div>
+                  <div style="height:36px; width:124px; border-radius:12px; background:#f59e0b;"></div>
+                </div>
+                <div style="display:grid; gap:14px;">
+                  <div style="border-radius:20px; background:#ffffff; border:1px solid #dbe3f0; min-height:68px;"></div>
+                  <div style="border-radius:20px; background:#ffffff; border:1px solid #dbe3f0; min-height:68px;"></div>
+                </div>
+              </div>
+            </main>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B. Gemini-like Workbench</h3>
+      <p>Use a real left rail, central workspace, large task framing, and quieter enterprise styling. The login page mirrors the same shell and visual language.</p>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Best matches the reference intent</li><li>Improves module hierarchy clearly</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Needs moderate Home page restructuring</li><li>More UI touch points than A</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image" style="background:#0f172a; padding:18px;">
+      <div class="mockup" style="margin:0; border-radius:16px; overflow:hidden; border:1px solid rgba(255,255,255,.12); box-shadow:0 18px 50px rgba(2,6,23,.35); background:#111827;">
+        <div class="mockup-body" style="padding:0;">
+          <div style="display:flex; min-height:250px;">
+            <aside style="width:104px; background:#111827; border-right:1px solid rgba(255,255,255,.08); padding:14px 12px; display:flex; flex-direction:column; gap:10px; align-items:center;">
+              <div style="width:58px; height:58px; border-radius:18px; background:linear-gradient(135deg,#1e293b,#334155); border:1px solid rgba(255,255,255,.12); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:900; color:#f8fafc;">DDI</div>
+              <div style="width:100%; height:38px; border-radius:14px; background:rgba(255,255,255,.08);"></div>
+              <div style="width:100%; height:38px; border-radius:14px; background:rgba(255,255,255,.08);"></div>
+              <div style="width:100%; height:38px; border-radius:14px; background:rgba(255,255,255,.08);"></div>
+            </aside>
+            <main style="flex:1; padding:20px; background:radial-gradient(circle at top right,rgba(59,130,246,.28),transparent 25%), radial-gradient(circle at bottom left,rgba(245,158,11,.18),transparent 20%), #0f172a;">
+              <div style="height:20px; width:180px; background:#ffffff; border-radius:999px; opacity:.12; margin-bottom:14px;"></div>
+              <div style="height:120px; border-radius:24px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08); margin-bottom:14px;"></div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+                <div style="height:84px; border-radius:18px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08);"></div>
+                <div style="height:84px; border-radius:18px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.08);"></div>
+              </div>
+            </main>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C. Executive Studio</h3>
+      <p>Push the visual identity harder with a darker, premium shell and more dramatic surfaces around the same module model.</p>
+      <div class="pros-cons" style="margin-top:12px;">
+        <div class="pros"><h4>Pros</h4><ul><li>Most distinctive visually</li><li>Strong “enterprise tool” personality</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Further from the light Gemini reference</li><li>Higher design risk for quick rollout</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 24px;">
+  <div class="mockup">
+    <div class="mockup-header">Login concept shared by all three options</div>
+    <div class="mockup-body" style="background:linear-gradient(135deg,#f8fafc,#eef3f8); padding:18px;">
+      <div style="display:grid; grid-template-columns: 1.2fr .8fr; gap:16px; align-items:stretch;">
+        <div style="border-radius:24px; padding:24px; background:#0f172a; color:#f8fafc; min-height:180px; display:flex; flex-direction:column; justify-content:space-between;">
+          <div>
+            <div style="font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:#93c5fd; margin-bottom:10px;">DDI PPT Assistant</div>
+            <div style="font-size:28px; line-height:1.15; font-weight:800; max-width:320px;">Create or beautify decks with one enterprise workbench.</div>
+          </div>
+          <div style="font-size:12px; color:#cbd5e1;">The right card contains SSO-only login actions.</div>
+        </div>
+        <div style="border-radius:24px; padding:20px; background:#ffffff; border:1px solid #dbe3f0; display:flex; flex-direction:column; gap:12px; justify-content:center;">
+          <div style="height:44px; border-radius:14px; background:#0f172a;"></div>
+          <div style="height:44px; border-radius:14px; background:#ffffff; border:1px solid #cbd5e1;"></div>
+          <div style="height:10px; width:70%; background:#0f172a; border-radius:999px; opacity:.08; margin-top:4px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

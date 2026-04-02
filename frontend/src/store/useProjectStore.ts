@@ -23,7 +23,7 @@ interface ProjectState {
   setError: (error: string | null) => void;
   
   // 项目操作
-  initializeProject: (type: 'idea' | 'outline' | 'description', content: string, templateImage?: File, templateStyle?: string, referenceFileIds?: string[]) => Promise<void>;
+  initializeProject: (type: 'idea' | 'outline' | 'description' | 'restyle', content: string, templateImage?: File, templateStyle?: string, referenceFileIds?: string[]) => Promise<void>;
   syncProject: (projectId?: string) => Promise<void>;
   
   // 页面操作

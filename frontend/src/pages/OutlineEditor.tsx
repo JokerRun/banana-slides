@@ -6,7 +6,7 @@ import { useT } from '@/hooks/useT';
 // 组件内翻译
 const outlineI18n = {
   zh: {
-    home: { title: '蕉幻' },
+    home: { title: 'DDI PPT助手' },
     outline: {
       title: "编辑大纲", pageCount: "共 {{count}} 页", addPage: "添加页面",
       generateDescriptions: "生成描述", generating: "生成中...", chapter: "章节",

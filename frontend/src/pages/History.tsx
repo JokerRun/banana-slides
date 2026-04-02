@@ -15,7 +15,7 @@ import type { Project } from '@/types';
 // 页面特有翻译 - AI 可以直接看到所有文案
 const historyI18n = {
   zh: {
-    home: { title: '蕉幻', actions: { createProject: '创建新项目' } },
+    home: { title: 'DDI PPT助手', actions: { createProject: '创建新项目' } },
     nav: { home: '主页' },
     settings: { language: { label: '界面语言' }, theme: { light: '浅色', dark: '深色' } },
     history: {
@@ -42,7 +42,7 @@ const historyI18n = {
     },
   },
   en: {
-    home: { title: 'Banana Slides', actions: { createProject: 'Create New Project' } },
+    home: { title: 'DDI PPT Assistant', actions: { createProject: 'Create New Project' } },
     nav: { home: 'Home' },
     settings: { language: { label: 'Interface Language' }, theme: { light: 'Light', dark: 'Dark' } },
     history: {

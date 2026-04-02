@@ -7,10 +7,10 @@ import { useT } from '@/hooks/useT';
 const helpI18n = {
   zh: {
     help: {
-      title: "蕉幻 · Banana Slides", quickStart: "快速开始", quickStartDesc: "完成基础配置，开启 AI 创作之旅",
+      title: "DDI PPT助手", quickStart: "快速开始", quickStartDesc: "完成基础配置，开启 AI 创作之旅",
       featuresIntro: "功能介绍", featuresIntroDesc: "探索如何使用 AI 快速创建精美 PPT",
-      showcases: "结果案例", showcasesDesc: "以下是使用蕉幻生成的 PPT 案例展示", viewMoreCases: "查看更多使用案例",
-      welcome: "欢迎使用蕉幻！", welcomeDesc: "在开始前，让我们先完成基础配置",
+      showcases: "结果案例", showcasesDesc: "以下是使用助手生成的 PPT 案例展示", viewMoreCases: "查看更多使用案例",
+      welcome: "欢迎使用DDI PPT助手！", welcomeDesc: "在开始前，让我们先完成基础配置",
       step1Title: "检查环境变量", step1Desc: "在部署环境中配置项目运行所需的 env（无需在应用内设置），包括：",
       step1Items: { apiConfig: "您的 AI 服务提供商的 API Base 和 API Key", modelConfig: "配置文本、图像生成模型(banana pro)和图像描述模型", mineruConfig: "若需要文件解析功能，请配置 MinerU Token", editableExport: "若需要可编辑导出功能，请配置MinerU TOKEN 和 Baidu API KEY" },
       step2Title: "重启并验证", step2Desc: "修改 env 后重启服务，然后创建一个示例项目验证生成链路是否正常。",
@@ -30,10 +30,10 @@ const helpI18n = {
   },
   en: {
     help: {
-      title: "Banana Slides", quickStart: "Quick Start", quickStartDesc: "Complete basic configuration and start your AI creation journey",
+      title: "DDI PPT Assistant", quickStart: "Quick Start", quickStartDesc: "Complete basic configuration and start your AI creation journey",
       featuresIntro: "Features", featuresIntroDesc: "Explore how to use AI to quickly create beautiful PPT",
-      showcases: "Showcases", showcasesDesc: "Here are PPT examples generated with Banana Slides", viewMoreCases: "View more examples",
-      welcome: "Welcome to Banana Slides!", welcomeDesc: "Let's complete the basic configuration before you start",
+      showcases: "Showcases", showcasesDesc: "Here are PPT examples generated with DDI PPT Assistant", viewMoreCases: "View more examples",
+      welcome: "Welcome to DDI PPT Assistant!", welcomeDesc: "Let's complete the basic configuration before you start",
       step1Title: "Check Environment Variables", step1Desc: "Configure required runtime env values in your deployment (no in-app settings), including:",
       step1Items: { apiConfig: "Your AI service provider's API Base and API Key", modelConfig: "Configure text, image generation model (banana pro) and image caption model", mineruConfig: "If you need file parsing, configure MinerU Token", editableExport: "If you need editable export, configure MinerU TOKEN and Baidu API KEY" },
       step2Title: "Restart and Verify", step2Desc: "After updating env, restart the service and create a sample project to verify the generation flow.",
@@ -109,7 +109,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
         <div className="inline-flex items-center justify-center mr-4">
           <img
             src="/logo.png"
-            alt="Banana Slides Logo"
+            alt="DDI Logo"
             className="h-16 w-16 object-contain"
           />
         </div>

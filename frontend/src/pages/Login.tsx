@@ -14,7 +14,7 @@ export const Login: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-100 via-white to-amber-100 flex items-center justify-center p-6">
       <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-8 shadow-xl">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-slate-900">Banana Slides</h1>
+          <h1 className="text-3xl font-bold text-slate-900">DDI PPT助手</h1>
           <p className="mt-2 text-sm text-slate-600">Sign in to continue.</p>
         </div>
         <div className="space-y-3">
