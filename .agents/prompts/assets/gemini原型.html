@@ -1,0 +1,333 @@
+import React, { useState } from 'react';
+import { 
+  UploadCloud, CheckCircle2, Wand2, Download, 
+  Settings, Image as ImageIcon, RefreshCw, 
+  Home, ArrowLeft, RotateCcw, 
+  ChevronLeft, ChevronRight, Sparkles,
+  Layers, PanelLeft, Edit,
+  ImagePlus, FolderOpen, Globe, Sun, 
+  Trash2, FileText, Clock, ChevronRight as ChevronRightIcon,
+  Lock, StickyNote, Plus, Paperclip
+} from 'lucide-react';
+
+// --- 模拟数据 ---
+const MOCK_PAGES = [
+  { id: 1, type: '封面', title: '2026数字化转型战略', status: '已完成' },
+  { id: 2, type: '正文', title: '核心驱动力分析', status: '已完成' },
+  { id: 3, type: '正文', title: '落地路径与里程碑', status: '待处理' },
+  { id: 4, type: '正文', title: '市场竞争格局', status: '待处理' },
+  { id: 5, type: '过渡页', title: '第二阶段：执行计划', status: '待处理' },
+  { id: 6, type: '封底', title: 'Thank You', status: '待处理' },
+];
+
+const MOCK_HISTORY = [
+  { id: 1, name: '2026战略规划定稿', pages: 8, time: '2026/03/12 10:37', status: '已完成' },
+  { id: 2, name: '新员工培训手册_V2', pages: 11, time: '2026/03/11 18:44', status: '已完成' },
+];
+
+const App = () => {
+  const [step, setStep] = useState('config'); // config, audit, editor, export, history
+  const [activeCategory, setActiveCategory] = useState('beautify'); 
+  const [genMethod, setGenMethod] = useState('description'); 
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [pages] = useState(MOCK_PAGES);
+  const [selectedPage, setSelectedPage] = useState(MOCK_PAGES[0]);
+
+  const handleProcess = (nextStep, duration = 1500) => {
+    setIsProcessing(true);
+    setTimeout(() => {
+      setIsProcessing(false);
+      setStep(nextStep);
+    }, duration);
+  };
+
+  // --- 子组件：顶部一级导航 ---
+  const CategoryTabs = () => (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div 
+        onClick={() => setActiveCategory('beautify')}
+        className={`p-6 rounded-xl cursor-pointer shadow-sm relative overflow-hidden transition-all ${activeCategory === 'beautify' ? 'bg-[#FFC000] scale-[1.02]' : 'bg-white border border-slate-200 hover:border-[#FFC000]'}`}
+      >
+        <h3 className={`text-lg font-bold mb-1 ${activeCategory === 'beautify' ? 'text-slate-900' : 'text-slate-700'}`}>美化现有PPT</h3>
+        <p className={`text-xs ${activeCategory === 'beautify' ? 'text-slate-800' : 'text-slate-500'}`}>统一模板格式，优化视觉呈现</p>
+      </div>
+
+      <div 
+        onClick={() => setActiveCategory('generate')}
+        className={`p-6 rounded-xl cursor-pointer shadow-sm relative overflow-hidden transition-all ${activeCategory === 'generate' ? 'bg-[#FFC000] scale-[1.02]' : 'bg-white border border-slate-200 hover:border-[#FFC000]'}`}
+      >
+        <h3 className={`text-lg font-bold mb-1 ${activeCategory === 'generate' ? 'text-slate-900' : 'text-slate-700'}`}>生成新PPT</h3>
+        <p className={`text-xs ${activeCategory === 'generate' ? 'text-slate-800' : 'text-slate-500'}`}>输入大纲或主题，快速出稿</p>
+      </div>
+
+      <div className="bg-white border border-slate-100 p-6 rounded-xl cursor-not-allowed opacity-60 relative">
+        <div className="absolute top-3 right-3 flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded text-[10px] font-bold text-slate-400 border border-slate-200">
+          <Lock className="w-3 h-3" /> 敬请期待
+        </div>
+        <h3 className="text-lg font-bold text-slate-400 mb-1">多语言翻译</h3>
+        <p className="text-xs text-slate-400">精准翻译，锁定排版保真</p>
+      </div>
+    </div>
+  );
+
+  // --- 子组件：美化现有PPT配置 (去除项目名称，重排序号) ---
+  const BeautifySection = ({onNext}) => (
+    <div className="px-8 py-8 space-y-10 animate-in fade-in border-t border-slate-100">
+       <p className="text-sm text-slate-600 mb-4 font-medium italic">上传已有 PPT/PDF，提供风格参考，AI 将逐页重绘为新风格</p>
+       
+       {/* Step 1: 上传文件 */}
+       <div>
+         <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center">
+           <span className="w-6 h-6 rounded-full border border-[#FFC000] text-[#FFC000] flex items-center justify-center text-xs mr-2 font-bold">1</span>
+           上传 PPT/PDF 源文件
+         </h3>
+         <div className="border border-dashed border-slate-300 rounded-lg p-12 text-center bg-slate-50/50 hover:bg-slate-50 transition-all cursor-pointer group">
+           <UploadCloud className="w-10 h-10 text-slate-400 mx-auto mb-3 group-hover:text-[#FFC000] transition-colors" />
+           <p className="text-sm font-medium text-slate-600 tracking-tight">点击或拖拽文件到此处</p>
+           <p className="text-xs text-slate-400 mt-1 uppercase tracking-widest">PPT / PPTX / PDF</p>
+         </div>
+       </div>
+
+       {/* Step 2: 选择风格 */}
+       <div>
+         <h3 className="text-base font-bold text-slate-800 mb-4 flex items-center">
+           <span className="w-6 h-6 rounded-full border border-[#FFC000] text-[#FFC000] flex items-center justify-center text-xs mr-2 font-bold">2</span>
+           选择风格模板
+         </h3>
+         <div className="flex gap-4 mb-6">
+            <button className="px-6 py-2 border border-[#FFC000] text-[#FFC000] font-bold rounded-md text-sm bg-yellow-50/30 shadow-sm">预置模板</button>
+            <button className="px-6 py-2 border border-slate-200 text-slate-400 font-medium rounded-md text-sm hover:bg-slate-50">自定义</button>
+         </div>
+         
+         <div className="w-64 h-40 bg-[#334155] border-2 border-[#FFC000] rounded-lg relative overflow-hidden flex flex-col cursor-pointer shadow-sm group p-6 transition-all hover:shadow-md">
+            <div className="flex flex-col justify-center flex-1">
+               <div className="text-white text-[18px] font-bold leading-tight mb-2 tracking-tight">DDI 标准样式</div>
+               <div className="w-3/4 h-[3px] bg-[#FFC000] mb-2"></div>
+               <div className="text-white text-[12px] font-medium opacity-60 italic">Preview Template Content</div>
+            </div>
+            <div className="absolute bottom-3 right-4 flex items-center gap-1 opacity-40">
+              <span className="text-[10px] font-black text-white italic">DDI</span>
+              <div className="w-2 h-2 rounded-full bg-orange-500"></div>
+            </div>
+            <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-[1px]">
+               <CheckCircle2 className="w-8 h-8 text-[#FFC000] mb-1" />
+               <span className="text-white text-xs font-bold">已选择此模板</span>
+            </div>
+         </div>
+       </div>
+
+       <div className="bg-slate-50 p-6 -mx-8 -mb-8 border-t border-slate-200 flex justify-end">
+          <button onClick={onNext} className="bg-[#FFC000] text-slate-900 px-10 py-3.5 rounded-md font-black text-sm shadow-md hover:brightness-105 active:scale-95 transition-all">开始美化与排版</button>
+       </div>
+    </div>
+);
+
+  // --- 子组件：生成新PPT配置 (二级标题与文案对齐) ---
+  const GenerateView = () => (
+    <div className="px-8 py-8 animate-in fade-in">
+      <div className="flex gap-4 mb-8">
+        <button onClick={() => setGenMethod('sentence')} className={`flex-1 py-4 rounded-lg font-bold text-sm flex items-center justify-center gap-2 border-2 transition-all ${genMethod === 'sentence' ? 'bg-[#FFC000] border-[#FFC000] text-slate-900 shadow-md' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-300'}`}>
+          <Sparkles className="w-4 h-4" /> 一句话生成
+        </button>
+        <button onClick={() => setGenMethod('outline')} className={`flex-1 py-4 rounded-lg font-bold text-sm flex items-center justify-center gap-2 border-2 transition-all ${genMethod === 'outline' ? 'bg-[#FFC000] border-[#FFC000] text-slate-900 shadow-md' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-300'}`}>
+          <FileText className="w-4 h-4" /> 大纲生成
+        </button>
+        <button onClick={() => setGenMethod('description')} className={`flex-1 py-4 rounded-lg font-bold text-sm flex items-center justify-center gap-2 border-2 transition-all ${genMethod === 'description' ? 'bg-[#FFC000] border-[#FFC000] text-slate-900 shadow-md' : 'bg-white border-slate-100 text-slate-500 hover:border-slate-300'}`}>
+          <StickyNote className="w-4 h-4" /> 定稿文案生成
+        </button>
+      </div>
+
+      <div className="flex items-center gap-2 mb-6">
+        <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200 flex items-center gap-3 w-full shadow-sm">
+          <Sun className="w-5 h-5 text-[#FFC000]" />
+          <span className="text-sm font-bold text-slate-800 tracking-tight">
+            {genMethod === 'sentence' && "输入你的想法，AI 将为你生成完整的 PPT"}
+            {genMethod === 'outline' && "已有大纲？直接粘贴，AI 将自动切分为结构化大纲"}
+            {genMethod === 'description' && "已有完整描述？AI 将自动解析并直接生成图片，跳过大纲步骤"}
+          </span>
+        </div>
+      </div>
+
+      <div className="relative mb-10 group">
+        <textarea 
+          placeholder={genMethod === 'sentence' ? "例如：生成一份关于 DDI 年度领导力报告的 PPT" : genMethod === 'outline' ? "粘贴您的结构化大纲..." : "直接粘贴您的定稿文案内容或详细页面描述..."}
+          className="w-full h-48 border border-slate-200 rounded-xl p-6 text-sm focus:ring-2 focus:ring-[#FFC000] outline-none shadow-sm resize-none bg-white font-medium"
+        />
+        <div className="absolute bottom-4 left-6 flex gap-4 text-slate-400">
+           <ImageIcon className="w-5 h-5 cursor-pointer hover:text-slate-600" />
+           <Paperclip className="w-5 h-5 cursor-pointer hover:text-slate-600" />
+        </div>
+        <button onClick={() => handleProcess('audit')} className="absolute bottom-4 right-6 bg-[#FFC000] text-slate-900 px-10 py-2.5 rounded-lg text-sm font-black shadow-md hover:brightness-105 active:scale-95 transition-all">
+          {genMethod === 'description' ? "立即生成 PPT" : "下一步"}
+        </button>
+      </div>
+
+      <div className="mb-6">
+        <h3 className="text-base font-bold text-slate-800 flex items-center gap-2 mb-6">
+          <PaletteIcon className="w-5 h-5 text-[#FFC000]" /> 选择视觉风格
+        </h3>
+        <div className="grid grid-cols-4 gap-4">
+           {[{ t: 'DDI 经典商务', c: 'bg-[#334155]', s: true }, { t: '数字化转型', c: 'bg-slate-800' }, { t: '工艺流程感', c: 'bg-[#f3e8d2]' }, { t: '未来科技', c: 'bg-blue-900' }].map((tmpl, i) => (
+             <div key={i} className={`aspect-[16/10] rounded-xl shadow-sm cursor-pointer hover:shadow-md transition-all overflow-hidden relative p-4 ${tmpl.c}`}>
+                <div className={`h-1 w-8 mb-2 ${tmpl.s ? 'bg-[#FFC000]' : 'bg-slate-300'}`}></div>
+                <div className={`text-[10px] font-bold ${tmpl.c.includes('bg-white') || tmpl.c.includes('bg-[#f3e8d2]') ? 'text-slate-800' : 'text-white'}`}>{tmpl.t}</div>
+                {tmpl.s && <div className="absolute inset-0 bg-[#FFC000]/10 border-2 border-[#FFC000] rounded-xl flex items-center justify-center"><CheckCircle2 className="w-6 h-6 text-[#FFC000]"/></div>}
+             </div>
+           ))}
+           <div className="aspect-[16/10] border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:border-[#FFC000] bg-slate-50/50 cursor-pointer">
+              <Plus className="w-6 h-6 mb-1" /><span className="text-[10px] font-bold">上传模板</span>
+           </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  // --- 主渲染逻辑 ---
+  return (
+    <div className="min-h-screen bg-slate-100 selection:bg-[#FFC000] selection:text-slate-900">
+      {step !== 'editor' && (
+        <nav className="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between sticky top-0 z-50 shadow-sm">
+          <div className="flex items-center gap-4">
+             <div className="flex items-center gap-2 cursor-pointer group" onClick={() => setStep('config')}>
+               <div className="text-2xl group-hover:rotate-12 transition-transform">🍌</div>
+               <div className="text-slate-800 font-black text-xl tracking-tighter italic">DDI PPT助手</div>
+             </div>
+          </div>
+          <div className="flex items-center gap-5 text-sm font-medium text-slate-600">
+            <button className="flex items-center gap-1.5 hover:text-blue-600 transition-colors font-bold text-xs"><ImagePlusIcon className="w-4 h-4" /> 素材生成</button>
+            <button className="flex items-center gap-1.5 hover:text-blue-600 transition-colors font-bold text-xs"><FolderOpen className="w-4 h-4" /> 素材中心</button>
+            <button onClick={() => setStep('history')} className={`transition-colors text-xs font-bold ${step === 'history' ? 'text-blue-600' : 'hover:text-blue-600'}`}>历史项目</button>
+            <div className="w-px h-4 bg-slate-200 mx-1"></div>
+            <button className="hover:text-blue-600 transition-colors font-black text-[10px]">EN <Globe className="w-3 h-3 ml-0.5" /></button>
+            <button className="hover:text-blue-600 transition-colors"><Sun className="w-4 h-4" /></button>
+            <div className="w-px h-4 bg-slate-200 mx-1"></div>
+            <div className="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-black text-[10px] shadow-sm">U</div>
+          </div>
+        </nav>
+      )}
+
+      <div className="animate-in fade-in duration-300">
+        {step === 'config' && (
+          <div className="max-w-5xl mx-auto pt-8 pb-20">
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-8 pb-4">
+                <CategoryTabs />
+              </div>
+              {activeCategory === 'beautify' ? <BeautifySection onNext={() => handleProcess('audit')} /> : <GenerateView />}
+            </div>
+          </div>
+        )}
+        {step === 'audit' && <AuditSection pages={pages} onBack={() => setStep('config')} onNext={() => handleProcess('editor', 2000)} isProcessing={isProcessing} />}
+        {step === 'editor' && <MainEditor selectedPage={selectedPage} pages={pages} setSelectedPage={setSelectedPage} setStep={setStep} />}
+        {step === 'history' && <HistorySection onBack={() => setStep('config')} />}
+        {step === 'export' && <ExportSection setStep={setStep} />}
+      </div>
+    </div>
+  );
+};
+
+// --- 子组件：人工校准 ---
+const AuditSection = ({pages, onBack, onNext, isProcessing}) => (
+  <div className="max-w-5xl mx-auto pt-10 pb-20 px-6 animate-in slide-in-from-bottom-4">
+    <div className="flex justify-between items-end mb-8">
+      <div>
+        <h2 className="text-2xl font-bold text-slate-900 flex items-center gap-2 tracking-tight"><CheckCircle2 className="text-[#FFC000] w-7 h-7" /> 语义解析完成</h2>
+        <p className="text-slate-500 mt-1 font-medium">请核对页面分类，以确保重构逻辑精准（封面/过渡页/正文）。</p>
+      </div>
+      <button onClick={onNext} className="bg-[#FFC000] text-slate-900 px-10 py-3.5 rounded-lg font-black hover:brightness-105 flex items-center gap-2 shadow-lg shadow-yellow-500/10 active:scale-95 transition-all">
+        {isProcessing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <><Wand2 className="w-5 h-5" /> 执行 AI 视觉重构</>}
+      </button>
+    </div>
+    <div className="grid grid-cols-3 gap-6">
+      {pages.map(p => (
+        <div key={p.id} className="bg-white border border-slate-200 rounded-2xl p-5 hover:border-[#FFC000] transition-all cursor-pointer group shadow-sm hover:shadow-md">
+          <div className="aspect-video bg-slate-100 rounded-lg mb-4 flex items-center justify-center text-slate-300 italic text-[10px] border border-slate-200">Page #{p.id} Original</div>
+          <p className="text-[10px] font-bold text-slate-500 uppercase mb-1 tracking-widest">属性校准</p>
+          <select className="w-full bg-slate-50 border border-slate-200 text-sm font-bold text-slate-800 rounded px-2 py-1.5 outline-none focus:ring-1 focus:ring-[#FFC000] cursor-pointer">
+            <option>{p.type}</option><option>封面</option><option>目录</option><option>过渡页</option><option>正文</option><option>封底</option>
+          </select>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+// --- 子组件：预览编辑器 ---
+const MainEditor = ({selectedPage, pages, setSelectedPage, setStep}) => (
+  <div className="h-screen flex flex-col bg-slate-50 overflow-hidden font-sans">
+    <header className="h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 shrink-0 shadow-sm z-20">
+      <div className="flex items-center gap-4">
+        <button onClick={() => setStep('config')} className="flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"><Home className="w-4 h-4" /> 主页</button>
+        <div className="w-px h-4 bg-slate-300"></div>
+        <div className="flex items-center gap-2 font-black text-lg text-slate-800 tracking-tight italic">DDI PPT助手 <span className="text-slate-300 font-normal">|</span> 预览</div>
+      </div>
+      <div className="flex items-center gap-5">
+        <button onClick={() => setStep('audit')} className="text-xs font-medium text-slate-600 hover:text-slate-900 flex items-center gap-1.5 border border-slate-200 px-3 py-1.5 rounded-md hover:bg-slate-50 transition-all">上一步</button>
+        <button onClick={() => setStep('export')} className="flex items-center gap-1.5 text-xs font-black text-slate-900 bg-[#FFC000] px-6 py-2 rounded-md hover:brightness-105 shadow-sm transition-all">导出交付</button>
+      </div>
+    </header>
+    <div className="flex flex-1 overflow-hidden relative">
+      <aside className="w-[280px] bg-white border-r border-slate-200 flex flex-col shrink-0 z-10 p-4 overflow-y-auto">
+        {pages.map((p, i) => (
+          <div key={p.id} onClick={() => setSelectedPage(p)} className={`aspect-[16/9] mb-6 rounded-md cursor-pointer border-2 transition-all relative overflow-hidden ${selectedPage.id === p.id ? 'border-[#FFC000] shadow-md ring-2 ring-yellow-50' : 'border-transparent hover:border-slate-300'}`}>
+            <div className="absolute inset-0 bg-[#334155] p-4 flex flex-col justify-center">
+               <div className="w-1/2 h-1 bg-[#FFC000] mb-2 opacity-60"></div>
+               <div className="text-[7px] text-white font-bold opacity-80 truncate uppercase">{p.title}</div>
+            </div>
+            {p.status === '已完成' && <div className="absolute bottom-1 right-1 bg-green-50 text-green-700 text-[8px] font-black px-1.5 py-0.5 rounded border border-green-200 shadow-sm">已完成</div>}
+          </div>
+        ))}
+      </aside>
+      <main className="flex-1 p-12 bg-[#fefce8]/20 flex flex-col items-center justify-center">
+         <div className="w-full max-w-5xl aspect-[16/9] bg-[#334155] shadow-[0_20px_60px_rgba(0,0,0,0.15)] relative p-20 text-white border-[12px] border-white group">
+            <h1 className="text-6xl font-black mb-6 tracking-tighter leading-tight">{selectedPage.title}</h1>
+            <div className="w-48 h-2 bg-[#FFC000] mb-8 shadow-sm"></div>
+            <div className="absolute bottom-10 right-10 flex items-center gap-2 opacity-20"><span className="text-4xl font-black italic">DDI</span><div className="w-4 h-4 rounded-full bg-orange-500"></div></div>
+            <div className="absolute top-8 right-8 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button className="bg-white/95 backdrop-blur text-slate-900 text-sm font-black px-6 py-3 rounded-xl flex items-center gap-3 shadow-xl hover:bg-[#FFC000] transition-all">
+                <Edit className="w-4 h-4 text-[#FFC000]" /> 局部精修
+              </button>
+            </div>
+         </div>
+      </main>
+    </div>
+  </div>
+);
+
+// --- 子组件：历史项目 ---
+const HistorySection = ({onBack}) => (
+  <div className="max-w-5xl mx-auto pt-10 pb-20 px-6 animate-in fade-in">
+    <div className="mb-8 flex justify-between items-end">
+      <div><h2 className="text-2xl font-black text-slate-900 tracking-tight">历史项目</h2><p className="text-slate-500 text-sm mt-1">管理您的所有 AI 交付资产</p></div>
+      <button onClick={onBack} className="text-xs font-bold text-slate-400 hover:text-slate-600 uppercase border-b border-transparent hover:border-slate-300 transition-all">返回工作台</button>
+    </div>
+    {MOCK_HISTORY.map(h => (
+      <div key={h.id} className="bg-white rounded-xl border border-slate-200 p-6 flex items-center gap-8 mb-6 shadow-sm hover:shadow-md cursor-pointer transition-all group">
+        <div className="flex-1"><h3 className="text-lg font-bold text-slate-800 group-hover:text-[#FFC000] transition-colors">{h.name}</h3><p className="text-xs text-slate-400 mt-2 flex items-center gap-1"><Clock className="w-3" /> {h.time}</p></div>
+        <div className="w-[200px] aspect-[16/9] bg-slate-700 rounded-lg p-5 border border-slate-600 group-hover:scale-[1.02] transition-transform">
+           <div className="w-1/2 h-1 bg-[#FFC000] mb-2 opacity-50"></div>
+           <div className="text-[7px] text-white font-bold opacity-30 tracking-widest uppercase">Preview Thumbnail</div>
+        </div>
+      </div>
+    ))}
+  </div>
+);
+
+// --- 子组件：导出完成 ---
+const ExportSection = ({setStep}) => (
+  <div className="h-[calc(100vh-64px)] flex items-center justify-center text-center p-6 animate-in zoom-in-95 duration-500">
+    <div className="max-w-md">
+      <div className="w-24 h-24 bg-yellow-50 text-[#FFC000] rounded-full flex items-center justify-center mx-auto mb-8 shadow-inner border border-yellow-100 ring-8 ring-yellow-50/50"><CheckCircle2 className="w-12 h-12" /></div>
+      <h2 className="text-3xl font-black text-slate-900 mb-4 tracking-tighter">交付资产已就绪！</h2>
+      <p className="text-slate-500 mb-10 font-medium">PPT 已按照 DDI 标准视觉基准完成重构。文件已导出为 100% 可二次编辑的 PPTX 格式。</p>
+      <button className="bg-[#FFC000] text-slate-900 w-full py-4 rounded-xl font-black shadow-lg mb-6 hover:brightness-105 active:scale-95 transition-all">立即下载 PPTX 文档</button>
+      <button onClick={() => setStep('config')} className="text-slate-400 font-bold text-xs uppercase tracking-widest hover:text-slate-600 transition-colors">Back to Workbench</button>
+    </div>
+  </div>
+);
+
+// 辅助图标
+const PaletteIcon = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="13.5" cy="6.5" r=".5"/><circle cx="17.5" cy="10.5" r=".5"/><circle cx="8.5" cy="7.5" r=".5"/><circle cx="6.5" cy="12.5" r=".5"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg>;
+const ImagePlusIcon = ({className}) => <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/><path d="M16 5h6"/><path d="M19 2v6"/></svg>;
+
+export default App;
