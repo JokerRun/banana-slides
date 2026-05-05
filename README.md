@@ -247,10 +247,12 @@ OPENAI_API_BASE=https://api.openai.com/v1
 # Azure OpenAI GPT-image 配置（当 IMAGE_PROVIDER_FORMAT=azure_openai 时使用）
 # AZURE_OPENAI_API_KEY=your-azure-openai-api-key
 # AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
-# AZURE_OPENAI_API_VERSION=preview
+# AZURE_OPENAI_API_VERSION=2025-04-01-preview
 # AZURE_OPENAI_IMAGE_DEPLOYMENT=gpt-image-2
 # 或复用完整 generations URL：
 # AZURE_OPENAI_IMAGE_GENERATION_URL=https://transtalent-us2.cognitiveservices.azure.com/openai/deployments/gpt-image-2/images/generations?api-version=2024-02-01
+# 带参考图/源图的 restyle 会使用 image edit API，需要 2025-04-01-preview：
+# AZURE_OPENAI_IMAGE_EDIT_URL=https://transtalent-us2.cognitiveservices.azure.com/openai/deployments/gpt-image-2/images/edits?api-version=2025-04-01-preview
 
 # Vertex AI 格式配置（当 AI_PROVIDER_FORMAT=vertex 时使用）
 # 需要 GCP 服务账户，可使用 GCP 免费额度

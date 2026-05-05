@@ -3,6 +3,7 @@ import base64
 import logging
 from io import BytesIO
 from typing import List, Optional
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import requests
 from PIL import Image
@@ -23,7 +24,7 @@ class AzureOpenAIImageProvider(ImageProvider):
         api_key: str,
         endpoint: str = None,
         deployment: str = "gpt-image-2",
-        api_version: str = "preview",
+        api_version: str = "2025-04-01-preview",
         image_generation_url: str = None,
         image_edit_url: str = None,
         quality: str = "high",
@@ -54,8 +55,17 @@ class AzureOpenAIImageProvider(ImageProvider):
             return self.image_edit_url
         generation_url = self._generation_url()
         if '/images/generations' in generation_url:
-            return generation_url.replace('/images/generations', '/images/edits')
+            return self._with_api_version(
+                generation_url.replace('/images/generations', '/images/edits')
+            )
         return f"{self.endpoint}/openai/v1/images/edits?api-version={self.api_version}"
+
+    def _with_api_version(self, url: str) -> str:
+        """Return URL with the provider's configured api-version query value."""
+        parts = urlsplit(url)
+        query = dict(parse_qsl(parts.query, keep_blank_values=True))
+        query['api-version'] = self.api_version
+        return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
     @staticmethod
     def _image_to_png_file(image: Image.Image, name: str):
@@ -131,38 +141,15 @@ class AzureOpenAIImageProvider(ImageProvider):
 
             if ref_images:
                 target_url = self._edit_url()
-                if '/deployments/' in target_url:
-                    payload.pop('model', None)
                 files = [self._image_to_png_file(image, f'reference_{idx}.png') for idx, image in enumerate(ref_images, start=1)]
-                try:
-                    response = requests.post(
-                        target_url,
-                        headers=headers,
-                        data={key: str(value) for key, value in payload.items()},
-                        files=files,
-                        timeout=self.timeout,
-                    )
-                    response.raise_for_status()
-                except requests.HTTPError as edit_error:
-                    status_code = getattr(edit_error.response, 'status_code', None)
-                    if status_code not in {404, 408}:
-                        raise
-                    logger.warning(
-                        "Azure OpenAI image edit endpoint failed with %s; falling back to text-only generation",
-                        status_code,
-                    )
-                    payload = self._base_payload(prompt, aspect_ratio, resolution)
-                    target_url = self._generation_url()
-                    if '/deployments/' in target_url:
-                        payload.pop('model', None)
-                    headers = {**self._request_headers(), 'Content-Type': 'application/json'}
-                    response = requests.post(
-                        target_url,
-                        headers=headers,
-                        json=payload,
-                        timeout=self.timeout,
-                    )
-                    response.raise_for_status()
+                response = requests.post(
+                    target_url,
+                    headers=headers,
+                    data={key: str(value) for key, value in payload.items()},
+                    files=files,
+                    timeout=self.timeout,
+                )
+                response.raise_for_status()
             else:
                 target_url = self._generation_url()
                 if '/deployments/' in target_url:

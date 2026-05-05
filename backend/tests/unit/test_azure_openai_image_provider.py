@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import requests
+import pytest
 from PIL import Image
 
 backend_path = Path(__file__).parent.parent.parent
@@ -67,9 +68,10 @@ class TestAzureOpenAIImageProvider:
 
         assert result.size == (32, 32)
         post.assert_called_once()
-        assert post.call_args.args[0] == 'https://example.cognitiveservices.azure.com/openai/deployments/gpt-image-2/images/edits?api-version=2024-02-01'
+        assert post.call_args.args[0] == 'https://example.cognitiveservices.azure.com/openai/deployments/gpt-image-2/images/edits?api-version=2025-04-01-preview'
         assert post.call_args.kwargs['headers']['api-key'] == 'test-key'
         assert post.call_args.kwargs['data'] == {
+            'model': 'gpt-image-2',
             'prompt': 'restyle this slide',
             'n': '1',
             'size': '1600x1200',
@@ -82,20 +84,17 @@ class TestAzureOpenAIImageProvider:
         assert files[0][1][0] == 'reference_1.png'
         assert files[0][1][2] == 'image/png'
 
-    def test_reference_image_falls_back_to_generation_when_edit_endpoint_unavailable(self):
+    def test_reference_image_edit_endpoint_unavailable_does_not_fallback_to_text_only(self):
         from services.ai_providers.image.azure_openai_provider import AzureOpenAIImageProvider
 
         edit_response = MagicMock()
         edit_response.status_code = 404
         edit_response.raise_for_status.side_effect = requests.HTTPError(response=edit_response)
 
-        generation_response = MagicMock()
-        generation_response.json.return_value = {'data': [{'b64_json': _png_b64('purple', (24, 24))}]}
-
         ref_image = Image.new('RGB', (20, 10), 'white')
         with patch(
             'services.ai_providers.image.azure_openai_provider.requests.post',
-            side_effect=[edit_response, generation_response],
+            return_value=edit_response,
         ) as post:
             provider = AzureOpenAIImageProvider(
                 api_key='test-key',
@@ -103,13 +102,13 @@ class TestAzureOpenAIImageProvider:
                 deployment='gpt-image-2',
             )
 
-            result = provider.generate_image('generate from style', ref_images=[ref_image])
+            with pytest.raises(Exception) as exc_info:
+                provider.generate_image('generate from style', ref_images=[ref_image])
 
-        assert result.size == (24, 24)
-        assert post.call_count == 2
-        assert post.call_args_list[0].args[0].endswith('/images/edits?api-version=2024-02-01')
-        assert post.call_args_list[1].args[0].endswith('/images/generations?api-version=2024-02-01')
-        assert 'files' not in post.call_args_list[1].kwargs
+        assert 'Error generating image with Azure OpenAI' in str(exc_info.value)
+        assert post.call_count == 1
+        assert post.call_args_list[0].args[0].endswith('/images/edits?api-version=2025-04-01-preview')
+        assert 'files' in post.call_args_list[0].kwargs
 
     def test_size_mapping_uses_gpt_image_2_valid_multiples_of_16(self):
         from services.ai_providers.image.azure_openai_provider import AzureOpenAIImageProvider
