@@ -134,13 +134,35 @@ class AzureOpenAIImageProvider(ImageProvider):
                 if '/deployments/' in target_url:
                     payload.pop('model', None)
                 files = [self._image_to_png_file(image, f'reference_{idx}.png') for idx, image in enumerate(ref_images, start=1)]
-                response = requests.post(
-                    target_url,
-                    headers=headers,
-                    data={key: str(value) for key, value in payload.items()},
-                    files=files,
-                    timeout=self.timeout,
-                )
+                try:
+                    response = requests.post(
+                        target_url,
+                        headers=headers,
+                        data={key: str(value) for key, value in payload.items()},
+                        files=files,
+                        timeout=self.timeout,
+                    )
+                    response.raise_for_status()
+                except requests.HTTPError as edit_error:
+                    status_code = getattr(edit_error.response, 'status_code', None)
+                    if status_code not in {404, 408}:
+                        raise
+                    logger.warning(
+                        "Azure OpenAI image edit endpoint failed with %s; falling back to text-only generation",
+                        status_code,
+                    )
+                    payload = self._base_payload(prompt, aspect_ratio, resolution)
+                    target_url = self._generation_url()
+                    if '/deployments/' in target_url:
+                        payload.pop('model', None)
+                    headers = {**self._request_headers(), 'Content-Type': 'application/json'}
+                    response = requests.post(
+                        target_url,
+                        headers=headers,
+                        json=payload,
+                        timeout=self.timeout,
+                    )
+                    response.raise_for_status()
             else:
                 target_url = self._generation_url()
                 if '/deployments/' in target_url:
@@ -152,8 +174,8 @@ class AzureOpenAIImageProvider(ImageProvider):
                     json=payload,
                     timeout=self.timeout,
                 )
+                response.raise_for_status()
 
-            response.raise_for_status()
             return self._decode_response_image(response.json())
 
         except Exception as e:
