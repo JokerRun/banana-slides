@@ -11,6 +11,7 @@ Configuration Priority (highest to lowest):
 
 Environment Variables:
     AI_PROVIDER_FORMAT: "gemini" (default), "openai", or "vertex"
+    IMAGE_PROVIDER_FORMAT: optional image-only override, including "azure_openai"
 
     For Gemini format (Google GenAI SDK):
         GOOGLE_API_KEY: API key
@@ -19,6 +20,11 @@ Environment Variables:
     For OpenAI format:
         OPENAI_API_KEY: API key
         OPENAI_API_BASE: API base URL (e.g., https://aihubmix.com/v1)
+
+    For Azure OpenAI image format:
+        AZURE_OPENAI_API_KEY: Azure OpenAI API key
+        AZURE_OPENAI_ENDPOINT: Resource endpoint, e.g. https://example.openai.azure.com
+        AZURE_OPENAI_IMAGE_GENERATION_URL: Optional full images/generations URL
 
     For Vertex AI format (Google Cloud):
         VERTEX_PROJECT_ID: GCP project ID
@@ -30,13 +36,13 @@ import logging
 from typing import Dict, Any
 
 from .text import TextProvider, GenAITextProvider, OpenAITextProvider
-from .image import ImageProvider, GenAIImageProvider, OpenAIImageProvider
+from .image import ImageProvider, GenAIImageProvider, OpenAIImageProvider, AzureOpenAIImageProvider
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
     'TextProvider', 'GenAITextProvider', 'OpenAITextProvider',
-    'ImageProvider', 'GenAIImageProvider', 'OpenAIImageProvider',
+    'ImageProvider', 'GenAIImageProvider', 'OpenAIImageProvider', 'AzureOpenAIImageProvider',
     'get_text_provider', 'get_image_provider', 'get_provider_format'
 ]
 
@@ -173,6 +179,65 @@ def _get_provider_config() -> Dict[str, Any]:
         }
 
 
+def _normalize_image_provider_format(provider_format: str) -> str:
+    provider = (provider_format or '').lower().replace('-', '_')
+    if provider == 'azure':
+        return 'azure_openai'
+    return provider
+
+
+def _get_image_provider_format() -> str:
+    """Get image provider format, allowing an image-only env override."""
+    image_provider = _get_config_value('IMAGE_PROVIDER_FORMAT')
+    if image_provider:
+        return _normalize_image_provider_format(image_provider)
+    return _normalize_image_provider_format(get_provider_format())
+
+
+def _get_azure_openai_image_config(model: str) -> Dict[str, Any]:
+    api_key = _get_config_value('AZURE_OPENAI_API_KEY')
+    endpoint = _get_config_value('AZURE_OPENAI_ENDPOINT')
+    api_version = _get_config_value('AZURE_OPENAI_API_VERSION', 'preview')
+    generation_url = _get_config_value('AZURE_OPENAI_IMAGE_GENERATION_URL')
+    edit_url = _get_config_value('AZURE_OPENAI_IMAGE_EDIT_URL')
+    deployment = _get_config_value('AZURE_OPENAI_IMAGE_DEPLOYMENT', model)
+    quality = _get_config_value('AZURE_OPENAI_IMAGE_QUALITY', 'high')
+    output_format = _get_config_value('AZURE_OPENAI_IMAGE_OUTPUT_FORMAT', 'png')
+
+    if not api_key:
+        raise ValueError("AZURE_OPENAI_API_KEY is required when IMAGE_PROVIDER_FORMAT=azure_openai")
+    if not endpoint and not generation_url:
+        raise ValueError("AZURE_OPENAI_ENDPOINT or AZURE_OPENAI_IMAGE_GENERATION_URL is required when IMAGE_PROVIDER_FORMAT=azure_openai")
+
+    logger.info(f"Provider config - image format: azure_openai, endpoint: {endpoint}, deployment: {deployment}")
+    return {
+        'api_key': api_key,
+        'endpoint': endpoint,
+        'api_version': api_version,
+        'image_generation_url': generation_url,
+        'image_edit_url': edit_url,
+        'deployment': deployment,
+        'quality': quality,
+        'output_format': output_format,
+    }
+
+
+def _get_openai_image_config() -> Dict[str, Any]:
+    api_key = _get_config_value('OPENAI_API_KEY') or _get_config_value('GOOGLE_API_KEY')
+    api_base = _get_config_value('OPENAI_API_BASE', 'https://aihubmix.com/v1')
+
+    if not api_key:
+        raise ValueError(
+            "OPENAI_API_KEY or GOOGLE_API_KEY (from database settings or environment) is required when IMAGE_PROVIDER_FORMAT=openai."
+        )
+
+    logger.info(f"Provider config - image format: openai, api_base: {api_base}")
+    return {
+        'api_key': api_key,
+        'api_base': api_base,
+    }
+
+
 def get_text_provider(model: str = "gemini-3-flash-preview") -> TextProvider:
     """
     Factory function to get text generation provider based on configuration
@@ -216,14 +281,23 @@ def get_image_provider(model: str = "gemini-3-pro-image-preview") -> ImageProvid
         OpenAI format does NOT support 4K resolution, only 1K is available.
         If you need higher resolution images, use Gemini or Vertex AI format.
     """
+    provider_format = _get_image_provider_format()
+
+    if provider_format == 'azure_openai':
+        azure_config = _get_azure_openai_image_config(model)
+        logger.info(f"Using Azure OpenAI format for image generation, deployment: {azure_config['deployment']}")
+        return AzureOpenAIImageProvider(**azure_config)
+
+    if provider_format == 'openai':
+        openai_config = _get_openai_image_config()
+        logger.info(f"Using OpenAI format for image generation, model: {model}")
+        logger.warning("OpenAI format only supports 1K resolution, 4K is not available")
+        return OpenAIImageProvider(api_key=openai_config['api_key'], api_base=openai_config['api_base'], model=model)
+
     config = _get_provider_config()
     provider_format = config['format']
 
-    if provider_format == 'openai':
-        logger.info(f"Using OpenAI format for image generation, model: {model}")
-        logger.warning("OpenAI format only supports 1K resolution, 4K is not available")
-        return OpenAIImageProvider(api_key=config['api_key'], api_base=config['api_base'], model=model)
-    elif provider_format == 'vertex':
+    if provider_format == 'vertex':
         logger.info(f"Using Vertex AI for image generation, model: {model}, project: {config['project_id']}")
         return GenAIImageProvider(
             model=model,

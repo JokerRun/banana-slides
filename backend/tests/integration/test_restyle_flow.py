@@ -681,9 +681,11 @@ class TestRestyleDebugArtifacts:
 
             config = get_config()
             original_debug_dir = getattr(config, 'RESTYLE_EDIT_DEBUG_DIR', None)
+            original_debug_enabled = getattr(config, 'DEBUG_RESTYLE_CONTEXT', False)
 
             try:
                 config.RESTYLE_EDIT_DEBUG_DIR = debug_dir
+                config.DEBUG_RESTYLE_CONTEXT = True
                 with patch('services.task_manager.save_image_with_version', return_value=(orig_path, 1)), \
                      patch('services.ai_service_manager.get_ai_service', return_value=mock_ai):
                     restyle_images_task(
@@ -718,6 +720,7 @@ class TestRestyleDebugArtifacts:
                     delattr(config, 'RESTYLE_EDIT_DEBUG_DIR')
                 elif original_debug_dir is not None:
                     config.RESTYLE_EDIT_DEBUG_DIR = original_debug_dir
+                config.DEBUG_RESTYLE_CONTEXT = original_debug_enabled
 
                 import shutil
                 shutil.rmtree(tmp_dir)

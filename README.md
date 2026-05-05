@@ -231,6 +231,8 @@ cp .env.example .env
 ```env
 # AI Provider格式配置 (gemini / openai / vertex)
 AI_PROVIDER_FORMAT=gemini
+# 可选：只切换图片 provider；文字仍按 AI_PROVIDER_FORMAT 走
+# IMAGE_PROVIDER_FORMAT=azure_openai
 
 # Gemini 格式配置（当 AI_PROVIDER_FORMAT=gemini 时使用）
 GOOGLE_API_KEY=your-api-key-here
@@ -241,6 +243,14 @@ GOOGLE_API_BASE=https://generativelanguage.googleapis.com
 OPENAI_API_KEY=your-api-key-here
 OPENAI_API_BASE=https://api.openai.com/v1
 # 代理示例: https://aihubmix.com/v1
+
+# Azure OpenAI GPT-image 配置（当 IMAGE_PROVIDER_FORMAT=azure_openai 时使用）
+# AZURE_OPENAI_API_KEY=your-azure-openai-api-key
+# AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
+# AZURE_OPENAI_API_VERSION=preview
+# AZURE_OPENAI_IMAGE_DEPLOYMENT=gpt-image-2
+# 或复用完整 generations URL：
+# AZURE_OPENAI_IMAGE_GENERATION_URL=https://transtalent-us2.cognitiveservices.azure.com/openai/deployments/gpt-image-2/images/generations?api-version=2024-02-01
 
 # Vertex AI 格式配置（当 AI_PROVIDER_FORMAT=vertex 时使用）
 # 需要 GCP 服务账户，可使用 GCP 免费额度
