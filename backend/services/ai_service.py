@@ -586,11 +586,13 @@ class AIService:
         conversation_attempted = False
         provider_fallback = False
         conversation_supported = getattr(self.image_provider, 'supports_conversation_contents', False)
+        conversation_fallback_allowed = getattr(self.image_provider, 'allow_conversation_fallback', True)
         snapshot_present = context.snapshot_source == 'persisted'
         provider_name = type(self.image_provider).__name__
         provider_model = getattr(self.image_provider, 'model', None)
         decision_event = {
             'conversation_supported': conversation_supported,
+            'conversation_fallback_allowed': conversation_fallback_allowed,
             'snapshot_present': snapshot_present,
             'degraded_context': context.degraded_context,
             'provider': provider_name,
@@ -656,14 +658,16 @@ class AIService:
                     )
                     return result
             except Exception as e:
-                if is_retryable_conversation_error(e):
+                classified_retryable = is_retryable_conversation_error(e)
+                if classified_retryable and conversation_fallback_allowed:
                     logger.warning(f"Conversation mode failed with retryable error, falling back to legacy: {e}")
                     provider_fallback = True
                     fallback_event = {
                         'from_mode': 'restyle_conversation',
                         'to_mode': 'legacy_flattened',
                         'provider_fallback': True,
-                        'classified_retryable': True,
+                        'classified_retryable': classified_retryable,
+                        'conversation_fallback_allowed': conversation_fallback_allowed,
                         'error_message': str(e),
                         'provider': provider_name,
                         'model': provider_model,
@@ -681,7 +685,8 @@ class AIService:
                     error_event = {
                         'context_mode': 'restyle_conversation',
                         'provider_fallback': False,
-                        'classified_retryable': False,
+                        'classified_retryable': classified_retryable,
+                        'conversation_fallback_allowed': conversation_fallback_allowed,
                         'error_message': str(e),
                         'provider': provider_name,
                         'model': provider_model,

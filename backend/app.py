@@ -57,6 +57,10 @@ def create_app():
     
     # Load configuration from Config class
     app.config.from_object(Config)
+    app.config['IMAGE_PROVIDER_FORMAT'] = os.getenv(
+        'IMAGE_PROVIDER_FORMAT',
+        app.config.get('AI_PROVIDER_FORMAT', 'gemini')
+    )
     
     # Override with environment-specific paths (use absolute path)
     backend_dir = os.path.dirname(os.path.abspath(__file__))
@@ -245,12 +249,24 @@ def _preflight_env_or_raise() -> None:
     if provider not in {'openai', 'gemini'}:
         raise ValueError('AI_PROVIDER_FORMAT must be set to "openai" or "gemini"')
 
+    image_provider = (os.getenv('IMAGE_PROVIDER_FORMAT') or provider).strip().lower().replace('-', '_')
+    if image_provider == 'azure':
+        image_provider = 'azure_openai'
+    if image_provider not in {'openai', 'gemini', 'azure_openai'}:
+        raise ValueError('IMAGE_PROVIDER_FORMAT must be set to "openai", "gemini", or "azure_openai"')
+
     if provider == 'openai':
         if not (os.getenv('OPENAI_API_KEY') or '').strip():
             raise ValueError('OPENAI_API_KEY is required when AI_PROVIDER_FORMAT=openai')
     else:
         if not (os.getenv('GOOGLE_API_KEY') or '').strip():
             raise ValueError('GOOGLE_API_KEY is required when AI_PROVIDER_FORMAT=gemini')
+
+    if image_provider == 'azure_openai':
+        if not (os.getenv('AZURE_OPENAI_API_KEY') or '').strip():
+            raise ValueError('AZURE_OPENAI_API_KEY is required when IMAGE_PROVIDER_FORMAT=azure_openai')
+        if not ((os.getenv('AZURE_OPENAI_RESPONSES_URL') or '').strip() or (os.getenv('AZURE_OPENAI_ENDPOINT') or '').strip()):
+            raise ValueError('AZURE_OPENAI_RESPONSES_URL or AZURE_OPENAI_ENDPOINT is required when IMAGE_PROVIDER_FORMAT=azure_openai')
 
 
 # Create app instance

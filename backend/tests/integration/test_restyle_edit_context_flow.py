@@ -364,6 +364,39 @@ class TestAIServiceRestyleEdit:
             assert payload['trace']['task_id'] == 'task-1'
             assert payload['event']['provider_fallback'] is True
 
+    def test_conversation_fallback_can_be_disabled(self, app):
+        """Providers can opt out of flattened fallback for strict structured-turn flows."""
+        with app.app_context():
+            from services.ai_service import AIService
+            from services.restyle_edit_context import RestyleEditContext
+
+            mock_text = MagicMock()
+            mock_image = MagicMock()
+            mock_image.supports_conversation_contents = True
+            mock_image.allow_conversation_fallback = False
+            mock_image.generate_image_from_conversation.side_effect = Exception(
+                "400 Bad Request: invalid_argument contents"
+            )
+
+            ai = AIService(text_provider=mock_text, image_provider=mock_image)
+
+            ctx = RestyleEditContext(
+                conversation_contents=[
+                    {'role': 'user', 'parts': [{'text': 'hello'}]},
+                ],
+                legacy_prompt='fallback prompt',
+                legacy_ref_images=[],
+                degraded_context=False,
+                baseline_images_count=1,
+                current_images_count=1,
+            )
+
+            with pytest.raises(Exception, match="invalid_argument"):
+                ai.edit_restyle_image_with_context(ctx, '16:9', '2K')
+
+            mock_image.generate_image_from_conversation.assert_called_once()
+            mock_image.generate_image.assert_not_called()
+
     def test_conversation_non_retryable_error_raises(self, app):
         """Non-retryable error (timeout/5xx) → should NOT fall back, should raise."""
         with app.app_context():

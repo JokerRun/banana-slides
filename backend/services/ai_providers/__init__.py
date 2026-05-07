@@ -30,14 +30,14 @@ import logging
 from typing import Dict, Any
 
 from .text import TextProvider, GenAITextProvider, OpenAITextProvider
-from .image import ImageProvider, GenAIImageProvider, OpenAIImageProvider
+from .image import ImageProvider, GenAIImageProvider, OpenAIImageProvider, AzureOpenAIImageProvider
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
     'TextProvider', 'GenAITextProvider', 'OpenAITextProvider',
-    'ImageProvider', 'GenAIImageProvider', 'OpenAIImageProvider',
-    'get_text_provider', 'get_image_provider', 'get_provider_format'
+    'ImageProvider', 'GenAIImageProvider', 'OpenAIImageProvider', 'AzureOpenAIImageProvider',
+    'get_text_provider', 'get_image_provider', 'get_provider_format', 'get_image_provider_format'
 ]
 
 
@@ -66,6 +66,30 @@ def get_provider_format() -> str:
     
     # Fallback to environment variable
     return os.getenv('AI_PROVIDER_FORMAT', 'gemini').lower()
+
+
+def get_image_provider_format() -> str:
+    """
+    Get the configured image provider format.
+
+    IMAGE_PROVIDER_FORMAT can override text provider format so text can remain
+    Gemini while image generation uses Azure OpenAI Responses GPT-image.
+    """
+    try:
+        from flask import current_app
+        if current_app and hasattr(current_app, 'config'):
+            config_value = current_app.config.get('IMAGE_PROVIDER_FORMAT')
+            if config_value:
+                provider_format = str(config_value).lower().replace('-', '_')
+                return 'azure_openai' if provider_format == 'azure' else provider_format
+    except RuntimeError:
+        pass
+
+    provider_format = os.getenv('IMAGE_PROVIDER_FORMAT') or get_provider_format()
+    provider_format = provider_format.lower().replace('-', '_')
+    if provider_format == 'azure':
+        return 'azure_openai'
+    return provider_format
 
 
 def _get_config_value(key: str, default: str = None) -> str:
@@ -216,6 +240,47 @@ def get_image_provider(model: str = "gemini-3-pro-image-preview") -> ImageProvid
         OpenAI format does NOT support 4K resolution, only 1K is available.
         If you need higher resolution images, use Gemini or Vertex AI format.
     """
+    provider_format = get_image_provider_format()
+
+    if provider_format == 'azure_openai':
+        api_key = _get_config_value('AZURE_OPENAI_API_KEY')
+        responses_url = _get_config_value('AZURE_OPENAI_RESPONSES_URL')
+        endpoint = _get_config_value('AZURE_OPENAI_ENDPOINT')
+        api_version = _get_config_value('AZURE_OPENAI_API_VERSION', '2025-04-01-preview')
+        responses_model = _get_config_value('AZURE_OPENAI_RESPONSES_MODEL', 'gpt-5.4')
+        # Azure image deployment is independent from the generic IMAGE_MODEL;
+        # the latter is usually a Gemini model name when text remains Gemini.
+        image_deployment = _get_config_value('AZURE_OPENAI_IMAGE_DEPLOYMENT', 'gpt-image-2')
+        quality = _get_config_value('AZURE_OPENAI_IMAGE_QUALITY', 'high')
+        output_format = _get_config_value('AZURE_OPENAI_IMAGE_OUTPUT_FORMAT', 'png')
+
+        if not api_key:
+            raise ValueError("AZURE_OPENAI_API_KEY is required when IMAGE_PROVIDER_FORMAT=azure_openai")
+        if not (responses_url or endpoint):
+            raise ValueError("AZURE_OPENAI_RESPONSES_URL or AZURE_OPENAI_ENDPOINT is required when IMAGE_PROVIDER_FORMAT=azure_openai")
+
+        logger.info(
+            "Using Azure OpenAI Responses for image generation, responses_model: %s, image_deployment: %s",
+            responses_model,
+            image_deployment,
+        )
+        return AzureOpenAIImageProvider(
+            api_key=api_key,
+            responses_url=responses_url,
+            endpoint=endpoint,
+            api_version=api_version,
+            responses_model=responses_model,
+            image_deployment=image_deployment,
+            quality=quality,
+            output_format=output_format,
+        )
+
+    if provider_format != get_provider_format():
+        logger.warning(
+            "IMAGE_PROVIDER_FORMAT=%s is configured, but only azure_openai image override is specialized; falling back to AI_PROVIDER_FORMAT",
+            provider_format,
+        )
+
     config = _get_provider_config()
     provider_format = config['format']
 
