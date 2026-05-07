@@ -191,7 +191,7 @@ class TestAzureOpenAIImageProvider:
         assert post.call_count == 2
         sleep.assert_called_once()
 
-    def test_generate_image_normalizes_landscape_output_to_requested_aspect_ratio(self):
+    def test_generate_image_preserves_azure_response_dimensions_without_cropping(self):
         from services.ai_providers.image.azure_openai_provider import AzureOpenAIImageProvider
 
         response = MagicMock()
@@ -201,7 +201,8 @@ class TestAzureOpenAIImageProvider:
                 {
                     'type': 'image_generation_call',
                     'status': 'completed',
-                    # Azure currently returns this landscape size for 16:9 requests.
+                    # Azure currently returns this landscape size for 16:9 requests;
+                    # do not crop it because template/footer fidelity matters more.
                     'result': _png_b64('blue', (1536, 1024)),
                 }
             ]
@@ -215,7 +216,7 @@ class TestAzureOpenAIImageProvider:
 
             result = provider.generate_image('make a PPT slide', aspect_ratio='16:9', resolution='2K')
 
-        assert result.size == (1536, 864)
+        assert result.size == (1536, 1024)
 
     def test_size_mapping_uses_azure_responses_supported_sizes(self):
         from services.ai_providers.image.azure_openai_provider import AzureOpenAIImageProvider

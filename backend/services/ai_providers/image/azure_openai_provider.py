@@ -102,49 +102,6 @@ class AzureOpenAIImageProvider(ImageProvider):
             return '1024x1536'
         return '1536x1024'
 
-    @staticmethod
-    def _parse_aspect_ratio(aspect_ratio: str) -> Optional[float]:
-        try:
-            width, height = (aspect_ratio or '').split(':', 1)
-            width_value = float(width)
-            height_value = float(height)
-            if width_value <= 0 or height_value <= 0:
-                return None
-            return width_value / height_value
-        except (TypeError, ValueError):
-            return None
-
-    @classmethod
-    def _normalize_to_aspect(cls, image: Image.Image, aspect_ratio: str) -> Image.Image:
-        """Center-crop Azure's fixed image sizes back to the requested slide aspect."""
-        target_ratio = cls._parse_aspect_ratio(aspect_ratio)
-        if not target_ratio or not image.width or not image.height:
-            return image
-
-        actual_ratio = image.width / image.height
-        if abs(actual_ratio - target_ratio) < 0.01:
-            return image
-
-        if actual_ratio > target_ratio:
-            new_width = min(int(round(image.height * target_ratio)), image.width)
-            left = max((image.width - new_width) // 2, 0)
-            box = (left, 0, left + new_width, image.height)
-        else:
-            new_height = min(int(round(image.width / target_ratio)), image.height)
-            top = max((image.height - new_height) // 2, 0)
-            box = (0, top, image.width, top + new_height)
-
-        cropped = image.crop(box)
-        logger.info(
-            "Azure OpenAI image normalized to requested aspect_ratio=%s: %sx%s -> %sx%s",
-            aspect_ratio,
-            image.width,
-            image.height,
-            cropped.width,
-            cropped.height,
-        )
-        return cropped
-
     def _request_headers(self) -> dict:
         return {
             'api-key': self.api_key,
@@ -301,8 +258,7 @@ class AzureOpenAIImageProvider(ImageProvider):
 
             payload = self._build_payload(prompt, ref_images, aspect_ratio, resolution)
             response_payload = self._post_responses(payload)
-            image = self._decode_response_image(response_payload)
-            return self._normalize_to_aspect(image, aspect_ratio)
+            return self._decode_response_image(response_payload)
 
         except Exception as e:
             error_detail = (
@@ -333,8 +289,7 @@ class AzureOpenAIImageProvider(ImageProvider):
 
             payload = self._build_conversation_payload(contents, aspect_ratio, resolution)
             response_payload = self._post_responses(payload)
-            image = self._decode_response_image(response_payload)
-            return self._normalize_to_aspect(image, aspect_ratio)
+            return self._decode_response_image(response_payload)
 
         except Exception as e:
             error_detail = (
