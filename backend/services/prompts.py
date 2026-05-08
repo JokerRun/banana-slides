@@ -160,7 +160,7 @@ The user's request: {idea_prompt}. Now generate the outline, don't include any o
 """
 
     final_prompt = files_xml + prompt
-    logger.debug(f"[get_outline_generation_prompt] Final prompt:\n{final_prompt}")
+    logger.info(f"[get_outline_generation_prompt] Final prompt:\n{final_prompt}")
     return final_prompt
 
 
@@ -226,7 +226,7 @@ Now parse the outline text above into the structured format. Return only the JSO
 """
 
     final_prompt = files_xml + prompt
-    logger.debug(f"[get_outline_parsing_prompt] Final prompt:\n{final_prompt}")
+    logger.info(f"[get_outline_parsing_prompt] Final prompt:\n{final_prompt}")
     return final_prompt
 
 
@@ -298,7 +298,7 @@ def get_page_description_prompt(
 """
 
     final_prompt = files_xml + prompt
-    logger.debug(f"[get_page_description_prompt] Final prompt:\n{final_prompt}")
+    logger.info(f"[get_page_description_prompt] Final prompt:\n{final_prompt}")
     return final_prompt
 
 
@@ -407,7 +407,7 @@ def get_image_generation_prompt(
 请输出基于 [文本] 内容生成的 16:9 高保真商业 PPT 页面，确保所有视觉块清晰规整，具有明确的边界逻辑。
 """
 
-    logger.debug(f"[get_image_generation_prompt] Final prompt:\n{prompt}")
+    logger.info(f"[get_image_generation_prompt] Final prompt:\n{prompt}")
     return prompt
 
 
@@ -440,7 +440,7 @@ def get_image_edit_prompt(
     else:
         prompt = f"根据以下指令修改这张PPT页面：{edit_instruction}\n保持原有的内容结构和设计风格，只按照指令进行修改。提供的参考图中既有新素材，也有用户手动框选出的区域，请你根据原图和参考图的关系智能判断用户意图。"
 
-    logger.debug(f"[get_image_edit_prompt] Final prompt:\n{prompt}")
+    logger.info(f"[get_image_edit_prompt] Final prompt:\n{prompt}")
     return prompt
 
 
@@ -507,7 +507,7 @@ Now extract the outline structure from the description text above. Return only t
 """
 
     final_prompt = files_xml + prompt
-    logger.debug(f"[get_description_to_outline_prompt] Final prompt:\n{final_prompt}")
+    logger.info(f"[get_description_to_outline_prompt] Final prompt:\n{final_prompt}")
     return final_prompt
 
 
@@ -572,7 +572,7 @@ Now split the description text into individual page descriptions. Return only th
 {get_language_instruction(language)}
 """
 
-    logger.debug(f"[get_description_split_prompt] Final prompt:\n{prompt}")
+    logger.info(f"[get_description_split_prompt] Final prompt:\n{prompt}")
     return prompt
 
 
@@ -675,7 +675,7 @@ You are a helpful assistant that modifies PPT outlines based on user requirement
 """
 
     final_prompt = files_xml + prompt
-    logger.debug(f"[get_outline_refinement_prompt] Final prompt:\n{final_prompt}")
+    logger.info(f"[get_outline_refinement_prompt] Final prompt:\n{final_prompt}")
     return final_prompt
 
 
@@ -796,7 +796,7 @@ You are a helpful assistant that modifies PPT page descriptions based on user re
 """
 
     final_prompt = files_xml + prompt
-    logger.debug(f"[get_descriptions_refinement_prompt] Final prompt:\n{final_prompt}")
+    logger.info(f"[get_descriptions_refinement_prompt] Final prompt:\n{final_prompt}")
     return final_prompt
 
 
@@ -862,7 +862,7 @@ Page {page_index}/{total_pages}.
 
 Output: 16:9 landscape PPT slide, high resolution, crisp readable text."""
 
-        logger.debug(
+        logger.info(
             f"[get_restyle_prompt] page {page_index}/{total_pages}, "
             f"style_refs={num_style_refs}, custom_prompt=True"
         )
@@ -894,7 +894,7 @@ Page {page_index}/{total_pages}.
 # Output Format:
 输出优化后的 16:9 高保真商业 PPT 页面。所有视觉块必须清晰、规整，具有明确边界逻辑。"""
 
-    logger.debug(
+    logger.info(
         f"[get_restyle_prompt] page {page_index}/{total_pages}, "
         f"style_refs={num_style_refs}, custom_prompt=False, ddi_requirements=True"
     )
@@ -1066,7 +1066,7 @@ Render all typography in 微软雅黑, all graphics as flat vector with consiste
 
 Output: single 16:9 presentation slide image."""
 
-    logger.debug(
+    logger.info(
         f"[get_restyle_prompt] page {page_index}/{total_pages}, "
         f"style_refs={num_style_refs}, custom_prompt=False"
     )
@@ -1090,7 +1090,7 @@ def get_clean_background_prompt() -> str:
 
 注意，**任意位置的, 所有的**文字和图表都应该被彻底移除，**输出不应该包含任何文字和图表。**
 """
-    logger.debug(f"[get_clean_background_prompt] Final prompt:\n{prompt}")
+    logger.info(f"[get_clean_background_prompt] Final prompt:\n{prompt}")
     return prompt
 
 
@@ -1145,7 +1145,7 @@ def get_text_attribute_extraction_prompt(content_hint: str = "") -> str:
 ```
 """.format(content_hint=content_hint)
 
-    # logger.debug(f"[get_text_attribute_extraction_prompt] Final prompt:\n{prompt}")
+    # logger.info(f"[get_text_attribute_extraction_prompt] Final prompt:\n{prompt}")
     return prompt
 
 
@@ -1219,7 +1219,7 @@ def get_batch_text_attribute_extraction_prompt(text_elements_json: str) -> str:
 ```
 """
 
-    # logger.debug(f"[get_batch_text_attribute_extraction_prompt] Final prompt:\n{prompt}")
+    # logger.info(f"[get_batch_text_attribute_extraction_prompt] Final prompt:\n{prompt}")
     return prompt
 
 
