@@ -7,3 +7,4 @@
 | --- | --- | --- |
 | 2026-05-06 | https://mg-cpa.ddiworld.cn/threads/T-019df8b9-5f98-7162-8d01-3c03b948d9a7 | Azure OpenAI gpt-image-2 image provider and deployment verification |
 | 2026-05-06 | https://mg-cpa.ddiworld.cn/threads/T-019df926-2601-71f6-88bc-428b3f5b5d12 | Fix Azure gpt-image-2 restyle image-context endpoint and validate production restyle |
+| 2026-05-08 | https://ampcode.com/threads/T-019e06ea-f553-700e-9268-b697902e2cc6 | Replace DDI PPT restyle prompt and align base-template image ordering |

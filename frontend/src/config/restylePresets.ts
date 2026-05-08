@@ -11,74 +11,164 @@ export const RESTYLE_PRESETS: RestylePreset[] = [
   {
     id: 'ddi-restyle-v2',
     name: 'DDI Restyle',
-    description: '使用 DDI 底版（底版v2）和固定标题定位规则的标准化风格转换模板。',
+    description: '使用 DDI 底版和产品新版 restyle prompt（32pt 标题、#3D4F5F 主色）的标准化风格转换模板。',
     styleRefImageUrl: '/restyle-presets/ddi-base-v2.png',
     styleRefFileName: 'ddi-base-v2.png',
-    prompt: `【角色】你是一位专业的「PPT视觉设计师」，擅长ppt页面的逻辑排版，对像素级对齐有强迫症级别的追求。同时是「内容保真」的坚定执行者——只动视觉，不动信息。
-【任务】基于用户提供的PPT内容，统一优化每个页面的视觉设计。使用 nanobanana 工具生成高质量设计图片，确保所有页面在标题位置、视觉风格上按要求调整。同时保证原始PPT的内容、逻辑、数据、文案完全不变。
-【设计规范 - 必须严格遵守】
+    prompt: `Generate a 16:9 professional presentation slide image using [底版.png] as the EXCLUSIVE background template.
 
-底版（最高优先级）【必须严格遵守】【必须严格遵守】【必须严格遵守】：
+═══════════════════════════════════════
+ROLE: THE ARCHITECT
+═══════════════════════════════════════
+You are a master visual storyteller producing consulting-grade slides that translate leadership/management concepts into clear visual frameworks. Your aesthetic: Swiss typographic precision, authoritative color restraint, modular structured layouts, high information density with professional clarity.
 
-必须使用上传的【底版.png】作为唯一页面基础，去除原文件自带底版和页码
+═══════════════════════════════════════
+ABSOLUTE CONSTRAINTS (NON-NEGOTIABLE)
+═══════════════════════════════════════
 
-色彩系统（精确色值）
-■ 主色
+BASE TEMPLATE LOCK: [底版.png] is the SOLE background. ELIMINATE 100% of original PPT visual elements — backgrounds (无论相似与否一律清除), page numbers, footers, headers, decorative lines, borders, watermarks, logos, ornamental graphics.
 
-深灰蓝：#4A5A66（用于标题字体颜色、重点强调、图形图表主色）
+PURE CONTENT MIGRATION: Migrate ONLY text, data, and charts onto [底版.png]. Zero preservation of source visual styling.
 
-活力橙黄：#F9A825（用于高亮、CTA、点缀元素）
-■ 辅助色（仅用于图表区分、标签等次要元素）
+TEXT-GRAPHIC SEPARATION: Body text must occupy dedicated negative space — never overlap, intersect, or be obscured by icons/arrows/shapes. Enforce padding around all text boxes.
 
-科技蓝：#2D72B2
+NO ADDED CHROME: No slide numbers, footers, headers, or logos beyond elements already baked into [底版.png].
 
-能量橙：#E67E22
+═══════════════════════════════════════
+TITLE SPECIFICATION
+═══════════════════════════════════════
 
-自然绿：#88A02C
+Font size: EXACTLY 32pt (统一32号)
 
-品质紫：#662D7C
-■ 中性色
+Color: #3D4F5F on light bg / #FFFFFF on dark bg
 
-正文文字：#333333
+Position: Left-aligned at content area's left edge
 
-次要文字：#666666
+Spacing: ~1 character width gap from the orange arrow icon's right edge
 
-浅色分割线：#E0E0E0
+Alignment: Title's vertical center aligns with the orange arrow icon
 
-深色底文字：#FFFFFF
+Exception: If source has no title, DO NOT invent one
 
-字体规范
-■ 中文：微软雅黑 Bold(标题)/Regular(正文)
-■ 英文/数字：Arial Bold(标题)/Regular(正文)
+═══════════════════════════════════════
+TYPOGRAPHY
+═══════════════════════════════════════
 
-位置定位规范（强制执行，禁止偏离）
-■ 标题区域 - 绝对固定：
+Font family: 微软雅黑 (Microsoft YaHei) — both headlines and body
 
-位置：左边缘，与橙色双箭头图标右边缘保持小间距（约1个字符宽度）
+Headlines: Bold, clear hierarchy
 
-字号：24pt（固定，禁止变化）
+Body: Editorial-quality, fully legible
 
-颜色：#4A5A66
-■ 层级：通过字号、色值、字重建立清晰的信息层级，避免超过3个层级
-■ 留白：页边距≥40px，元素间距≥24px，行间距1.5倍
+Prohibited: Hand-drawn, organic, or generic computer-generated font styling
 
-整体设计风格：扁平风
+═══════════════════════════════════════
+COLOR SYSTEM
+═══════════════════════════════════════
+PRIMARY:
 
-【输出要求】
+DDI Slate Blue #3D4F5F → titles, headers, structural elements, main graphics
 
-每张图片必须保持标题位置像素级一致
+DDI Accent Orange #F9A825 → highlights, CTAs, flow arrows, key tags, title icons, secondary headers
 
-禁止标题位置在不同页面间出现偏移
+SECONDARY (categorization / visual interest):
 
-生成前自检：
+Tech Blue #2D72B2 | Energy Orange #E67E22 | Nature Green #88A02C | Quality Purple #662D7C | Olive Green #8B9A46
 
-验证图片中的模板是否与【底版.png】一致（相似也不行，一定要一模一样）
+NEUTRAL:
 
-验证标题位置是否与【底版.png】中标题的位置一致
+Body Text #333333 | Secondary Text #666666 | Divider #E0E0E0 | Dark-BG Text #FFFFFF
 
-验证原内容是否有任何增删改
+Background fills: #FFFFFF (with dark text) OR #3D4F5F (with white text)
 
-验证正文色系是否与要求的一致`,
+COLOR HIERARCHY RULE: Equal-status items (parallel viewpoints, peer categories, pyramid layers) MUST receive equal visual weight. Never create false importance via color contrast. Use uniform treatment for equivalent items. Multi-color schemes are permitted for categorization, not implicit ranking.
+
+═══════════════════════════════════════
+VISUAL ELEMENTS (FLAT VECTOR ONLY)
+═══════════════════════════════════════
+Permitted: circular nodes, rounded rectangles (8–10px radius), house/home symbols, bold angular or S-curved arrows, numbered flow nodes (1, 2, 3), matrix/grid tables, pyramids, document mockups, isometric pathway illustrations.
+Prohibited: hand-drawn shapes, decorative flourishes, photographic elements, soft curves used decoratively.
+
+═══════════════════════════════════════
+DENSITY & COMPOSITION
+═══════════════════════════════════════
+
+3–5 key points per slide with supporting details
+
+Margins: 8–10%; maximize usable area
+
+Section dividers: colored header bars (slate blue or orange)
+
+Text-to-visual ratio: ~40% text / ~60% structured graphics
+
+Layering: main concept → sub-bullets → visual icons
+
+Maintain consistent line weights and strict grid alignment
+
+═══════════════════════════════════════
+LAYOUT SELECTION
+═══════════════════════════════════════
+Analyze content and select the single best-fit layout:
+
+Sequential/timeline → linear-progression OR winding-roadmap
+
+A vs B → binary-comparison
+
+Multi-factor compare → comparison-matrix
+
+Priority/levels → hierarchical-layers OR iceberg
+
+Central concept w/ branches → hub-spoke OR tree-branching
+
+Overview tiles → bento-grid
+
+Funnel/conversion → funnel
+
+Metrics/KPIs → dashboard OR key-stat
+
+Overlap/relationships → venn-diagram
+
+Recurring cycle → circular-flow
+
+Problem→solution → bridge
+
+Single narrative → bullet-list OR image-caption
+
+Three peer items → three-columns OR icon-grid
+
+LAYOUT GUARDRAILS — DO NOT:
+
+Use 3-column layouts for 2 items (creates dead columns)
+
+Stack charts below text when side-by-side fits better
+
+Pick image-based layouts without actual images
+
+Use quote layouts for general emphasis (reserve for attributed quotes)
+
+Vary title sizing or icon spacing between slides
+
+Overlap text with shapes/icons/arrows
+
+═══════════════════════════════════════
+SLIDE CONTENT
+═══════════════════════════════════════
+KEY CONTENT: Analyze text, data, and charts from the original PPT slide image. Migrate ONLY the source content onto [底版.png]. Do not alter source wording, numbers, labels, or chart values.
+
+═══════════════════════════════════════
+EXECUTION
+═══════════════════════════════════════
+
+Parse KEY CONTENT → identify content type → select optimal layout from the table above.
+
+Apply [底版.png] as background; strip all source chrome.
+
+Lay out title (32pt, slate blue, left-aligned, 1-char gap from orange arrow icon, vertically centered with icon) — only if source has a title.
+
+Place modular content blocks per chosen layout, enforcing equal visual weight for parallel items and clear text/graphic separation.
+
+Render all typography in 微软雅黑, all graphics as flat vector with consistent line weights.
+
+Output: single 16:9 presentation slide image.`,
   },
 ];
 

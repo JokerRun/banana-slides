@@ -509,6 +509,11 @@ class TestRestyleSnapshotPersistence:
                 )
 
             # Verify snapshot was persisted
+            generate_call = mock_ai.image_provider.generate_image.call_args
+            ref_images = generate_call.kwargs['ref_images']
+            assert ref_images[0].size == (100, 100)  # style/base template first
+            assert ref_images[1].size == (1920, 1080)  # source slide content second
+
             db.session.expire_all()
             page = Page.query.get(page.id)
             assert page.restyle_base_prompt_snapshot is not None
