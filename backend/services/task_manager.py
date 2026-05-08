@@ -1438,8 +1438,9 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
                             path_components=page_artifact_path,
                         )
 
-                        # Build ref_images: original slide first, then style refs
-                        ref_images = [original_image] + list(style_ref_images)
+                        # Build ref_images to match prompt labels:
+                        # style/base template refs first, then original slide content.
+                        ref_images = list(style_ref_images) + [original_image]
 
                         # Generate restyled image via AIService
                         thinking_level = ai_svc._get_image_thinking_level()
@@ -1468,7 +1469,7 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
                             'aspect_ratio': aspect_ratio,
                             'resolution': resolution,
                             'thinking_level': thinking_level,
-                            'ref_image_paths': [original_path, *[item['path'] for item in style_ref_manifest if item['selected']]],
+                            'ref_image_paths': [*[item['path'] for item in style_ref_manifest if item['selected']], original_path],
                         }
                         log_restyle_edit_event('restyle_first_pass_provider_request', page_trace, {
                             'provider': provider_name,

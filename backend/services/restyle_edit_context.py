@@ -241,12 +241,13 @@ def _build_conversation_contents(
         'parts': [{'text': baseline_text}],
     })
 
-    # Turn 2 (user, images): baseline images
+    # Turn 2 (user, images): baseline images, matching first-pass prompt order:
+    # style/base template refs first, then original slide content.
     turn2_parts: list = []
-    if original_slide_path:
-        turn2_parts.append({'image_path': original_slide_path})
     for ref in selected_style_refs:
         turn2_parts.append({'image_path': ref})
+    if original_slide_path:
+        turn2_parts.append({'image_path': original_slide_path})
     if turn2_parts:
         turns.append({'role': 'user', 'parts': turn2_parts})
 
@@ -289,9 +290,9 @@ def _build_legacy_ref_images(
 ) -> List[str]:
     """Flatten images in deterministic order for legacy providers."""
     images: List[str] = []
+    images.extend(selected_style_refs)
     if original_slide_path:
         images.append(original_slide_path)
-    images.extend(selected_style_refs)
     if current_selected_path:
         images.append(current_selected_path)
     images.extend(selected_extras)

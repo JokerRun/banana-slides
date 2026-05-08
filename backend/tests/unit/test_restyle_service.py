@@ -203,41 +203,45 @@ class TestFindLibreoffice:
 
 
 class TestRestylePrompt:
-    """get_restyle_prompt tests (compose_images pattern)"""
+    """get_restyle_prompt tests (DDI restyle prompt)"""
 
     def test_basic_prompt(self):
-        """Basic prompt with IMAGE labels"""
+        """Basic prompt should use DDI product prompt with IMAGE labels"""
         from services.prompts import get_restyle_prompt
         prompt = get_restyle_prompt(page_index=1, total_pages=5)
 
-        assert "IMAGE 1: Style reference template" in prompt
+        assert "IMAGE 1: [底版.png] base template reference" in prompt
         assert "IMAGE 2: Original PPT slide (content source)" in prompt
         assert "1/5" in prompt
-        # Key instruction preserved
-        assert "keep ALL text content exactly the same" in prompt
-        assert "Apply the visual style" in prompt
+        assert "ROLE: THE ARCHITECT" in prompt
+        assert "BASE TEMPLATE LOCK" in prompt
+        assert "Font size: EXACTLY 32pt" in prompt
+        assert "DDI Slate Blue #3D4F5F" in prompt
 
-    def test_prompt_without_brand_section(self):
-        """Prompt no longer includes brand section"""
+    def test_prompt_migrates_source_content_to_base_template(self):
+        """Prompt should map source slide content onto the base template"""
         from services.prompts import get_restyle_prompt
         prompt = get_restyle_prompt(page_index=2, total_pages=5)
 
         assert "Brand guidelines" not in prompt
         assert "2/5" in prompt
+        assert "PURE CONTENT MIGRATION" in prompt
+        assert "KEY CONTENT: Analyze text, data, and charts from IMAGE 2" in prompt
+        assert "Apply [底版.png] as background" in prompt
 
-    def test_cover_page_prompt(self):
-        """Cover page should have COVER hint"""
+    def test_first_page_uses_product_prompt_without_legacy_cover_hint(self):
+        """Product prompt should not add legacy cover-page styling hints"""
         from services.prompts import get_restyle_prompt
         prompt = get_restyle_prompt(page_index=1, total_pages=5)
 
-        assert "COVER" in prompt
+        assert "COVER" not in prompt
 
-    def test_last_page_prompt(self):
-        """Last page should have ENDING hint"""
+    def test_last_page_uses_product_prompt_without_legacy_ending_hint(self):
+        """Product prompt should not add legacy ending-page styling hints"""
         from services.prompts import get_restyle_prompt
         prompt = get_restyle_prompt(page_index=5, total_pages=5)
 
-        assert "ENDING" in prompt
+        assert "ENDING" not in prompt
 
     def test_middle_page_no_special_hint(self):
         """Middle page should have no special hint"""
@@ -248,23 +252,23 @@ class TestRestylePrompt:
         assert "ENDING" not in prompt
 
     def test_multiple_style_refs(self):
-        """Multiple style references should get numbered labels"""
+        """Multiple base template references should get numbered labels"""
         from services.prompts import get_restyle_prompt
         prompt = get_restyle_prompt(page_index=2, total_pages=5, num_style_refs=3)
 
-        assert "IMAGE 1: Style reference template #1" in prompt
-        assert "IMAGE 2: Style reference template #2" in prompt
-        assert "IMAGE 3: Style reference template #3" in prompt
+        assert "IMAGE 1: [底版.png] base template reference #1" in prompt
+        assert "IMAGE 2: [底版.png] base template reference #2" in prompt
+        assert "IMAGE 3: [底版.png] base template reference #3" in prompt
         assert "IMAGE 4: Original PPT slide (content source)" in prompt
-        assert "Apply the visual style from IMAGE 1 to IMAGE 4" in prompt
+        assert "IMAGE 1..3 are base/style references" in prompt
 
     def test_text_preservation_instruction(self):
-        """Verify text preservation is clearly instructed"""
+        """Verify source content preservation is clearly instructed"""
         from services.prompts import get_restyle_prompt
         prompt = get_restyle_prompt(page_index=2, total_pages=5)
 
-        assert "every word, number, and punctuation mark" in prompt
-        assert "preserved unchanged" in prompt
+        assert "Migrate ONLY text, data, and charts" in prompt
+        assert "Do not alter source wording, numbers, labels, or chart values" in prompt
 
     def test_custom_prompt_overrides_default_body(self):
         """Custom prompt should be injected when provided"""
@@ -281,7 +285,7 @@ class TestRestylePrompt:
         assert custom in prompt
         assert "Use the following restyle instructions strictly" in prompt
         assert "Non-negotiable" in prompt
-        assert "Apply the visual style from IMAGE 1" not in prompt
+        assert "ROLE: THE ARCHITECT" not in prompt
 
     def test_custom_prompt_keeps_image_labels(self):
         """Custom prompt mode should still include IMAGE label mapping"""
@@ -294,7 +298,7 @@ class TestRestylePrompt:
             custom_prompt="custom instructions"
         )
 
-        assert "IMAGE 1: Style reference template #1" in prompt
-        assert "IMAGE 2: Style reference template #2" in prompt
-        assert "IMAGE 3: Style reference template #3" in prompt
+        assert "IMAGE 1: [底版.png] base template reference #1" in prompt
+        assert "IMAGE 2: [底版.png] base template reference #2" in prompt
+        assert "IMAGE 3: [底版.png] base template reference #3" in prompt
         assert "IMAGE 4: Original PPT slide (content source)" in prompt

@@ -179,7 +179,7 @@ class TestBuildRestyleEditContext:
         assert old_extra['selection_reason'] == 'pruned_budget'
 
     def test_legacy_ref_images_deterministic_order(self):
-        """Legacy images follow: original, style refs, current selected, extras"""
+        """Legacy images follow: style refs, original, current selected, extras"""
         ctx = build_restyle_edit_context(
             original_slide_path='/fake/orig.png',
             style_ref_paths=['/fake/ref1.png'],
@@ -192,10 +192,31 @@ class TestBuildRestyleEditContext:
             total_cap=8,
         )
         assert ctx.legacy_ref_images == [
-            '/fake/orig.png',
             '/fake/ref1.png',
+            '/fake/orig.png',
             '/fake/cur.png',
             '/fake/extra.png',
+        ]
+
+    def test_conversation_baseline_images_match_prompt_order(self):
+        """Baseline conversation images follow: style refs first, then original slide."""
+        ctx = build_restyle_edit_context(
+            original_slide_path='/fake/orig.png',
+            style_ref_paths=['/fake/ref1.png', '/fake/ref2.png'],
+            restyle_base_prompt_snapshot='SNAP',
+            restyle_prompt='',
+            current_selected_path='/fake/cur.png',
+            edit_instruction='edit',
+        )
+        baseline_image_paths = [
+            part['image_path']
+            for part in ctx.conversation_contents[1]['parts']
+            if 'image_path' in part
+        ]
+        assert baseline_image_paths == [
+            '/fake/ref1.png',
+            '/fake/ref2.png',
+            '/fake/orig.png',
         ]
 
     def test_conversation_turn1_contains_baseline_text(self):
