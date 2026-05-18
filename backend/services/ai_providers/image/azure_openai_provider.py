@@ -4,6 +4,7 @@ import logging
 import time
 from io import BytesIO
 from typing import List, Optional
+from urllib.parse import urlparse
 
 import requests
 from PIL import Image
@@ -35,10 +36,10 @@ class AzureOpenAIImageProvider(ImageProvider):
         max_retries: int = None,
         timeout: float = None,
     ):
-        self.api_key = api_key
-        self.endpoint = (endpoint or "").rstrip('/')
+        self.api_key = (api_key or "").strip()
+        self.endpoint = (endpoint or "").strip().rstrip('/')
         self.api_version = api_version
-        self.responses_url = responses_url or self._build_responses_url()
+        self.responses_url = (responses_url or self._build_responses_url()).strip()
         self.responses_model = responses_model or "gpt-5.4"
         self.image_deployment = image_deployment or "gpt-image-2"
         # Existing debug artifacts read `model` from providers.
@@ -103,11 +104,19 @@ class AzureOpenAIImageProvider(ImageProvider):
         return '1536x1024'
 
     def _request_headers(self) -> dict:
-        return {
-            'api-key': self.api_key,
+        headers = {
             'Content-Type': 'application/json',
             'x-ms-oai-image-generation-deployment': self.image_deployment,
         }
+        if self._uses_azure_api_key_header():
+            headers['api-key'] = self.api_key
+        else:
+            headers['Authorization'] = f"Bearer {self.api_key}"
+        return headers
+
+    def _uses_azure_api_key_header(self) -> bool:
+        path = f"{urlparse(self.responses_url).path.rstrip('/')}/".lower()
+        return '/openai/' in path
 
     def _image_tool(self, action: str, aspect_ratio: str, resolution: str) -> dict:
         tool = {

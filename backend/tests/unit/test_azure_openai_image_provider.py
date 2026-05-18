@@ -65,6 +65,21 @@ class TestAzureOpenAIImageProvider:
             }],
         }
 
+    def test_openai_compatible_responses_url_uses_bearer_auth_header(self):
+        from services.ai_providers.image.azure_openai_provider import AzureOpenAIImageProvider
+
+        provider = AzureOpenAIImageProvider(
+            api_key='test-key',
+            responses_url='https://mg-cpa.ddiworld.cn/v1/responses?api-version=2025-04-01-preview',
+            image_deployment='gpt-image-2',
+        )
+
+        assert provider._request_headers() == {
+            'Authorization': 'Bearer test-key',
+            'Content-Type': 'application/json',
+            'x-ms-oai-image-generation-deployment': 'gpt-image-2',
+        }
+
     def test_generate_image_with_reference_images_posts_responses_edit(self):
         from services.ai_providers.image.azure_openai_provider import AzureOpenAIImageProvider
 
