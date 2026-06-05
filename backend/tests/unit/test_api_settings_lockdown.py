@@ -83,7 +83,7 @@ def test_startup_preflight_allows_azure_openai_image_override(monkeypatch):
     monkeypatch.setenv('GOOGLE_API_KEY', 'mock-api-key-for-testing')
     monkeypatch.setenv('IMAGE_PROVIDER_FORMAT', 'azure_openai')
     monkeypatch.setenv('AZURE_OPENAI_API_KEY', 'azure-key')
-    monkeypatch.setenv('AZURE_OPENAI_ENDPOINT', 'https://example.openai.azure.com')
+    monkeypatch.setenv('AZURE_OPENAI_RESPONSES_URL', 'https://example.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview')
 
     app = app_module.create_app()
 

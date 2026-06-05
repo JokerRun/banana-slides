@@ -1,4 +1,4 @@
-"""Tests for Azure OpenAI GPT-image provider."""
+"""Tests for Azure OpenAI Responses GPT-image provider."""
 import base64
 import io
 import sys
@@ -6,7 +6,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import requests
-import pytest
 from PIL import Image
 
 backend_path = Path(__file__).parent.parent.parent
@@ -21,104 +20,245 @@ def _png_b64(color='red', size=(32, 32)):
 
 
 class TestAzureOpenAIImageProvider:
-    def test_generate_image_posts_json_and_decodes_base64(self):
+    def test_generate_image_posts_responses_json_and_decodes_base64(self):
         from services.ai_providers.image.azure_openai_provider import AzureOpenAIImageProvider
 
         response = MagicMock()
-        response.json.return_value = {'data': [{'b64_json': _png_b64('blue', (40, 24))}]}
+        response.status_code = 200
+        response.json.return_value = {
+            'output': [
+                {
+                    'type': 'image_generation_call',
+                    'status': 'completed',
+                    'result': _png_b64('blue', (48, 27)),
+                }
+            ]
+        }
 
         with patch('services.ai_providers.image.azure_openai_provider.requests.post', return_value=response) as post:
             provider = AzureOpenAIImageProvider(
                 api_key='test-key',
-                endpoint='https://example.openai.azure.com',
-                deployment='gpt-image-2',
-                api_version='preview',
+                responses_url='https://example.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview',
+                responses_model='gpt-5.4',
+                image_deployment='gpt-image-2',
             )
 
             result = provider.generate_image('draw a clean slide', aspect_ratio='16:9', resolution='2K')
 
-        assert result.size == (40, 24)
+        assert result.size == (48, 27)
         post.assert_called_once()
-        assert post.call_args.args[0] == 'https://example.openai.azure.com/openai/v1/images/generations?api-version=preview'
-        assert post.call_args.kwargs['headers']['api-key'] == 'test-key'
+        assert post.call_args.args[0] == 'https://example.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview'
+        assert post.call_args.kwargs['headers'] == {
+            'api-key': 'test-key',
+            'Content-Type': 'application/json',
+            'x-ms-oai-image-generation-deployment': 'gpt-image-2',
+        }
         assert post.call_args.kwargs['json'] == {
-            'model': 'gpt-image-2',
-            'prompt': 'draw a clean slide',
-            'n': 1,
-            'size': '1920x1088',
-            'quality': 'high',
-            'output_format': 'png',
+            'model': 'gpt-5.4',
+            'input': 'draw a clean slide',
+            'tools': [{
+                'type': 'image_generation',
+                'action': 'generate',
+                'quality': 'high',
+                'size': 'auto',
+                'output_format': 'png',
+            }],
         }
 
-    def test_generate_image_with_reference_images_posts_multipart_edit(self):
+    def test_openai_compatible_responses_url_uses_bearer_auth_header(self):
+        from services.ai_providers.image.azure_openai_provider import AzureOpenAIImageProvider
+
+        provider = AzureOpenAIImageProvider(
+            api_key='test-key',
+            responses_url='https://mg-cpa.ddiworld.cn/v1/responses?api-version=2025-04-01-preview',
+            image_deployment='gpt-image-2',
+        )
+
+        assert provider._request_headers() == {
+            'Authorization': 'Bearer test-key',
+            'Content-Type': 'application/json',
+            'x-ms-oai-image-generation-deployment': 'gpt-image-2',
+        }
+
+    def test_generate_image_with_reference_images_posts_responses_edit(self):
         from services.ai_providers.image.azure_openai_provider import AzureOpenAIImageProvider
 
         response = MagicMock()
-        response.json.return_value = {'data': [{'b64_json': _png_b64('green')}]}
+        response.status_code = 200
+        response.json.return_value = {
+            'output': [
+                {
+                    'type': 'image_generation_call',
+                    'status': 'completed',
+                    'result': _png_b64('green', (40, 30)),
+                }
+            ]
+        }
         ref_image = Image.new('RGB', (20, 10), 'white')
 
         with patch('services.ai_providers.image.azure_openai_provider.requests.post', return_value=response) as post:
             provider = AzureOpenAIImageProvider(
                 api_key='test-key',
-                image_generation_url='https://example.cognitiveservices.azure.com/openai/deployments/gpt-image-2/images/generations?api-version=2024-02-01',
-                deployment='gpt-image-2',
+                responses_url='https://example.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview',
+                responses_model='gpt-5.4',
+                image_deployment='gpt-image-2',
             )
 
             result = provider.generate_image('restyle this slide', ref_images=[ref_image], aspect_ratio='4:3', resolution='2K')
 
-        assert result.size == (32, 32)
+        assert result.size == (40, 30)
         post.assert_called_once()
-        assert post.call_args.args[0] == 'https://example.cognitiveservices.azure.com/openai/deployments/gpt-image-2/images/edits?api-version=2025-04-01-preview'
-        assert post.call_args.kwargs['headers']['api-key'] == 'test-key'
-        assert post.call_args.kwargs['data'] == {
-            'model': 'gpt-image-2',
-            'prompt': 'restyle this slide',
-            'n': '1',
-            'size': '1600x1200',
+        payload = post.call_args.kwargs['json']
+        assert payload['model'] == 'gpt-5.4'
+        assert payload['tools'] == [{
+            'type': 'image_generation',
+            'action': 'edit',
             'quality': 'high',
+            'size': 'auto',
             'output_format': 'png',
-        }
-        files = post.call_args.kwargs['files']
-        assert len(files) == 1
-        assert files[0][0] == 'image[]'
-        assert files[0][1][0] == 'reference_1.png'
-        assert files[0][1][2] == 'image/png'
+        }]
+        assert payload['input'][0]['role'] == 'user'
+        content = payload['input'][0]['content']
+        assert content[0] == {'type': 'input_text', 'text': 'restyle this slide'}
+        assert content[1]['type'] == 'input_image'
+        assert content[1]['image_url'].startswith('data:image/png;base64,')
 
-    def test_reference_image_edit_endpoint_unavailable_does_not_fallback_to_text_only(self):
+    def test_generate_image_from_conversation_posts_structured_multi_turn_request(self):
         from services.ai_providers.image.azure_openai_provider import AzureOpenAIImageProvider
 
-        edit_response = MagicMock()
-        edit_response.status_code = 404
-        edit_response.raise_for_status.side_effect = requests.HTTPError(response=edit_response)
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {
+            'output': [
+                {
+                    'type': 'image_generation_call',
+                    'status': 'completed',
+                    'result': _png_b64('purple', (64, 36)),
+                }
+            ]
+        }
+        original_slide = Image.new('RGB', (20, 10), 'white')
+        template_ref = Image.new('RGB', (20, 10), 'blue')
+        current_image = Image.new('RGB', (20, 10), 'green')
+        contents = [
+            {'role': 'user', 'parts': ['global base instruction']},
+            {'role': 'user', 'parts': [original_slide, template_ref]},
+            {'role': 'user', 'parts': [current_image]},
+            {'role': 'user', 'parts': ['make the title more prominent']},
+        ]
 
-        ref_image = Image.new('RGB', (20, 10), 'white')
-        with patch(
-            'services.ai_providers.image.azure_openai_provider.requests.post',
-            return_value=edit_response,
-        ) as post:
+        with patch('services.ai_providers.image.azure_openai_provider.requests.post', return_value=response) as post:
             provider = AzureOpenAIImageProvider(
                 api_key='test-key',
-                image_generation_url='https://example.cognitiveservices.azure.com/openai/deployments/gpt-image-2/images/generations?api-version=2024-02-01',
-                deployment='gpt-image-2',
+                responses_url='https://example.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview',
+                responses_model='gpt-5.4',
+                image_deployment='gpt-image-2',
             )
 
-            with pytest.raises(Exception) as exc_info:
-                provider.generate_image('generate from style', ref_images=[ref_image])
+            result = provider.generate_image_from_conversation(contents, aspect_ratio='16:9', resolution='2K')
 
-        assert 'Error generating image with Azure OpenAI' in str(exc_info.value)
-        assert post.call_count == 1
-        assert post.call_args_list[0].args[0].endswith('/images/edits?api-version=2025-04-01-preview')
-        assert 'files' in post.call_args_list[0].kwargs
+        assert provider.supports_conversation_contents is True
+        assert result.size == (64, 36)
+        payload = post.call_args.kwargs['json']
+        assert payload['model'] == 'gpt-5.4'
+        assert payload['tools'] == [{
+            'type': 'image_generation',
+            'action': 'edit',
+            'quality': 'high',
+            'size': 'auto',
+            'output_format': 'png',
+        }]
+        assert [message['role'] for message in payload['input']] == ['user', 'user', 'user', 'user']
+        assert payload['input'][0]['content'] == [{'type': 'input_text', 'text': 'global base instruction'}]
+        assert [part['type'] for part in payload['input'][1]['content']] == ['input_image', 'input_image']
+        assert payload['input'][1]['content'][0]['image_url'].startswith('data:image/png;base64,')
+        assert payload['input'][2]['content'][0]['type'] == 'input_image'
+        assert payload['input'][3]['content'] == [{'type': 'input_text', 'text': 'make the title more prominent'}]
 
-    def test_size_mapping_uses_gpt_image_2_valid_multiples_of_16(self):
+    def test_engine_overloaded_is_retried_before_success(self):
         from services.ai_providers.image.azure_openai_provider import AzureOpenAIImageProvider
 
-        provider = AzureOpenAIImageProvider(api_key='test-key', endpoint='https://example.openai.azure.com')
+        overloaded = MagicMock()
+        overloaded.status_code = 400
+        overloaded.json.return_value = {'error': {'message': 'Engine is overloaded'}}
+        overloaded.raise_for_status.side_effect = requests.HTTPError(response=overloaded)
+        success = MagicMock()
+        success.status_code = 200
+        success.json.return_value = {
+            'output': [{'type': 'image_generation_call', 'status': 'completed', 'result': _png_b64('green', (64, 36))}]
+        }
 
-        assert provider._resolve_size('16:9', '1K') == '1280x720'
-        assert provider._resolve_size('16:9', '2K') == '1920x1088'
-        assert provider._resolve_size('16:9', '4K') == '3840x2160'
-        assert provider._resolve_size('1:1', '4K') == '2880x2880'
+        with patch(
+            'services.ai_providers.image.azure_openai_provider.requests.post',
+            side_effect=[overloaded, success],
+        ) as post, patch('services.ai_providers.image.azure_openai_provider.time.sleep') as sleep:
+            provider = AzureOpenAIImageProvider(
+                api_key='test-key',
+                responses_url='https://example.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview',
+                responses_model='gpt-5.4',
+                image_deployment='gpt-image-2',
+                max_retries=1,
+            )
+
+            result = provider.generate_image('generate from style')
+
+        assert result.size == (64, 36)
+        assert post.call_count == 2
+        sleep.assert_called_once()
+
+    def test_generate_image_preserves_azure_response_dimensions_without_cropping(self):
+        from services.ai_providers.image.azure_openai_provider import AzureOpenAIImageProvider
+
+        response = MagicMock()
+        response.status_code = 200
+        response.json.return_value = {
+            'output': [
+                {
+                    'type': 'image_generation_call',
+                    'status': 'completed',
+                    # Azure currently returns this landscape size for 16:9 requests;
+                    # do not crop it because template/footer fidelity matters more.
+                    'result': _png_b64('blue', (1536, 1024)),
+                }
+            ]
+        }
+
+        with patch('services.ai_providers.image.azure_openai_provider.requests.post', return_value=response):
+            provider = AzureOpenAIImageProvider(
+                api_key='test-key',
+                responses_url='https://example.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview',
+            )
+
+            result = provider.generate_image('make a PPT slide', aspect_ratio='16:9', resolution='2K')
+
+        assert result.size == (1536, 1024)
+
+    def test_size_mapping_uses_azure_responses_supported_sizes(self):
+        from services.ai_providers.image.azure_openai_provider import AzureOpenAIImageProvider
+
+        provider = AzureOpenAIImageProvider(
+            api_key='test-key',
+            responses_url='https://example.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview',
+        )
+
+        assert provider._resolve_size('16:9', '1K') == 'auto'
+        assert provider._resolve_size('4:3', '2K') == 'auto'
+        assert provider._resolve_size('9:16', '4K') == '1024x1536'
+        assert provider._resolve_size('1:1', '4K') == '1024x1024'
+
+    def test_openai_image_override_keeps_text_provider_format_on_gemini(self, monkeypatch):
+        from services import ai_providers
+
+        monkeypatch.setenv('AI_PROVIDER_FORMAT', 'gemini')
+        monkeypatch.setenv('GOOGLE_API_KEY', 'google-key')
+        monkeypatch.setenv('IMAGE_PROVIDER_FORMAT', 'openai')
+        monkeypatch.setenv('OPENAI_API_KEY', 'openai-key')
+        monkeypatch.setenv('OPENAI_API_BASE', 'https://api.openai.example/v1')
+
+        provider = ai_providers.get_image_provider(model='gpt-image-1')
+
+        assert provider.__class__.__name__ == 'OpenAIImageProvider'
+        assert ai_providers.get_provider_format() == 'gemini'
 
     def test_factory_uses_image_provider_format_without_changing_text_provider_format(self, monkeypatch):
         from services import ai_providers
@@ -127,9 +267,28 @@ class TestAzureOpenAIImageProvider:
         monkeypatch.setenv('GOOGLE_API_KEY', 'google-key')
         monkeypatch.setenv('IMAGE_PROVIDER_FORMAT', 'azure_openai')
         monkeypatch.setenv('AZURE_OPENAI_API_KEY', 'azure-key')
-        monkeypatch.setenv('AZURE_OPENAI_ENDPOINT', 'https://example.openai.azure.com')
+        monkeypatch.setenv('AZURE_OPENAI_RESPONSES_URL', 'https://example.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview')
+        monkeypatch.setenv('AZURE_OPENAI_RESPONSES_MODEL', 'gpt-5.4')
+        monkeypatch.setenv('AZURE_OPENAI_IMAGE_DEPLOYMENT', 'gpt-image-2')
 
         provider = ai_providers.get_image_provider(model='gpt-image-2')
 
         assert provider.__class__.__name__ == 'AzureOpenAIImageProvider'
+        assert provider.responses_model == 'gpt-5.4'
+        assert provider.image_deployment == 'gpt-image-2'
         assert ai_providers.get_provider_format() == 'gemini'
+
+    def test_factory_defaults_azure_image_deployment_to_gpt_image_2(self, monkeypatch):
+        from services import ai_providers
+
+        monkeypatch.setenv('AI_PROVIDER_FORMAT', 'gemini')
+        monkeypatch.setenv('GOOGLE_API_KEY', 'google-key')
+        monkeypatch.setenv('IMAGE_PROVIDER_FORMAT', 'azure_openai')
+        monkeypatch.setenv('AZURE_OPENAI_API_KEY', 'azure-key')
+        monkeypatch.setenv('AZURE_OPENAI_RESPONSES_URL', 'https://example.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview')
+        monkeypatch.setenv('IMAGE_MODEL', 'gemini-3-pro-image-preview')
+        monkeypatch.delenv('AZURE_OPENAI_IMAGE_DEPLOYMENT', raising=False)
+
+        provider = ai_providers.get_image_provider(model='gemini-3-pro-image-preview')
+
+        assert provider.image_deployment == 'gpt-image-2'

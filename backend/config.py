@@ -47,7 +47,7 @@ class Config:
     
     # AI Provider 格式配置: "gemini" (Google GenAI SDK), "openai" (OpenAI SDK), "vertex" (Vertex AI)
     AI_PROVIDER_FORMAT = os.getenv('AI_PROVIDER_FORMAT', 'gemini')
-    # 图片 provider 可单独覆盖；例如文字继续用 Gemini，图片切到 Azure OpenAI GPT-image
+    # 图片 provider 可单独覆盖；例如文字继续用 Gemini，图片切到 Azure OpenAI Responses GPT-image
     IMAGE_PROVIDER_FORMAT = os.getenv('IMAGE_PROVIDER_FORMAT', AI_PROVIDER_FORMAT)
 
     # Vertex AI 专用配置（当 AI_PROVIDER_FORMAT=vertex 时使用）
@@ -64,13 +64,13 @@ class Config:
     OPENAI_TIMEOUT = float(os.getenv('OPENAI_TIMEOUT', '300.0'))  # 增加到 5 分钟（生成清洁背景图需要很长时间）
     OPENAI_MAX_RETRIES = int(os.getenv('OPENAI_MAX_RETRIES', '2'))  # 减少重试次数，避免过多重试导致累积超时
 
-    # Azure OpenAI GPT-image 专用配置（当 IMAGE_PROVIDER_FORMAT=azure_openai 时使用）
+    # Azure OpenAI Responses + GPT-image 专用配置（当 IMAGE_PROVIDER_FORMAT=azure_openai 时使用）
     AZURE_OPENAI_API_KEY = os.getenv('AZURE_OPENAI_API_KEY', '')
     AZURE_OPENAI_ENDPOINT = os.getenv('AZURE_OPENAI_ENDPOINT', '')
     AZURE_OPENAI_API_VERSION = os.getenv('AZURE_OPENAI_API_VERSION', '2025-04-01-preview')
+    AZURE_OPENAI_RESPONSES_URL = os.getenv('AZURE_OPENAI_RESPONSES_URL', '')
+    AZURE_OPENAI_RESPONSES_MODEL = os.getenv('AZURE_OPENAI_RESPONSES_MODEL', 'gpt-5.4')
     AZURE_OPENAI_IMAGE_DEPLOYMENT = os.getenv('AZURE_OPENAI_IMAGE_DEPLOYMENT', '')
-    AZURE_OPENAI_IMAGE_GENERATION_URL = os.getenv('AZURE_OPENAI_IMAGE_GENERATION_URL', '')
-    AZURE_OPENAI_IMAGE_EDIT_URL = os.getenv('AZURE_OPENAI_IMAGE_EDIT_URL', '')
     AZURE_OPENAI_IMAGE_QUALITY = os.getenv('AZURE_OPENAI_IMAGE_QUALITY', 'high')
     AZURE_OPENAI_IMAGE_OUTPUT_FORMAT = os.getenv('AZURE_OPENAI_IMAGE_OUTPUT_FORMAT', 'png')
     

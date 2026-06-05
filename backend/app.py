@@ -265,8 +265,8 @@ def _preflight_env_or_raise() -> None:
     if image_provider == 'azure_openai':
         if not (os.getenv('AZURE_OPENAI_API_KEY') or '').strip():
             raise ValueError('AZURE_OPENAI_API_KEY is required when IMAGE_PROVIDER_FORMAT=azure_openai')
-        if not ((os.getenv('AZURE_OPENAI_ENDPOINT') or '').strip() or (os.getenv('AZURE_OPENAI_IMAGE_GENERATION_URL') or '').strip()):
-            raise ValueError('AZURE_OPENAI_ENDPOINT or AZURE_OPENAI_IMAGE_GENERATION_URL is required when IMAGE_PROVIDER_FORMAT=azure_openai')
+        if not ((os.getenv('AZURE_OPENAI_RESPONSES_URL') or '').strip() or (os.getenv('AZURE_OPENAI_ENDPOINT') or '').strip()):
+            raise ValueError('AZURE_OPENAI_RESPONSES_URL or AZURE_OPENAI_ENDPOINT is required when IMAGE_PROVIDER_FORMAT=azure_openai')
 
 
 # Create app instance
