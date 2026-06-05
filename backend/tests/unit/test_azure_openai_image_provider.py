@@ -60,7 +60,7 @@ class TestAzureOpenAIImageProvider:
                 'type': 'image_generation',
                 'action': 'generate',
                 'quality': 'high',
-                'size': '1536x1024',
+                'size': 'auto',
                 'output_format': 'png',
             }],
         }
@@ -114,7 +114,7 @@ class TestAzureOpenAIImageProvider:
             'type': 'image_generation',
             'action': 'edit',
             'quality': 'high',
-            'size': '1536x1024',
+            'size': 'auto',
             'output_format': 'png',
         }]
         assert payload['input'][0]['role'] == 'user'
@@ -165,7 +165,7 @@ class TestAzureOpenAIImageProvider:
             'type': 'image_generation',
             'action': 'edit',
             'quality': 'high',
-            'size': '1536x1024',
+            'size': 'auto',
             'output_format': 'png',
         }]
         assert [message['role'] for message in payload['input']] == ['user', 'user', 'user', 'user']
@@ -241,10 +241,24 @@ class TestAzureOpenAIImageProvider:
             responses_url='https://example.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview',
         )
 
-        assert provider._resolve_size('16:9', '1K') == '1536x1024'
-        assert provider._resolve_size('4:3', '2K') == '1536x1024'
+        assert provider._resolve_size('16:9', '1K') == 'auto'
+        assert provider._resolve_size('4:3', '2K') == 'auto'
         assert provider._resolve_size('9:16', '4K') == '1024x1536'
         assert provider._resolve_size('1:1', '4K') == '1024x1024'
+
+    def test_openai_image_override_keeps_text_provider_format_on_gemini(self, monkeypatch):
+        from services import ai_providers
+
+        monkeypatch.setenv('AI_PROVIDER_FORMAT', 'gemini')
+        monkeypatch.setenv('GOOGLE_API_KEY', 'google-key')
+        monkeypatch.setenv('IMAGE_PROVIDER_FORMAT', 'openai')
+        monkeypatch.setenv('OPENAI_API_KEY', 'openai-key')
+        monkeypatch.setenv('OPENAI_API_BASE', 'https://api.openai.example/v1')
+
+        provider = ai_providers.get_image_provider(model='gpt-image-1')
+
+        assert provider.__class__.__name__ == 'OpenAIImageProvider'
+        assert ai_providers.get_provider_format() == 'gemini'
 
     def test_factory_uses_image_provider_format_without_changing_text_provider_format(self, monkeypatch):
         from services import ai_providers

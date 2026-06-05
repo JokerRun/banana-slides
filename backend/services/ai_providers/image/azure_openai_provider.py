@@ -101,7 +101,7 @@ class AzureOpenAIImageProvider(ImageProvider):
             return '1024x1024'
         if ratio in {'9:16', '3:4'}:
             return '1024x1536'
-        return '1536x1024'
+        return 'auto'
 
     def _request_headers(self) -> dict:
         headers = {

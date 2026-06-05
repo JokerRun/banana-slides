@@ -275,6 +275,19 @@ def get_image_provider(model: str = "gemini-3-pro-image-preview") -> ImageProvid
             output_format=output_format,
         )
 
+    if provider_format == 'openai':
+        api_key = _get_config_value('OPENAI_API_KEY') or _get_config_value('GOOGLE_API_KEY')
+        api_base = _get_config_value('OPENAI_API_BASE', 'https://aihubmix.com/v1')
+
+        if not api_key:
+            raise ValueError(
+                "OPENAI_API_KEY or GOOGLE_API_KEY (from database settings or environment) is required when IMAGE_PROVIDER_FORMAT=openai."
+            )
+
+        logger.info(f"Using OpenAI image override for image generation, model: {model}, api_base: {api_base}")
+        logger.warning("OpenAI format only supports 1K resolution, 4K is not available")
+        return OpenAIImageProvider(api_key=api_key, api_base=api_base, model=model)
+
     if provider_format != get_provider_format():
         logger.warning(
             "IMAGE_PROVIDER_FORMAT=%s is configured, but only azure_openai image override is specialized; falling back to AI_PROVIDER_FORMAT",

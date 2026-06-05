@@ -47,7 +47,10 @@
 # Python / local env
 *.pyc
 __pycache__/
+.env.*
 .env
+!.env.example
+/debug/
 
 # Secrets
 gcp-service-account.json
