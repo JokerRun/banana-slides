@@ -143,6 +143,7 @@ class AzureOpenAIImageProvider(ImageProvider):
             'model': self.responses_model,
             'input': input_payload,
             'tools': [self._image_tool(action, aspect_ratio, resolution)],
+            'tool_choice': {'type': 'image_generation'},
         }
 
     def _conversation_part_to_responses_content(self, part) -> dict:
@@ -179,6 +180,7 @@ class AzureOpenAIImageProvider(ImageProvider):
             'model': self.responses_model,
             'input': [self._conversation_turn_to_responses_message(turn) for turn in contents],
             'tools': [self._image_tool('edit', aspect_ratio, resolution)],
+            'tool_choice': {'type': 'image_generation'},
         }
 
     @staticmethod

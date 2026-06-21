@@ -63,6 +63,7 @@ class TestAzureOpenAIImageProvider:
                 'size': 'auto',
                 'output_format': 'png',
             }],
+            'tool_choice': {'type': 'image_generation'},
         }
 
     def test_openai_compatible_responses_url_uses_bearer_auth_header(self):
@@ -117,6 +118,7 @@ class TestAzureOpenAIImageProvider:
             'size': 'auto',
             'output_format': 'png',
         }]
+        assert payload['tool_choice'] == {'type': 'image_generation'}
         assert payload['input'][0]['role'] == 'user'
         content = payload['input'][0]['content']
         assert content[0] == {'type': 'input_text', 'text': 'restyle this slide'}
@@ -168,6 +170,7 @@ class TestAzureOpenAIImageProvider:
             'size': 'auto',
             'output_format': 'png',
         }]
+        assert payload['tool_choice'] == {'type': 'image_generation'}
         assert [message['role'] for message in payload['input']] == ['user', 'user', 'user', 'user']
         assert payload['input'][0]['content'] == [{'type': 'input_text', 'text': 'global base instruction'}]
         assert [part['type'] for part in payload['input'][1]['content']] == ['input_image', 'input_image']
