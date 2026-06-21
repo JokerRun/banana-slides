@@ -232,7 +232,7 @@ cp .env.example .env
 # AI Provider格式配置 (gemini / openai / vertex)
 AI_PROVIDER_FORMAT=gemini
 # 可选：只切换图片 provider；文字仍按 AI_PROVIDER_FORMAT 走
-# IMAGE_PROVIDER_FORMAT=azure_openai
+# IMAGE_PROVIDER_FORMAT=openai
 
 # Gemini 格式配置（当 AI_PROVIDER_FORMAT=gemini 时使用）
 GOOGLE_API_KEY=your-api-key-here
@@ -244,15 +244,20 @@ OPENAI_API_KEY=your-api-key-here
 OPENAI_API_BASE=https://api.openai.com/v1
 # 代理示例: https://aihubmix.com/v1
 
-# Azure OpenAI GPT-image 配置（当 IMAGE_PROVIDER_FORMAT=azure_openai 时使用）
-# AZURE_OPENAI_API_KEY=your-azure-openai-api-key
-# AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
-# AZURE_OPENAI_API_VERSION=2025-04-01-preview
-# AZURE_OPENAI_IMAGE_DEPLOYMENT=gpt-image-2
-# 或复用完整 generations URL：
-# AZURE_OPENAI_IMAGE_GENERATION_URL=https://transtalent-us2.cognitiveservices.azure.com/openai/deployments/gpt-image-2/images/generations?api-version=2024-02-01
-# 带参考图/源图的 restyle 会使用 image edit API，需要 2025-04-01-preview：
-# AZURE_OPENAI_IMAGE_EDIT_URL=https://transtalent-us2.cognitiveservices.azure.com/openai/deployments/gpt-image-2/images/edits?api-version=2025-04-01-preview
+# OpenAI SDK 图片后端配置（当 IMAGE_PROVIDER_FORMAT=openai 时使用）
+# OPENAI_IMAGE_BACKEND=azure  # proxy / azure / chatgpt
+# OPENAI_IMAGE_MODE=responses # 默认 responses；支持 restyle edit 多轮上下文
+# Azure OpenAI 示例：仍使用 OpenAI SDK，不使用 AzureOpenAI client
+# OPENAI_API_KEY=your-azure-openai-api-key
+# OPENAI_API_BASE=https://your-resource.cognitiveservices.azure.com/openai/v1
+# OPENAI_API_VERSION=preview
+# OPENAI_RESPONSES_MODEL=gpt-5.4
+# OPENAI_IMAGE_MODEL=gpt-image-2
+# OPENAI_IMAGE_DEPLOYMENT=gpt-image-2
+# OPENAI_IMAGE_QUALITY=high
+# OPENAI_IMAGE_OUTPUT_FORMAT=png
+# 本地 ChatGPT/Codex 示例（仅建议本地使用）
+# OPENAI_AUTH_JSON=/Users/you/.codex/auth.json
 
 # Vertex AI 格式配置（当 AI_PROVIDER_FORMAT=vertex 时使用）
 # 需要 GCP 服务账户，可使用 GCP 免费额度

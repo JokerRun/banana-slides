@@ -20,6 +20,7 @@ os.environ['TESTING'] = 'true'
 os.environ['USE_MOCK_AI'] = 'true'  # 标记使用mock AI服务
 os.environ['GOOGLE_API_KEY'] = os.environ.get('GOOGLE_API_KEY', 'mock-api-key-for-testing')
 os.environ['AI_PROVIDER_FORMAT'] = os.environ.get('AI_PROVIDER_FORMAT', 'gemini')
+os.environ['IMAGE_PROVIDER_FORMAT'] = 'gemini'
 os.environ['FLASK_ENV'] = 'testing'
 
 

@@ -30,13 +30,13 @@ import logging
 from typing import Dict, Any
 
 from .text import TextProvider, GenAITextProvider, OpenAITextProvider
-from .image import ImageProvider, GenAIImageProvider, OpenAIImageProvider, AzureOpenAIImageProvider
+from .image import ImageProvider, GenAIImageProvider, OpenAIImageProvider
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
     'TextProvider', 'GenAITextProvider', 'OpenAITextProvider',
-    'ImageProvider', 'GenAIImageProvider', 'OpenAIImageProvider', 'AzureOpenAIImageProvider',
+    'ImageProvider', 'GenAIImageProvider', 'OpenAIImageProvider',
     'get_text_provider', 'get_image_provider', 'get_provider_format', 'get_image_provider_format'
 ]
 
@@ -73,7 +73,7 @@ def get_image_provider_format() -> str:
     Get the configured image provider format.
 
     IMAGE_PROVIDER_FORMAT can override text provider format so text can remain
-    Gemini while image generation uses Azure OpenAI Responses GPT-image.
+    Gemini while image generation uses an OpenAI SDK image backend.
     """
     try:
         from flask import current_app
@@ -81,14 +81,12 @@ def get_image_provider_format() -> str:
             config_value = current_app.config.get('IMAGE_PROVIDER_FORMAT')
             if config_value:
                 provider_format = str(config_value).lower().replace('-', '_')
-                return 'azure_openai' if provider_format == 'azure' else provider_format
+                return provider_format
     except RuntimeError:
         pass
 
     provider_format = os.getenv('IMAGE_PROVIDER_FORMAT') or get_provider_format()
     provider_format = provider_format.lower().replace('-', '_')
-    if provider_format == 'azure':
-        return 'azure_openai'
     return provider_format
 
 
@@ -242,55 +240,61 @@ def get_image_provider(model: str = "gemini-3-pro-image-preview") -> ImageProvid
     """
     provider_format = get_image_provider_format()
 
-    if provider_format == 'azure_openai':
-        api_key = _get_config_value('AZURE_OPENAI_API_KEY')
-        responses_url = _get_config_value('AZURE_OPENAI_RESPONSES_URL')
-        endpoint = _get_config_value('AZURE_OPENAI_ENDPOINT')
-        api_version = _get_config_value('AZURE_OPENAI_API_VERSION', '2025-04-01-preview')
-        responses_model = _get_config_value('AZURE_OPENAI_RESPONSES_MODEL', 'gpt-5.4')
-        # Azure image deployment is independent from the generic IMAGE_MODEL;
-        # the latter is usually a Gemini model name when text remains Gemini.
-        image_deployment = _get_config_value('AZURE_OPENAI_IMAGE_DEPLOYMENT', 'gpt-image-2')
-        quality = _get_config_value('AZURE_OPENAI_IMAGE_QUALITY', 'high')
-        output_format = _get_config_value('AZURE_OPENAI_IMAGE_OUTPUT_FORMAT', 'png')
-
-        if not api_key:
-            raise ValueError("AZURE_OPENAI_API_KEY is required when IMAGE_PROVIDER_FORMAT=azure_openai")
-        if not (responses_url or endpoint):
-            raise ValueError("AZURE_OPENAI_RESPONSES_URL or AZURE_OPENAI_ENDPOINT is required when IMAGE_PROVIDER_FORMAT=azure_openai")
-
-        logger.info(
-            "Using Azure OpenAI Responses for image generation, responses_model: %s, image_deployment: %s",
-            responses_model,
-            image_deployment,
-        )
-        return AzureOpenAIImageProvider(
-            api_key=api_key,
-            responses_url=responses_url,
-            endpoint=endpoint,
-            api_version=api_version,
-            responses_model=responses_model,
-            image_deployment=image_deployment,
-            quality=quality,
-            output_format=output_format,
-        )
-
     if provider_format == 'openai':
-        api_key = _get_config_value('OPENAI_API_KEY') or _get_config_value('GOOGLE_API_KEY')
+        backend = (_get_config_value('OPENAI_IMAGE_BACKEND', 'proxy') or 'proxy').lower().replace('-', '_')
+        mode = (_get_config_value('OPENAI_IMAGE_MODE', 'responses') or 'responses').lower().replace('-', '_')
+        api_key = _get_config_value('OPENAI_API_KEY')
+        if backend == 'proxy':
+            api_key = api_key or _get_config_value('GOOGLE_API_KEY')
         api_base = _get_config_value('OPENAI_API_BASE', 'https://aihubmix.com/v1')
+        api_version = _get_config_value('OPENAI_API_VERSION', 'preview')
+        responses_model = _get_config_value('OPENAI_RESPONSES_MODEL')
+        image_model = _get_config_value('OPENAI_IMAGE_MODEL') or model
+        image_deployment = _get_config_value('OPENAI_IMAGE_DEPLOYMENT') or image_model
+        quality = _get_config_value('OPENAI_IMAGE_QUALITY', 'high')
+        output_format = _get_config_value('OPENAI_IMAGE_OUTPUT_FORMAT', 'png')
+        auth_json = _get_config_value('OPENAI_AUTH_JSON')
 
-        if not api_key:
+        if backend not in {'proxy', 'azure', 'chatgpt'}:
+            raise ValueError("OPENAI_IMAGE_BACKEND must be proxy, azure, or chatgpt")
+        if mode not in {'responses', 'chat'}:
+            raise ValueError("OPENAI_IMAGE_MODE must be responses or chat")
+        if mode == 'chat' and backend != 'proxy':
+            raise ValueError("OPENAI_IMAGE_MODE=chat is only supported when OPENAI_IMAGE_BACKEND=proxy")
+        if backend != 'chatgpt' and not api_key:
             raise ValueError(
                 "OPENAI_API_KEY or GOOGLE_API_KEY (from database settings or environment) is required when IMAGE_PROVIDER_FORMAT=openai."
             )
+        if backend == 'chatgpt' and not (api_key or auth_json):
+            raise ValueError("OPENAI_API_KEY or OPENAI_AUTH_JSON is required when OPENAI_IMAGE_BACKEND=chatgpt")
+        if mode == 'responses' and not responses_model:
+            raise ValueError("OPENAI_RESPONSES_MODEL is required when OPENAI_IMAGE_MODE=responses")
 
-        logger.info(f"Using OpenAI image override for image generation, model: {model}, api_base: {api_base}")
-        logger.warning("OpenAI format only supports 1K resolution, 4K is not available")
-        return OpenAIImageProvider(api_key=api_key, api_base=api_base, model=model)
+        logger.info(
+            "Using OpenAI image override for image generation, backend: %s, mode: %s, model: %s, api_base: %s",
+            backend,
+            mode,
+            image_model,
+            api_base,
+        )
+        return OpenAIImageProvider(
+            api_key=api_key,
+            api_base=api_base,
+            model=model,
+            backend=backend,
+            mode=mode,
+            api_version=api_version,
+            responses_model=responses_model,
+            image_model=image_model,
+            image_deployment=image_deployment,
+            quality=quality,
+            output_format=output_format,
+            auth_json=auth_json,
+        )
 
     if provider_format != get_provider_format():
         logger.warning(
-            "IMAGE_PROVIDER_FORMAT=%s is configured, but only azure_openai image override is specialized; falling back to AI_PROVIDER_FORMAT",
+            "IMAGE_PROVIDER_FORMAT=%s is configured, but only openai image override is specialized; falling back to AI_PROVIDER_FORMAT",
             provider_format,
         )
 

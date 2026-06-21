@@ -74,21 +74,60 @@ def test_startup_preflight_invalid_provider(monkeypatch):
         app_module.create_app()
 
 
-def test_startup_preflight_allows_azure_openai_image_override(monkeypatch):
-    """IMAGE_PROVIDER_FORMAT=azure_openai should not force text provider off Gemini."""
+def test_startup_preflight_rejects_legacy_azure_openai_image_override(monkeypatch):
+    """Legacy IMAGE_PROVIDER_FORMAT=azure_openai should be removed, not aliased."""
     app_module = importlib.import_module('app')
     app_module = importlib.reload(app_module)
 
     monkeypatch.setenv('AI_PROVIDER_FORMAT', 'gemini')
     monkeypatch.setenv('GOOGLE_API_KEY', 'mock-api-key-for-testing')
     monkeypatch.setenv('IMAGE_PROVIDER_FORMAT', 'azure_openai')
-    monkeypatch.setenv('AZURE_OPENAI_API_KEY', 'azure-key')
-    monkeypatch.setenv('AZURE_OPENAI_RESPONSES_URL', 'https://example.cognitiveservices.azure.com/openai/responses?api-version=2025-04-01-preview')
+
+    import pytest
+
+    with pytest.raises(ValueError, match='IMAGE_PROVIDER_FORMAT'):
+        app_module.create_app()
+
+
+def test_startup_preflight_allows_openai_image_backend_azure(monkeypatch):
+    """IMAGE_PROVIDER_FORMAT=openai + OPENAI_IMAGE_BACKEND=azure should keep text on Gemini."""
+    app_module = importlib.import_module('app')
+    app_module = importlib.reload(app_module)
+
+    monkeypatch.setenv('AI_PROVIDER_FORMAT', 'gemini')
+    monkeypatch.setenv('GOOGLE_API_KEY', 'mock-api-key-for-testing')
+    monkeypatch.setenv('IMAGE_PROVIDER_FORMAT', 'openai')
+    monkeypatch.setenv('OPENAI_IMAGE_BACKEND', 'azure')
+    monkeypatch.setenv('OPENAI_API_KEY', 'openai-key')
+    monkeypatch.setenv('OPENAI_API_BASE', 'https://example.cognitiveservices.azure.com/openai/v1')
+    monkeypatch.setenv('OPENAI_RESPONSES_MODEL', 'gpt-5.4')
+    monkeypatch.setenv('OPENAI_IMAGE_MODEL', 'gpt-image-2')
+    monkeypatch.setenv('OPENAI_IMAGE_DEPLOYMENT', 'gpt-image-2')
 
     app = app_module.create_app()
 
     assert app.config['AI_PROVIDER_FORMAT'] == 'gemini'
-    assert app.config['IMAGE_PROVIDER_FORMAT'] == 'azure_openai'
+    assert app.config['IMAGE_PROVIDER_FORMAT'] == 'openai'
+
+
+def test_startup_preflight_defaults_openai_proxy_images_to_responses(monkeypatch):
+    """OPENAI_IMAGE_BACKEND=proxy should default to Responses API image mode."""
+    app_module = importlib.import_module('app')
+    app_module = importlib.reload(app_module)
+
+    monkeypatch.setenv('AI_PROVIDER_FORMAT', 'gemini')
+    monkeypatch.setenv('GOOGLE_API_KEY', 'mock-api-key-for-testing')
+    monkeypatch.setenv('IMAGE_PROVIDER_FORMAT', 'openai')
+    monkeypatch.setenv('OPENAI_IMAGE_BACKEND', 'proxy')
+    monkeypatch.delenv('OPENAI_IMAGE_MODE', raising=False)
+    monkeypatch.setenv('OPENAI_API_KEY', 'proxy-key')
+    monkeypatch.setenv('OPENAI_API_BASE', 'https://proxy.example/v1')
+    monkeypatch.setenv('OPENAI_RESPONSES_MODEL', 'gpt-5.4')
+    monkeypatch.setenv('OPENAI_IMAGE_MODEL', 'gpt-image-2')
+
+    app = app_module.create_app()
+
+    assert app.config['IMAGE_PROVIDER_FORMAT'] == 'openai'
 
 
 def test_output_language_reads_from_config_not_db(app):
