@@ -99,7 +99,7 @@ def test_startup_preflight_allows_openai_image_backend_azure(monkeypatch):
     monkeypatch.setenv('IMAGE_PROVIDER_FORMAT', 'openai')
     monkeypatch.setenv('OPENAI_IMAGE_BACKEND', 'azure')
     monkeypatch.setenv('OPENAI_API_KEY', 'openai-key')
-    monkeypatch.setenv('OPENAI_API_BASE', 'https://example.cognitiveservices.azure.com/openai/v1')
+    monkeypatch.setenv('OPENAI_API_BASE', 'https://example.openai.azure.com/openai/v1/')
     monkeypatch.setenv('OPENAI_RESPONSES_MODEL', 'gpt-5.4')
     monkeypatch.setenv('OPENAI_IMAGE_MODEL', 'gpt-image-2')
     monkeypatch.setenv('OPENAI_IMAGE_DEPLOYMENT', 'gpt-image-2')

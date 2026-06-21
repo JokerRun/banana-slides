@@ -137,12 +137,14 @@ class OpenAIImageProvider(ImageProvider):
         if self.backend == "azure":
             if not self.api_key:
                 raise ValueError("OPENAI_API_KEY is required when OPENAI_IMAGE_BACKEND=azure")
+            headers = {"api_version": self.api_version}
+            if self.image_deployment:
+                headers["x-ms-oai-image-generation-deployment"] = self.image_deployment
             return {
                 **common,
                 "api_key": self.api_key,
                 "base_url": _normalize_azure_base_url(self.api_base),
-                "default_headers": {"api-key": self.api_key},
-                "default_query": {"api-version": self.api_version},
+                "default_headers": headers,
             }
         if self.backend == "chatgpt":
             access_token = self.api_key
@@ -225,10 +227,6 @@ class OpenAIImageProvider(ImageProvider):
             "parallel_tool_calls": True,
             "store": False,
         }
-        if self.backend == "azure" and self.image_deployment:
-            kwargs["extra_headers"] = {
-                "x-ms-oai-image-generation-deployment": self.image_deployment,
-            }
         return kwargs
 
     def _decode_response_image(self, response) -> Image.Image:

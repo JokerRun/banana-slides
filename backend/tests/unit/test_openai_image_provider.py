@@ -61,7 +61,7 @@ class TestOpenAIImageProvider:
 
         provider = OpenAIImageProvider(
             api_key='test-key',
-            api_base='https://example.cognitiveservices.azure.com/openai/v1',
+            api_base='https://example.openai.azure.com/openai/v1/',
             backend='azure',
             responses_model='gpt-5.4',
             image_model='gpt-image-2',
@@ -77,9 +77,11 @@ class TestOpenAIImageProvider:
         assert provider.allow_conversation_fallback is False
         assert created_clients[0].kwargs == {
             'api_key': 'test-key',
-            'base_url': 'https://example.cognitiveservices.azure.com/openai/v1',
-            'default_headers': {'api-key': 'test-key'},
-            'default_query': {'api-version': 'preview'},
+            'base_url': 'https://example.openai.azure.com/openai/v1',
+            'default_headers': {
+                'api_version': 'preview',
+                'x-ms-oai-image-generation-deployment': 'gpt-image-2',
+            },
             'timeout': provider.timeout,
             'max_retries': provider.max_retries,
         }
@@ -98,7 +100,6 @@ class TestOpenAIImageProvider:
             'tool_choice': {'type': 'image_generation'},
             'parallel_tool_calls': True,
             'store': False,
-            'extra_headers': {'x-ms-oai-image-generation-deployment': 'gpt-image-2'},
         }
 
     def test_azure_backend_conversation_posts_structured_responses_input(self):
@@ -114,7 +115,7 @@ class TestOpenAIImageProvider:
         ]
         provider = OpenAIImageProvider(
             api_key='test-key',
-            api_base='https://example.cognitiveservices.azure.com/openai/v1',
+            api_base='https://example.openai.azure.com/openai/v1/',
             backend='azure',
             responses_model='gpt-5.4',
             image_model='gpt-image-2',
@@ -225,7 +226,7 @@ class TestOpenAIImageProvider:
         monkeypatch.setenv('IMAGE_PROVIDER_FORMAT', 'openai')
         monkeypatch.setenv('OPENAI_IMAGE_BACKEND', 'azure')
         monkeypatch.setenv('OPENAI_API_KEY', 'openai-key')
-        monkeypatch.setenv('OPENAI_API_BASE', 'https://example.cognitiveservices.azure.com/openai/v1')
+        monkeypatch.setenv('OPENAI_API_BASE', 'https://example.openai.azure.com/openai/v1/')
         monkeypatch.setenv('OPENAI_API_VERSION', 'preview')
         monkeypatch.setenv('OPENAI_RESPONSES_MODEL', 'gpt-5.4')
         monkeypatch.setenv('OPENAI_IMAGE_MODEL', 'gpt-image-2')

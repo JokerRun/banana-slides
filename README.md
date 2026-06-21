@@ -249,7 +249,8 @@ OPENAI_API_BASE=https://api.openai.com/v1
 # OPENAI_IMAGE_MODE=responses # 默认 responses；支持 restyle edit 多轮上下文
 # Azure OpenAI 示例：仍使用 OpenAI SDK，不使用 AzureOpenAI client
 # OPENAI_API_KEY=your-azure-openai-api-key
-# OPENAI_API_BASE=https://your-resource.cognitiveservices.azure.com/openai/v1
+# Azure OpenAI v1 endpoint，需包含 /openai/v1/，对齐官方 Azure-Samples。
+# OPENAI_API_BASE=https://your-resource.openai.azure.com/openai/v1/
 # OPENAI_API_VERSION=preview
 # OPENAI_RESPONSES_MODEL=gpt-5.4
 # OPENAI_IMAGE_MODEL=gpt-image-2
