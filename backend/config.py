@@ -64,15 +64,16 @@ class Config:
     OPENAI_TIMEOUT = float(os.getenv('OPENAI_TIMEOUT', '300.0'))  # 增加到 5 分钟（生成清洁背景图需要很长时间）
     OPENAI_MAX_RETRIES = int(os.getenv('OPENAI_MAX_RETRIES', '2'))  # 减少重试次数，避免过多重试导致累积超时
 
-    # Azure OpenAI Responses + GPT-image 专用配置（当 IMAGE_PROVIDER_FORMAT=azure_openai 时使用）
-    AZURE_OPENAI_API_KEY = os.getenv('AZURE_OPENAI_API_KEY', '')
-    AZURE_OPENAI_ENDPOINT = os.getenv('AZURE_OPENAI_ENDPOINT', '')
-    AZURE_OPENAI_API_VERSION = os.getenv('AZURE_OPENAI_API_VERSION', '2025-04-01-preview')
-    AZURE_OPENAI_RESPONSES_URL = os.getenv('AZURE_OPENAI_RESPONSES_URL', '')
-    AZURE_OPENAI_RESPONSES_MODEL = os.getenv('AZURE_OPENAI_RESPONSES_MODEL', 'gpt-5.4')
-    AZURE_OPENAI_IMAGE_DEPLOYMENT = os.getenv('AZURE_OPENAI_IMAGE_DEPLOYMENT', '')
-    AZURE_OPENAI_IMAGE_QUALITY = os.getenv('AZURE_OPENAI_IMAGE_QUALITY', 'high')
-    AZURE_OPENAI_IMAGE_OUTPUT_FORMAT = os.getenv('AZURE_OPENAI_IMAGE_OUTPUT_FORMAT', 'png')
+    # OpenAI SDK 图片后端配置（当 IMAGE_PROVIDER_FORMAT=openai 时使用）
+    OPENAI_IMAGE_BACKEND = os.getenv('OPENAI_IMAGE_BACKEND', 'proxy')  # proxy / azure / chatgpt
+    OPENAI_IMAGE_MODE = os.getenv('OPENAI_IMAGE_MODE', 'responses')  # responses / chat
+    OPENAI_API_VERSION = os.getenv('OPENAI_API_VERSION', 'preview')
+    OPENAI_RESPONSES_MODEL = os.getenv('OPENAI_RESPONSES_MODEL', '')
+    OPENAI_IMAGE_MODEL = os.getenv('OPENAI_IMAGE_MODEL', '')
+    OPENAI_IMAGE_DEPLOYMENT = os.getenv('OPENAI_IMAGE_DEPLOYMENT', '')
+    OPENAI_IMAGE_QUALITY = os.getenv('OPENAI_IMAGE_QUALITY', 'high')
+    OPENAI_IMAGE_OUTPUT_FORMAT = os.getenv('OPENAI_IMAGE_OUTPUT_FORMAT', 'png')
+    OPENAI_AUTH_JSON = os.getenv('OPENAI_AUTH_JSON', '')
     
     # AI 模型配置
     TEXT_MODEL = os.getenv('TEXT_MODEL', 'gemini-3-flash-preview')

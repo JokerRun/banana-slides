@@ -22,10 +22,25 @@ class TestProviderCapabilityFlag:
             provider = GenAIImageProvider(api_key='test-key')
             assert provider.supports_conversation_contents is True
 
-    def test_openai_provider_does_not_support_conversation_contents(self):
-        """OpenAI provider should NOT report conversation support"""
+    def test_openai_provider_responses_mode_supports_conversation_contents(self):
+        """OpenAI provider defaults to Responses mode with conversation support."""
         from services.ai_providers.image.openai_provider import OpenAIImageProvider
-        provider = OpenAIImageProvider(api_key='test-key')
+        provider = OpenAIImageProvider(
+            api_key='test-key',
+            responses_model='gpt-5.4',
+            image_model='gpt-image-2',
+            openai_client_factory=lambda **_: MagicMock(),
+        )
+        assert provider.supports_conversation_contents is True
+
+    def test_openai_provider_chat_mode_does_not_support_conversation_contents(self):
+        """Legacy OpenAI chat mode should not report conversation support."""
+        from services.ai_providers.image.openai_provider import OpenAIImageProvider
+        provider = OpenAIImageProvider(
+            api_key='test-key',
+            mode='chat',
+            openai_client_factory=lambda **_: MagicMock(),
+        )
         assert provider.supports_conversation_contents is False
 
     def test_base_provider_defaults_to_no_conversation_support(self):

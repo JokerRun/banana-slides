@@ -16,7 +16,8 @@ from flask_migrate import Migrate
 # Load environment variables from project root .env file
 _project_root = Path(__file__).parent.parent
 _env_file = _project_root / '.env'
-load_dotenv(dotenv_path=_env_file, override=True)
+if os.getenv('TESTING') != 'true':
+    load_dotenv(dotenv_path=_env_file, override=True)
 
 from flask import Flask
 from flask_cors import CORS
@@ -250,10 +251,8 @@ def _preflight_env_or_raise() -> None:
         raise ValueError('AI_PROVIDER_FORMAT must be set to "openai" or "gemini"')
 
     image_provider = (os.getenv('IMAGE_PROVIDER_FORMAT') or provider).strip().lower().replace('-', '_')
-    if image_provider == 'azure':
-        image_provider = 'azure_openai'
-    if image_provider not in {'openai', 'gemini', 'azure_openai'}:
-        raise ValueError('IMAGE_PROVIDER_FORMAT must be set to "openai", "gemini", or "azure_openai"')
+    if image_provider not in {'openai', 'gemini'}:
+        raise ValueError(f'IMAGE_PROVIDER_FORMAT must be set to "openai" or "gemini" (got {image_provider!r})')
 
     if provider == 'openai':
         if not (os.getenv('OPENAI_API_KEY') or '').strip():
@@ -262,11 +261,29 @@ def _preflight_env_or_raise() -> None:
         if not (os.getenv('GOOGLE_API_KEY') or '').strip():
             raise ValueError('GOOGLE_API_KEY is required when AI_PROVIDER_FORMAT=gemini')
 
-    if image_provider == 'azure_openai':
-        if not (os.getenv('AZURE_OPENAI_API_KEY') or '').strip():
-            raise ValueError('AZURE_OPENAI_API_KEY is required when IMAGE_PROVIDER_FORMAT=azure_openai')
-        if not ((os.getenv('AZURE_OPENAI_RESPONSES_URL') or '').strip() or (os.getenv('AZURE_OPENAI_ENDPOINT') or '').strip()):
-            raise ValueError('AZURE_OPENAI_RESPONSES_URL or AZURE_OPENAI_ENDPOINT is required when IMAGE_PROVIDER_FORMAT=azure_openai')
+    if image_provider == 'openai':
+        image_backend = (os.getenv('OPENAI_IMAGE_BACKEND') or 'proxy').strip().lower().replace('-', '_')
+        image_mode = (os.getenv('OPENAI_IMAGE_MODE') or 'responses').strip().lower().replace('-', '_')
+        if image_backend not in {'proxy', 'azure', 'chatgpt'}:
+            raise ValueError('OPENAI_IMAGE_BACKEND must be set to "proxy", "azure", or "chatgpt"')
+        if image_mode not in {'responses', 'chat'}:
+            raise ValueError('OPENAI_IMAGE_MODE must be set to "responses" or "chat"')
+        if image_mode == 'chat' and image_backend != 'proxy':
+            raise ValueError('OPENAI_IMAGE_MODE=chat is only supported when OPENAI_IMAGE_BACKEND=proxy')
+        if image_backend != 'chatgpt' and not (os.getenv('OPENAI_API_KEY') or '').strip():
+            raise ValueError('OPENAI_API_KEY is required when IMAGE_PROVIDER_FORMAT=openai')
+        if image_backend == 'chatgpt' and not ((os.getenv('OPENAI_API_KEY') or '').strip() or (os.getenv('OPENAI_AUTH_JSON') or '').strip()):
+            raise ValueError('OPENAI_API_KEY or OPENAI_AUTH_JSON is required when OPENAI_IMAGE_BACKEND=chatgpt')
+        if image_mode == 'responses':
+            if not (os.getenv('OPENAI_RESPONSES_MODEL') or '').strip():
+                raise ValueError('OPENAI_RESPONSES_MODEL is required when OPENAI_IMAGE_MODE=responses')
+            if not (os.getenv('OPENAI_IMAGE_MODEL') or '').strip():
+                raise ValueError('OPENAI_IMAGE_MODEL is required when OPENAI_IMAGE_MODE=responses')
+        if image_backend == 'azure':
+            if not (os.getenv('OPENAI_API_BASE') or '').strip():
+                raise ValueError('OPENAI_API_BASE is required when OPENAI_IMAGE_BACKEND=azure')
+            if not (os.getenv('OPENAI_IMAGE_DEPLOYMENT') or '').strip():
+                raise ValueError('OPENAI_IMAGE_DEPLOYMENT is required when OPENAI_IMAGE_BACKEND=azure')
 
 
 # Create app instance
