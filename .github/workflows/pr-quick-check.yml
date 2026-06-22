@@ -119,6 +119,6 @@ jobs:
             exit 1
           fi
         env:
+          AI_PROVIDER_FORMAT: gemini
           GOOGLE_API_KEY: mock-key-for-testing
           TESTING: true
-
