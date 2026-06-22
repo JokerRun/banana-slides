@@ -1,17 +1,9 @@
 name: Build and Push to Docker Hub
 
-# 在测试通过后自动构建并推送镜像到 Docker Hub
+# 手动构建并推送镜像到 Docker Hub。
+# 当前仓库已关闭 GitHub CI，因此不再由测试 workflow 自动触发。
 
-# 触发条件：
-# 1. CI workflow (Full Test Suite) 成功完成后（主要触发方式）
-# 2. 手动触发（workflow_dispatch）
 on:
-  workflow_run:
-    workflows: ["Full Test Suite"]
-    types:
-      - completed
-    branches:
-      - main
   workflow_dispatch:  # 允许手动触发
 
 # Cancel old builds on the same branch
@@ -23,18 +15,12 @@ jobs:
   build-and-push:
     name: Build and Push Docker Images
     runs-on: ubuntu-latest
-    # 如果是 workflow_run 触发，只在前一个 workflow 成功时运行
-    # 手动触发时总是运行
-    if: |
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
     
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # 如果是 workflow_run 触发，使用原始 workflow 的 commit SHA
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ github.sha }}
           fetch-depth: 0
       
       - name: Set up QEMU
@@ -111,4 +97,3 @@ jobs:
           echo "Backend image: ${{ steps.meta-backend.outputs.tags }}"
           echo "Frontend image: ${{ steps.meta-frontend.outputs.tags }}"
           echo "✅ Images pushed to Docker Hub successfully!"
-
