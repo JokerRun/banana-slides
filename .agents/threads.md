@@ -12,3 +12,4 @@
 | 2026-05-18 | https://mg-cpa.ddiworld.cn/threads/T-019e39ce-89d8-776b-a8d6-ae635d8d362a | Add CLIProxyAPI /v1/responses bearer auth support for Azure OpenAI image provider |
 | 2026-06-21 | https://ampcode.com/threads/T-019ee9fd-1bc2-76b8-9578-6be1415a8163 | Force Azure Responses image tool choice for CLIProxy restyle edits |
 | 2026-06-21 | https://ampcode.com/threads/T-019eea1a-c5ba-73c9-a92c-c04e9cabe137 | Unify image generation on OpenAI SDK backends and remove Azure provider legacy path |
+| 2026-06-24 | https://ampcode.com/threads/T-019ef890-453a-75fe-ab95-89905af5e3c2 | Home page DDI branding refresh and GitHub link cleanup |

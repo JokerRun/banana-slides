@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Sparkles, FileText, FileEdit, ImagePlus, Paperclip, Palette, Lightbulb, Search, FolderOpen, HelpCircle, Sun, Moon, Globe, Monitor, ChevronDown, RefreshCw, Upload, LogOut } from 'lucide-react';
-import { Button, Textarea, Card, useToast, MaterialGeneratorModal, MaterialCenterModal, ReferenceFileList, ReferenceFileSelector, FilePreviewModal, HelpModal, Footer, GithubRepoCard } from '@/components/shared';
+import { Button, Textarea, Card, useToast, MaterialGeneratorModal, MaterialCenterModal, ReferenceFileList, ReferenceFileSelector, FilePreviewModal, HelpModal, Footer } from '@/components/shared';
 import { MarkdownTextarea, type MarkdownTextareaRef } from '@/components/shared/MarkdownTextarea';
 import { TemplateSelector, getTemplateFile } from '@/components/shared/TemplateSelector';
 import { getAuthMe, listUserTemplates, type UserTemplate, uploadReferenceFile, type ReferenceFile, associateFileToProject, triggerFileParse, associateMaterialsToProject, createRestyleProject, logoutAuth } from '@/api/endpoints';
@@ -847,25 +847,6 @@ export const Home: React.FC = () => {
               <span className="hidden sm:inline">{t('nav.history')}</span>
               <span className="sm:hidden">{t('nav.history')}</span>
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsHelpModalOpen(true)}
-              className="hidden md:inline-flex hover:bg-banana-50/50"
-            >
-              {t('nav.help')}
-            </Button>
-            {/* 移动端帮助按钮 */}
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={<HelpCircle size={16} />}
-              onClick={() => setIsHelpModalOpen(true)}
-              className="md:hidden hover:bg-banana-100/60 hover:shadow-sm hover:scale-105 transition-all duration-200"
-              title={t('nav.help')}
-            />
-            {/* 分隔线 */}
-            <div className="h-5 w-px bg-gray-300 dark:bg-border-primary mx-1" />
             {/* 语言切换按钮 */}
             <button
               onClick={() => i18n.changeLanguage(i18n.language?.startsWith('zh') ? 'en' : 'zh')}
@@ -917,10 +898,6 @@ export const Home: React.FC = () => {
             </div>
             {/* 分隔线 */}
             <div className="h-5 w-px bg-gray-300 dark:bg-border-primary mx-1" />
-            {/* GitHub 仓库卡片 */}
-            <GithubRepoCard />
-            {/* 分隔线 */}
-            <div className="h-5 w-px bg-gray-300 dark:bg-border-primary mx-1" />
             {/* 登录态 */}
             {authUserName && (
               <span
@@ -946,14 +923,9 @@ export const Home: React.FC = () => {
       </nav>
 
       {/* 主内容 */}
-      <main className="relative max-w-5xl mx-auto px-3 md:px-4 py-8 md:py-12">
+      <main className="relative max-w-5xl mx-auto px-3 md:px-4 pt-4 pb-8 md:pt-6 md:pb-12">
         {/* Hero 标题区 */}
-        <div className="text-center mb-10 md:mb-16 space-y-4 md:space-y-6">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/60 dark:bg-background-secondary backdrop-blur-sm rounded-full shadow-sm dark:shadow-none mb-4">
-            <span className="text-2xl animate-pulse"><Sparkles size={20} className="text-orange-500 dark:text-banana" /></span>
-            <span className="text-sm font-medium text-gray-700 dark:text-foreground-secondary">{t('home.tagline')}</span>
-          </div>
-
+        <div className="text-center mb-8 md:mb-12 space-y-4 md:space-y-6">
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold leading-tight">
             <span className="bg-gradient-to-r from-yellow-600 via-orange-500 to-pink-500 dark:from-banana-dark dark:via-banana dark:to-banana-light bg-clip-text text-transparent dark:italic" style={{
               backgroundSize: '200% auto',

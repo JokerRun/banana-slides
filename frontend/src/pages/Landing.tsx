@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Sparkles, FileText, MessageSquare, Download, ChevronRight, Github, ChevronLeft } from 'lucide-react';
+import { Sparkles, FileText, MessageSquare, Download, ChevronRight, ChevronLeft } from 'lucide-react';
 import { Button, Footer } from '@/components/shared';
 import { useT } from '@/hooks/useT';
 
@@ -34,9 +34,6 @@ const landingI18n = {
     }
   }
 };
-
-// Feature keys consistent with HelpModal
-const _featureKeys = ['flexiblePaths', 'materialParsing', 'vibeEditing', 'easyExport'] as const;
 
 // Showcase data consistent with HelpModal
 const showcaseKeys = [
@@ -94,7 +91,7 @@ export const Landing: React.FC = () => {
       {/* 导航栏 */}
       <nav className="relative z-50 w-full px-6 py-6 flex items-center justify-between max-w-7xl mx-auto">
         <div className="flex items-center gap-2">
-          <img src="/logo.png" alt="Logo" className="w-8 h-8 md:w-10 md:h-10 object-contain rounded-lg shadow-sm" />
+          <img src="/logo.png" alt="Logo" className="h-8 md:h-10 w-auto object-contain" />
           <span className="text-xl md:text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 bg-clip-text text-transparent">
             DDI PPT助手
           </span>
@@ -153,15 +150,6 @@ export const Landing: React.FC = () => {
             >
               {t('landing.hero.cta_primary')}
             </Button>
-            <a
-              href="https://github.com/Anionex/banana-slides"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-200 font-medium hover:bg-gray-50 dark:hover:bg-white/10 transition-all duration-200 hover:shadow-md"
-            >
-              <Github size={20} />
-              GitHub
-            </a>
           </div>
 
           {/* 案例展示区域 (Carousel) */}
@@ -250,7 +238,7 @@ export const Landing: React.FC = () => {
                   
                   {/* 详情列表 */}
                   <ul className="space-y-4 pt-4">
-                    {(t(`help.features.${feature.key}.details`, { returnObjects: true }) as string[])?.map((detail: string, i: number) => (
+                    {(i18n.t(`help.features.${feature.key}.details`, { returnObjects: true }) as string[])?.map((detail: string, i: number) => (
                       <li key={i} className="flex items-start gap-3">
                         <div className="mt-1.5 w-1.5 h-1.5 rounded-full bg-banana-500 shrink-0" />
                         <span className="text-gray-600 dark:text-gray-400 font-medium">{detail}</span>
