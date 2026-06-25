@@ -67,12 +67,16 @@ export const uploadTemplate = async (
 export const uploadStyleRefs = async (
   projectId: string,
   styleRefs: File[] = [],
-  stylePresetId?: string
+  stylePresetId?: string,
+  replace = false
 ): Promise<ApiResponse<{ style_ref_image_paths: string[]; style_ref_image_urls: string[] }>> => {
   const formData = new FormData();
   styleRefs.forEach(ref => formData.append('style_refs', ref));
   if (stylePresetId) {
     formData.append('style_preset_id', stylePresetId);
+  }
+  if (replace) {
+    formData.append('replace', 'true');
   }
 
   const response = await apiClient.post<ApiResponse<{ style_ref_image_paths: string[]; style_ref_image_urls: string[] }>>(

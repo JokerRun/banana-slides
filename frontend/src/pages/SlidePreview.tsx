@@ -14,7 +14,7 @@ const previewI18n = {
       materialsAdded: "已添加 {{count}} 个素材", exportStarted: "导出任务已开始，可在导出任务面板查看进度",
       cannotRefresh: "无法刷新：缺少项目ID", refreshSuccess: "刷新成功",
       extraRequirementsSaved: "额外要求已保存", styleDescSaved: "风格描述已保存",
-      exportSettingsSaved: "导出设置已保存", loadTemplateFailed: "加载模板失败", templateChanged: "模板更换成功"
+      exportSettingsSaved: "导出设置已保存", loadTemplateFailed: "加载风格参考失败", templateChanged: "风格参考已更新"
     },
     preview: {
       title: "预览", pageCount: "共 {{count}} 页", export: "导出",
@@ -23,7 +23,7 @@ const previewI18n = {
       exportSelectedPages: "将导出选中的 {{count}} 页",
       regenerate: "重新生成", regenerating: "生成中...",
       editMode: "编辑模式", viewMode: "查看模式", page: "第 {{num}} 页",
-      projectSettings: "项目设置", changeTemplate: "更换模板", refresh: "刷新",
+      projectSettings: "项目设置", changeTemplate: "更换风格参考", refresh: "刷新",
       batchGenerate: "批量生成图片 ({{count}})", generateSelected: "生成选中页面 ({{count}})",
       restyleBatchGenerate: "开始风格转换 ({{count}})", restyleGenerateSelected: "开始选中页风格转换 ({{count}})",
       multiSelect: "多选", cancelMultiSelect: "取消多选", pagesUnit: "页",
@@ -41,8 +41,8 @@ const previewI18n = {
       editPromptLabel: "输入修改指令(将自动添加页面描述)",
       editPromptPlaceholder: "例如：将框选区域内的素材移除、把背景改成蓝色、增大标题字号、更改文本框样式为虚线...",
       saveOutlineOnly: "仅保存大纲/描述", generateImage: "生成图片",
-      templateModalDesc: "选择一个新的模板将应用到后续PPT页面生成（不影响已经生成的页面）。你可以选择预设模板、已有模板或上传新模板。",
-      uploadingTemplate: "正在上传模板...",
+      templateModalDesc: "选择预制模板或上传自定义风格参考图，将应用到后续 PPT 页面生成（不影响已经生成的页面）。",
+      uploadingTemplate: "正在更新风格参考...",
       resolution1KWarning: "1K分辨率警告",
       resolution1KWarningText: "当前使用 1K 分辨率 生成图片，可能导致渲染的文字乱码或模糊。",
       resolution1KWarningHint: "建议通过部署环境变量将分辨率切换到 2K 或 4K，以获得更清晰的效果。",
@@ -69,7 +69,7 @@ const previewI18n = {
       materialsAdded: "Added {{count}} material(s)", exportStarted: "Export task started, check progress in export tasks panel",
       cannotRefresh: "Cannot refresh: Missing project ID", refreshSuccess: "Refresh successful",
       extraRequirementsSaved: "Extra requirements saved", styleDescSaved: "Style description saved",
-      exportSettingsSaved: "Export settings saved", loadTemplateFailed: "Failed to load template", templateChanged: "Template changed successfully"
+      exportSettingsSaved: "Export settings saved", loadTemplateFailed: "Failed to load style reference", templateChanged: "Style references updated"
     },
     preview: {
       title: "Preview", pageCount: "{{count}} pages", export: "Export",
@@ -78,7 +78,7 @@ const previewI18n = {
       exportSelectedPages: "Will export {{count}} selected page(s)",
       regenerate: "Regenerate", regenerating: "Generating...",
       editMode: "Edit Mode", viewMode: "View Mode", page: "Page {{num}}",
-      projectSettings: "Project Settings", changeTemplate: "Change Template", refresh: "Refresh",
+      projectSettings: "Project Settings", changeTemplate: "Change Style References", refresh: "Refresh",
       batchGenerate: "Batch Generate Images ({{count}})", generateSelected: "Generate Selected ({{count}})",
       restyleBatchGenerate: "Start Restyle ({{count}})", restyleGenerateSelected: "Start Restyle for Selected ({{count}})",
       multiSelect: "Multi-select", cancelMultiSelect: "Cancel Multi-select", pagesUnit: " pages",
@@ -96,8 +96,8 @@ const previewI18n = {
       editPromptLabel: "Enter edit instructions (page description will be auto-added)",
       editPromptPlaceholder: "e.g., Remove elements in selected area, change background to blue, increase title font size, change text box style to dashed...",
       saveOutlineOnly: "Save Outline/Description Only", generateImage: "Generate Image",
-      templateModalDesc: "Selecting a new template will apply to future PPT page generation (won't affect already generated pages). You can choose preset templates, existing templates, or upload a new one.",
-      uploadingTemplate: "Uploading template...",
+      templateModalDesc: "Select a preset template or upload custom style references for future PPT generation. Existing generated pages are not changed.",
+      uploadingTemplate: "Updating style references...",
       resolution1KWarning: "1K Resolution Warning",
       resolution1KWarningText: "Currently using 1K resolution for image generation, which may cause garbled or blurry text.",
       resolution1KWarningHint: "It's recommended to switch the resolution to 2K or 4K via deployment environment variables for clearer results.",
@@ -140,17 +140,16 @@ import {
 } from 'lucide-react';
 import { Button, Loading, Modal, Textarea, useToast, useConfirm, MaterialSelector, ProjectSettingsModal, ExportTasksPanel } from '@/components/shared';
 import { MaterialGeneratorModal } from '@/components/shared/MaterialGeneratorModal';
-import { TemplateSelector, getTemplateFile } from '@/components/shared/TemplateSelector';
-import { listUserTemplates, type UserTemplate } from '@/api/endpoints';
 import { materialUrlToFile } from '@/components/shared/MaterialSelector';
 import type { Material } from '@/api/endpoints';
 import { SlideCard } from '@/components/preview/SlideCard';
 import { useProjectStore } from '@/store/useProjectStore';
 import { useExportTasksStore, type ExportTaskType } from '@/store/useExportTasksStore';
 import { getImageUrl } from '@/api/client';
-import { getPageImageVersions, setCurrentImageVersion, updateProject, uploadTemplate, exportPPTX as apiExportPPTX, exportPDF as apiExportPDF, exportEditablePPTX as apiExportEditablePPTX } from '@/api/endpoints';
+import { getPageImageVersions, setCurrentImageVersion, updateProject, uploadStyleRefs, exportPPTX as apiExportPPTX, exportPDF as apiExportPDF, exportEditablePPTX as apiExportEditablePPTX } from '@/api/endpoints';
 import type { ImageVersion, DescriptionContent, ExportExtractorMethod, ExportInpaintMethod, Page } from '@/types';
 import { normalizeErrorMessage } from '@/utils';
+import { GENERATE_PRESETS } from '@/config/generatePresets';
 
 export const SlidePreview: React.FC = () => {
   const navigate = useNavigate();
@@ -198,9 +197,10 @@ export const SlidePreview: React.FC = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [imageVersions, setImageVersions] = useState<ImageVersion[]>([]);
   const [showVersionMenu, setShowVersionMenu] = useState(false);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-  const [selectedPresetTemplateId, setSelectedPresetTemplateId] = useState<string | null>(null);
+  const [selectedStylePresetId, setSelectedStylePresetId] = useState<string>('ddi-standard');
+  const [styleRefFiles, setStyleRefFiles] = useState<File[]>([]);
   const [isUploadingTemplate, setIsUploadingTemplate] = useState(false);
+  const styleRefInputRef = useRef<HTMLInputElement>(null);
   const [selectedContextImages, setSelectedContextImages] = useState<{
     useTemplate: boolean;
     descImageUrls: string[];
@@ -221,7 +221,6 @@ export const SlidePreview: React.FC = () => {
   // 素材生成模态开关（模块本身可复用，这里只是示例入口）
   const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false);
   // 素材选择器模态开关
-  const [userTemplates, setUserTemplates] = useState<UserTemplate[]>([]);
   const [isMaterialSelectorOpen, setIsMaterialSelectorOpen] = useState(false);
   // 导出设置
   const [exportExtractorMethod, setExportExtractorMethod] = useState<ExportExtractorMethod>(
@@ -263,25 +262,12 @@ export const SlidePreview: React.FC = () => {
     return currentProject?.pages.filter(p => p.id && p.generated_image_path) || [];
   }, [currentProject?.pages]);
 
-  // 加载项目数据 & 用户模板
+  // 加载项目数据
   useEffect(() => {
     if (projectId && (!currentProject || currentProject.id !== projectId)) {
       // 直接使用 projectId 同步项目数据
       syncProject(projectId);
     }
-    
-    // 加载用户模板列表（用于按需获取File）
-    const loadTemplates = async () => {
-      try {
-        const response = await listUserTemplates();
-        if (response.data?.templates) {
-          setUserTemplates(response.data.templates);
-        }
-      } catch (error) {
-        console.error('Failed to load user templates:', error);
-      }
-    };
-    loadTemplates();
   }, [projectId, currentProject, syncProject]);
 
   // Restyle 项目：从 Home.tsx navigate state 获取 task_id，自动轮询生成进度
@@ -1064,51 +1050,39 @@ export const SlidePreview: React.FC = () => {
     }
   }, [currentProject, projectId, exportExtractorMethod, exportInpaintMethod, exportAllowPartial, syncProject, show]);
 
-  const handleTemplateSelect = async (templateFile: File | null, templateId?: string) => {
+  const handleStyleReferenceSave = async () => {
     if (!projectId) return;
-    
-    // 如果有templateId，按需加载File
-    let file = templateFile;
-    if (templateId && !file) {
-      file = await getTemplateFile(templateId, userTemplates);
-      if (!file) {
-        show({ message: t('slidePreview.loadTemplateFailed'), type: 'error' });
-        return;
-      }
-    }
-    
-    if (!file) {
-      // 如果没有文件也没有 ID，可能是取消选择
+
+    const stylePresetId = selectedStylePresetId === 'ddi-standard' ? 'ddi' : undefined;
+    if (!stylePresetId && styleRefFiles.length === 0) {
+      show({ message: t('slidePreview.loadTemplateFailed'), type: 'error' });
       return;
     }
-    
+
     setIsUploadingTemplate(true);
     try {
-      await uploadTemplate(projectId, file);
+      await uploadStyleRefs(projectId, styleRefFiles, stylePresetId, true);
       await syncProject(projectId);
       setIsTemplateModalOpen(false);
       show({ message: t('slidePreview.templateChanged'), type: 'success' });
-      
-      // 更新选择状态
-      if (templateId) {
-        // 判断是用户模板还是预设模板（短ID通常是预设模板）
-        if (templateId.length <= 3 && /^\d+$/.test(templateId)) {
-          setSelectedPresetTemplateId(templateId);
-          setSelectedTemplateId(null);
-        } else {
-          setSelectedTemplateId(templateId);
-          setSelectedPresetTemplateId(null);
-        }
-      }
     } catch (error: any) {
       show({ 
-        message: `更换模板失败: ${error.message || '未知错误'}`, 
+        message: `更换风格参考失败: ${error.message || '未知错误'}`,
         type: 'error' 
       });
     } finally {
       setIsUploadingTemplate(false);
     }
   };
+
+  const currentStyleRefUrls = useMemo(() => {
+    const urls = currentProject?.style_ref_image_urls || [];
+    if (urls.length > 0) {
+      return urls.map((url) => getImageUrl(url, currentProject?.updated_at));
+    }
+    const paths = currentProject?.style_ref_image_paths || [];
+    return paths.map((path) => getImageUrl(path, currentProject?.updated_at));
+  }, [currentProject?.style_ref_image_paths, currentProject?.style_ref_image_urls, currentProject?.updated_at]);
 
   if (!currentProject) {
     return <Loading fullscreen message={t('preview.messages.loadingProject')} />;
@@ -1656,14 +1630,14 @@ export const SlidePreview: React.FC = () => {
 
                   {/* 操作 */}
                   <div className="flex items-center gap-1.5 md:gap-2 w-full sm:w-auto justify-center">
-                    {/* 手机端：模板更换按钮 */}
+                    {/* 手机端：风格参考更换按钮 */}
                     <Button
                       variant="ghost"
                       size="sm"
                       icon={<Upload size={16} />}
                       onClick={() => setIsTemplateModalOpen(true)}
                       className="lg:hidden text-xs"
-                      title="更换模板"
+                      title="更换风格参考"
                     />
                     {/* 手机端：素材生成按钮 */}
                     <Button
@@ -2042,7 +2016,7 @@ export const SlidePreview: React.FC = () => {
       <ToastContainer />
       {ConfirmDialog}
       
-      {/* 模板选择 Modal */}
+      {/* 风格参考选择 Modal */}
       <Modal
         isOpen={isTemplateModalOpen}
         onClose={() => setIsTemplateModalOpen(false)}
@@ -2053,13 +2027,93 @@ export const SlidePreview: React.FC = () => {
           <p className="text-sm text-gray-600 dark:text-foreground-tertiary mb-4">
             {t('preview.templateModalDesc')}
           </p>
-          <TemplateSelector
-            onSelect={handleTemplateSelect}
-            selectedTemplateId={selectedTemplateId}
-            selectedPresetTemplateId={selectedPresetTemplateId}
-            showUpload={false} // 在预览页面上传的模板直接应用到项目，不上传到用户模板库
-            projectId={projectId || null}
-          />
+          <div className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-foreground-secondary mb-2">
+                模板选择
+              </label>
+              <select
+                value={selectedStylePresetId}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setSelectedStylePresetId(value);
+                  if (value !== 'custom') {
+                    setStyleRefFiles([]);
+                  }
+                }}
+                className="w-full rounded-lg border-2 border-gray-200 dark:border-border-primary bg-white dark:bg-background-tertiary px-4 py-3 text-sm font-semibold text-gray-900 dark:text-white focus:border-banana-400 dark:focus:border-banana outline-none"
+              >
+                {GENERATE_PRESETS.map((preset) => (
+                  <option key={preset.id} value={preset.id}>{preset.name}</option>
+                ))}
+                <option value="custom">自定义风格参考图</option>
+              </select>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <label className="text-sm font-medium text-gray-700 dark:text-foreground-secondary">
+                  风格参考图
+                </label>
+                <span className="text-xs text-gray-500 dark:text-foreground-tertiary">
+                  最多 5 张
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-3">
+                {selectedStylePresetId === 'ddi-standard' && styleRefFiles.length === 0 && (
+                  <div className="w-40 h-24 rounded-lg border-2 border-banana-400 overflow-hidden bg-slate-100 shadow-sm">
+                    <img
+                      src={GENERATE_PRESETS[0].styleRefImageUrl}
+                      alt="DDI standard template"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+                {styleRefFiles.map((ref, i) => (
+                  <div key={`${ref.name}-${i}`} className="relative w-32 h-20 rounded-lg overflow-hidden border-2 border-banana-300 dark:border-banana/50 group">
+                    <img
+                      src={URL.createObjectURL(ref)}
+                      alt={`style ref ${i + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setStyleRefFiles(prev => prev.filter((_, idx) => idx !== i))}
+                      className="absolute top-0 right-0 bg-black/50 text-white text-xs px-1 rounded-bl opacity-0 group-hover:opacity-100 transition-opacity"
+                    >✕</button>
+                  </div>
+                ))}
+                {styleRefFiles.length < 5 && (
+                  <button
+                    type="button"
+                    onClick={() => styleRefInputRef.current?.click()}
+                    className="w-32 h-20 border-2 border-dashed border-gray-300 dark:border-border-primary rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-banana-400 dark:hover:border-banana/50 transition-colors text-gray-400 hover:text-banana-600"
+                  >
+                    <span className="text-2xl">+</span>
+                    <span className="text-xs font-medium">上传自定义</span>
+                  </button>
+                )}
+              </div>
+              <input
+                ref={styleRefInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={(e) => {
+                  const files = Array.from(e.target.files || []);
+                  if (files.length > 0) {
+                    setSelectedStylePresetId('custom');
+                    setStyleRefFiles(prev => [...prev, ...files].slice(0, 5));
+                  }
+                  e.target.value = '';
+                }}
+                className="hidden"
+              />
+              <p className="mt-2 text-xs text-gray-500 dark:text-foreground-tertiary">
+                风格参考图只控制版式、配色和视觉语言；内容仍来自页面大纲/描述。
+              </p>
+            </div>
+          </div>
           {isUploadingTemplate && (
             <div className="text-center py-2 text-sm text-gray-500 dark:text-foreground-tertiary">
               {t('preview.uploadingTemplate')}
@@ -2072,6 +2126,13 @@ export const SlidePreview: React.FC = () => {
               disabled={isUploadingTemplate}
             >
               {t('common.close')}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleStyleReferenceSave}
+              disabled={isUploadingTemplate || (selectedStylePresetId === 'custom' && styleRefFiles.length === 0)}
+            >
+              {t('preview.changeTemplate')}
             </Button>
           </div>
         </div>
@@ -2098,6 +2159,7 @@ export const SlidePreview: React.FC = () => {
             onClose={() => setIsProjectSettingsOpen(false)}
             extraRequirements={extraRequirements}
             templateStyle={templateStyle}
+            styleRefImageUrls={currentStyleRefUrls}
             onExtraRequirementsChange={(value) => {
               isEditingRequirements.current = true;
               setExtraRequirements(value);
@@ -2105,6 +2167,10 @@ export const SlidePreview: React.FC = () => {
             onTemplateStyleChange={(value) => {
               isEditingTemplateStyle.current = true;
               setTemplateStyle(value);
+            }}
+            onChangeStyleReferences={() => {
+              setIsProjectSettingsOpen(false);
+              setIsTemplateModalOpen(true);
             }}
             onSaveExtraRequirements={handleSaveExtraRequirements}
             onSaveTemplateStyle={handleSaveTemplateStyle}

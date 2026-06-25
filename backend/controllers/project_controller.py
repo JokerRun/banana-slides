@@ -247,6 +247,7 @@ def upload_style_refs(project_id):
     Multipart form data:
     - style_refs: File[] (optional)
     - style_preset_id: "ddi" (optional)
+    - replace: "true" to replace existing project style references
     """
     try:
         auth_error = require_auth_response()
@@ -259,6 +260,7 @@ def upload_style_refs(project_id):
 
         style_refs = request.files.getlist('style_refs')
         style_preset_id = (request.form.get('style_preset_id') or '').strip()
+        replace_existing = (request.form.get('replace') or '').strip().lower() in ('1', 'true', 'yes')
 
         if not style_refs and not style_preset_id:
             return bad_request("style_refs or style_preset_id is required")
@@ -269,7 +271,7 @@ def upload_style_refs(project_id):
         style_ref_dir = project_dir / 'style_refs'
         style_ref_dir.mkdir(exist_ok=True, parents=True)
 
-        saved_paths = project.get_style_ref_image_paths()
+        saved_paths = [] if replace_existing else project.get_style_ref_image_paths()
 
         if style_preset_id:
             if style_preset_id != 'ddi':

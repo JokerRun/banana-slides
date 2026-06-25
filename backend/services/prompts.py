@@ -850,6 +850,8 @@ def get_restyle_prompt(
 Image role notes:
 - {template_ref_note}
 - IMAGE {original_image_num} is the original PPT slide. Extract content only.
+- In the custom instructions, STYLE_REFERENCE means the base/style reference image(s).
+- In the custom instructions, ORIGINAL_SLIDE means IMAGE {original_image_num}, the original PPT slide.
 
 Use the following restyle instructions strictly:
 {custom_prompt_text}

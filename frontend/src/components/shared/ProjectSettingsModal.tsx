@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, FileText, Download, Sparkles, AlertTriangle } from 'lucide-react';
+import { X, FileText, Download, Sparkles, AlertTriangle, ImagePlus } from 'lucide-react';
 import { Button, Textarea } from '@/components/shared';
 import { useT } from '@/hooks/useT';
 import type { ExportExtractorMethod, ExportInpaintMethod } from '@/types';
@@ -13,10 +13,12 @@ const projectSettingsI18n = {
       extraRequirements: "额外要求", extraRequirementsDesc: "在生成每个页面时，AI 会参考这些额外要求",
       extraRequirementsPlaceholder: "例如：使用紧凑的布局，顶部展示一级大纲标题，加入更丰富的PPT插图...",
       saveExtraRequirements: "保存额外要求",
-      styleDescription: "风格描述", styleDescriptionDesc: "描述您期望的 PPT 整体风格，AI 将根据描述生成相应风格的页面",
+      styleReferences: "风格参考", styleReferencesDesc: "当前项目后续生成会使用这些风格参考图与风格描述。",
+      changeStyleReferences: "更换风格参考",
+      styleDescription: "风格描述", styleDescriptionDesc: "描述您期望的 PPT 整体风格，AI 将结合风格参考图生成相应风格的页面",
       styleDescriptionPlaceholder: "例如：简约商务风格，使用深蓝色和白色配色，字体清晰大方，布局整洁...",
       saveStyleDescription: "保存风格描述",
-      styleTip: "风格描述会在生成图片时自动添加到提示词中。如果同时上传了模板图片，风格描述会作为补充说明。",
+      styleTip: "风格参考图用于控制版式、配色和视觉语言；风格描述用于补充生成约束。内容仍来自页面大纲/描述。",
       editablePptxExport: "可编辑 PPTX 导出设置", editablePptxExportDesc: "配置「导出可编辑 PPTX」功能的处理方式。这些设置影响导出质量和API调用成本。",
       extractorMethod: "组件提取方法", extractorMethodDesc: "选择如何从PPT图片中提取文字、表格等可编辑组件",
       extractorHybrid: "混合提取（推荐）", extractorHybridDesc: "MinerU版面分析 + 百度高精度OCR，文字识别更精确",
@@ -42,10 +44,12 @@ const projectSettingsI18n = {
       extraRequirements: "Extra Requirements", extraRequirementsDesc: "AI will reference these extra requirements when generating each page",
       extraRequirementsPlaceholder: "e.g., Use compact layout, show first-level outline title at top, add richer PPT illustrations...",
       saveExtraRequirements: "Save Extra Requirements",
-      styleDescription: "Style Description", styleDescriptionDesc: "Describe your expected PPT overall style, AI will generate pages in that style",
+      styleReferences: "Style References", styleReferencesDesc: "Future generation for this project uses these style reference images plus the style description.",
+      changeStyleReferences: "Change Style References",
+      styleDescription: "Style Description", styleDescriptionDesc: "Describe your expected PPT overall style; AI will combine it with style reference images",
       styleDescriptionPlaceholder: "e.g., Simple business style, use navy blue and white colors, clear fonts, clean layout...",
       saveStyleDescription: "Save Style Description",
-      styleTip: "Style description will be automatically added to the prompt when generating images. If a template image is also uploaded, the style description will serve as supplementary notes.",
+      styleTip: "Style reference images control layout, palette, and visual language; style description adds generation constraints. Content still comes from page outline/description.",
       editablePptxExport: "Editable PPTX Export Settings", editablePptxExportDesc: "Configure how \"Export Editable PPTX\" works. These settings affect export quality and API call costs.",
       extractorMethod: "Component Extraction Method", extractorMethodDesc: "Choose how to extract editable components like text and tables from PPT images",
       extractorHybrid: "Hybrid Extraction (Recommended)", extractorHybridDesc: "MinerU layout analysis + Baidu high-precision OCR for more accurate text recognition",
@@ -71,8 +75,10 @@ interface ProjectSettingsModalProps {
   onClose: () => void;
   extraRequirements: string;
   templateStyle: string;
+  styleRefImageUrls?: string[];
   onExtraRequirementsChange: (value: string) => void;
   onTemplateStyleChange: (value: string) => void;
+  onChangeStyleReferences?: () => void;
   onSaveExtraRequirements: () => void;
   onSaveTemplateStyle: () => void;
   isSavingRequirements: boolean;
@@ -94,8 +100,10 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
   onClose,
   extraRequirements,
   templateStyle,
+  styleRefImageUrls = [],
   onExtraRequirementsChange,
   onTemplateStyleChange,
+  onChangeStyleReferences,
   onSaveExtraRequirements,
   onSaveTemplateStyle,
   isSavingRequirements,
@@ -203,6 +211,29 @@ export const ProjectSettingsModal: React.FC<ProjectSettingsModalProps> = ({
                 </div>
 
                 <div className="bg-blue-50 dark:bg-blue-900/30 rounded-lg p-6 space-y-4">
+                  <div>
+                    <h4 className="text-base font-semibold text-gray-900 dark:text-foreground-primary mb-2">{t('projectSettings.styleReferences')}</h4>
+                    <p className="text-sm text-gray-600 dark:text-foreground-tertiary">
+                      {t('projectSettings.styleReferencesDesc')}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    {styleRefImageUrls.map((url, index) => (
+                      <div key={`${url}-${index}`} className="w-32 h-20 rounded-lg border-2 border-banana-300 dark:border-banana/50 overflow-hidden bg-white dark:bg-background-secondary">
+                        <img src={url} alt={`style reference ${index + 1}`} className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={onChangeStyleReferences}
+                      className="w-32 h-20 border-2 border-dashed border-gray-300 dark:border-border-primary rounded-lg flex flex-col items-center justify-center gap-1 cursor-pointer hover:border-banana-400 dark:hover:border-banana/50 transition-colors text-gray-500 hover:text-banana-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={!onChangeStyleReferences}
+                    >
+                      <ImagePlus size={20} />
+                      <span className="text-xs font-medium">{t('projectSettings.changeStyleReferences')}</span>
+                    </button>
+                  </div>
+
                   <div>
                     <h4 className="text-base font-semibold text-gray-900 dark:text-foreground-primary mb-2">{t('projectSettings.styleDescription')}</h4>
                     <p className="text-sm text-gray-600 dark:text-foreground-tertiary">
