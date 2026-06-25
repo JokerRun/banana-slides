@@ -346,9 +346,9 @@ def get_image_generation_prompt(
     if extra_requirements and extra_requirements.strip():
         extra_req_text = f"\n\n额外要求（请务必遵循）：\n{extra_requirements}\n"
 
-    # 根据是否有模板生成不同的设计指南内容（保持原prompt要点顺序）
+    # 根据是否有模板/风格参考图生成不同的设计指南内容（保持原prompt要点顺序）
     template_style_guideline = (
-        "- 配色和设计语言和模板图片严格相似。"
+        "- 深度解析参考图的版式框架、色彩系统、字体规范、图形语言，并将其完整应用于新页面。"
         if has_template
         else "- 严格按照风格描述进行设计。"
     )
@@ -356,10 +356,19 @@ def get_image_generation_prompt(
         "- 只参考风格设计，禁止出现模板中的文字。\n" if has_template else ""
     )
 
-    # 该处参考了@歸藏的A工具箱
     prompt = f"""\
-你是一位专家级UI UX演示设计师，专注于生成设计良好的PPT页面。
-当前PPT页面的页面描述如下:
+# Role: 资深商业咨询级 PPT 内容架构师与视觉设计师
+
+# Inputs:
+- 参考图片 = 标准 PPT 模板 / 风格参考图（若提供）
+- [文本] = 当前页需要转化为 PPT 的原始页面内容
+
+# Core Objective:
+基于 [文本] 的内容与业务逻辑，套用参考图片的 PPT 模板风格，
+从零设计页面的信息架构、视觉层级、空间关系与排版方式，
+输出具有麦肯锡 / BCG 咨询报告风格的专业商务 PPT 页面。
+
+当前PPT页面的[文本]如下:
 <page_description>
 {page_desc}
 </page_description>
@@ -372,17 +381,30 @@ def get_image_generation_prompt(
 </reference_information>
 
 
-<design_guidelines>
-- 要求文字清晰锐利, 画面为4K分辨率，16:9比例。
+<execution_rules>
+- 要求文字清晰锐利，画面为高分辨率，16:9比例。
 {template_style_guideline}
-- 根据内容自动设计最完美的构图，不重不漏地渲染"页面描述"中的文本。
+- 严格基于 [文本] 中的原始文字内容进行排版设计，禁止凭空新增、替换、总结或重写未出现的文字信息。
+- 可以对内容进行视觉化拆分、归类、层级化呈现，以及必要的版式适配（如将长句拆分为要点列表）。
+- 深度理解 [文本] 的业务主题、逻辑关系（并列 / 递进 / 包含 / 对比 / 因果），再决定版式。
+- 强制执行文本条目与视觉区块的 1:1 映射，严格基于实际文本条目数生成对应数量的几何区块或层级。
+- 若 [文本] 中包含明确主题或标题，将其作为页面标题；若无法识别明确标题，严禁自行捏造标题。
+- 标题规范：微软雅黑 Bold，32pt，DDI 板岩蓝 #3D4F5F，左对齐，贴近内容区左侧。
+- 色系限定：标题/页眉/结构线/主视觉使用 #3D4F5F；强调色/流程箭头/重点标签使用 #F9A825；辅助色仅使用 #2D72B2 / #E67E22 / #88A02C / #662D7C / #8B9A46；正文 #333333，次要文本 #666666，分割线 #E0E0E0，背景 #FFFFFF。
+- 优先理解内容逻辑并匹配最优版式：流程用路线图，对比用左右/矩阵，层级用分层/冰山，核心主题用辐射/树状，概览用网格卡片，指标用 dashboard，循环用环形流转，问题到解决方案用桥接版式。
+- 允许图形：圆形节点、圆角矩形、房屋图标、粗体折线/S形箭头、带序号流程节点、矩阵表格、金字塔、文档图示；必须为纯扁平化矢量风格。
+- 主视觉区块控制在 3–5 个内并容纳所有原文内容；整体留白 8%–10%；文字约 40%，结构化图形约 60%；线条粗细一致，严格网格对齐。
+- 若文本缺乏视觉支撑，可生成与内容高度匹配的扁平化图标或配图，但不得与文字重叠。
 - 如非必要，禁止出现 markdown 格式符号（如 # 和 * 等）。
 {forbidden_template_text_guidline}- 使用大小恰当的装饰性图形或插画对空缺位置进行填补。
-</design_guidelines>
+</execution_rules>
 {get_ppt_language_instruction(language)}
 {material_images_note}{extra_req_text}
 
 {"**注意：当前页面为ppt的封面页，请你采用专业的封面设计美学技巧，务必凸显出页面标题，分清主次，确保一下就能抓住观众的注意力。**" if page_index == 1 else ""}
+
+# Output Format:
+请输出基于 [文本] 内容生成的 16:9 高保真商业 PPT 页面，确保所有视觉块清晰规整，具有明确的边界逻辑。
 """
 
     logger.debug(f"[get_image_generation_prompt] Final prompt:\n{prompt}")
@@ -843,6 +865,38 @@ Output: 16:9 landscape PPT slide, high resolution, crisp readable text."""
             f"style_refs={num_style_refs}, custom_prompt=True"
         )
         return prompt
+
+    prompt = f"""\
+{image_section}
+
+Image role notes:
+- {template_ref_note}
+- IMAGE {original_image_num} is the original PPT slide. Extract content only.
+
+# Role: 资深商业咨询级 PPT 排版与视觉架构师
+
+# Core Objective:
+将 IMAGE {original_image_num} 套用参考图的 PPT 模板版式，在严格保留原始页面内容信息与业务逻辑的前提下，重新设计页面的信息架构、视觉层级、空间关系与排版方式，输出具有麦肯锡 / BCG 咨询报告风格的专业商务 PPT 页面。
+
+Page {page_index}/{total_pages}.
+
+# Execution Rules:
+1. 模板迁移与背景净化：将参考图的版式框架严格应用到原始页面上；彻底移除原始页面中的背景、页眉、页脚、页码、装饰线条、低质量图形、无意义色块、旧版式视觉干扰元素；仅保留原始文本内容、数据信息、业务逻辑。
+2. 零重写内容原则：严格保留 IMAGE {original_image_num} 的全部文字内容与逻辑层级；禁止修改、新增、删除、总结或重写任何文本；仅允许调整布局位置、对齐方式、字号层级和视觉排版。
+3. 内容逻辑理解与结构重组：原图只是排版草稿，禁止复刻遮挡块、涂抹痕迹、多余占位符或错位元素；先清点实际文本条目数，基于文本条目生成对应数量的几何区块或层级；完全依据文本间的并列、递进、包含、对比、因果关系重构版式。
+4. 标题规范：仅当原图存在标题时应用；若无标题，严禁新增。标题使用微软雅黑 Bold，32pt，DDI 板岩蓝 #3D4F5F，左对齐贴近内容区左侧。
+5. 色系规范：禁止继承原图旧颜色。标题/页眉/结构线/主视觉使用 #3D4F5F；强调色/流程箭头/重点标签使用 #F9A825；辅助色仅可使用 #2D72B2 / #E67E22 / #88A02C / #662D7C / #8B9A46；正文 #333333，次要文本 #666666，分割线 #E0E0E0，背景 #FFFFFF。
+6. 动态版式选择：时序/流程用线性流程或路线图；两方对比用左右对比；多维对比用矩阵；优先级/层级用分层架构或冰山图；核心主题+分支用辐射或树状；板块概览用网格卡片；漏斗/转化用漏斗图；指标/KPI 用 dashboard；交集关系用维恩图；循环用环形流转；问题到解决方案用桥接过渡；单一叙事用极简要点或图文注解；三项并列用三栏或图标网格。
+7. 视觉元素与密度：允许圆形节点、圆角矩形、房屋图标、粗体折线/S形箭头、带序号流程节点、矩阵表格、金字塔、文档图示、等轴测路径图；必须纯扁平化矢量风格。主区块尽量控制在 3–5 个内并容纳全部原文；留白 8%–10%；文字约 40%，结构化图形约 60%；线条一致，严格网格对齐；禁止文字与图形重叠。
+
+# Output Format:
+输出优化后的 16:9 高保真商业 PPT 页面。所有视觉块必须清晰、规整，具有明确边界逻辑。"""
+
+    logger.debug(
+        f"[get_restyle_prompt] page {page_index}/{total_pages}, "
+        f"style_refs={num_style_refs}, custom_prompt=False, ddi_requirements=True"
+    )
+    return prompt
 
     prompt = f"""\
 {image_section}

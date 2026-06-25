@@ -23,7 +23,7 @@ interface ProjectState {
   setError: (error: string | null) => void;
   
   // 项目操作
-  initializeProject: (type: 'idea' | 'outline' | 'description' | 'restyle', content: string, templateImage?: File, templateStyle?: string, referenceFileIds?: string[]) => Promise<void>;
+  initializeProject: (type: 'idea' | 'outline' | 'description' | 'restyle', content: string, templateImage?: File, templateStyle?: string, referenceFileIds?: string[], styleRefImages?: File[], stylePresetId?: string) => Promise<void>;
   syncProject: (projectId?: string) => Promise<void>;
   
   // 页面操作
@@ -120,7 +120,7 @@ const debouncedUpdatePage = debounce(
   setError: (error) => set({ error }),
 
   // 初始化项目
-  initializeProject: async (type, content, templateImage, templateStyle, referenceFileIds) => {
+  initializeProject: async (type, content, templateImage, templateStyle, referenceFileIds, styleRefImages, stylePresetId) => {
     set({ isGlobalLoading: true, error: null });
     try {
       const request: any = {};
@@ -168,7 +168,17 @@ const debouncedUpdatePage = debounce(
         }
       }
 
-      // 4. 如果是 description 类型，自动生成大纲和页面描述
+      // 4. 上传风格参考图 / 绑定内置 DDI 风格底版（生成新 PPT 使用）
+      if ((styleRefImages && styleRefImages.length > 0) || stylePresetId) {
+        try {
+          await api.uploadStyleRefs(projectId, styleRefImages || [], stylePresetId);
+        } catch (error) {
+          console.warn('风格参考图上传失败:', error);
+          // 风格参考图失败不影响项目创建，后续图片生成时会提示补充风格
+        }
+      }
+
+      // 5. 如果是 description 类型，自动生成大纲和页面描述
       if (type === 'description') {
         try {
           await api.generateFromDescription(projectId, content);
@@ -179,7 +189,7 @@ const debouncedUpdatePage = debounce(
         }
       }
 
-      // 5. 获取完整项目信息
+      // 6. 获取完整项目信息
       const projectResponse = await api.getProject(projectId);
       const project = normalizeProject(projectResponse.data);
 

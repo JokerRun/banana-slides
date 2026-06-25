@@ -4,7 +4,9 @@ Project Controller - handles project-related endpoints
 import json
 import logging
 import traceback
+import shutil
 from datetime import datetime
+from pathlib import Path
 
 from flask import Blueprint, request, jsonify, current_app
 from sqlalchemy import desc
@@ -28,6 +30,12 @@ from utils import (
 logger = logging.getLogger(__name__)
 
 project_bp = Blueprint('projects', __name__, url_prefix='/api/projects')
+
+ALLOWED_STYLE_REF_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'bmp'}
+
+
+def _allowed_style_ref_file(filename: str) -> bool:
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_STYLE_REF_EXTENSIONS
 
 
 def _get_project_reference_files_content(project_id: str) -> list:
@@ -228,6 +236,74 @@ def create_project():
         db.session.rollback()
         error_trace = traceback.format_exc()
         logger.error(f"create_project failed: {str(e)}", exc_info=True)
+        return error_response('SERVER_ERROR', str(e), 500)
+
+
+@project_bp.route('/<project_id>/style-refs', methods=['POST'])
+def upload_style_refs(project_id):
+    """
+    POST /api/projects/{project_id}/style-refs - Upload style reference images for a project
+
+    Multipart form data:
+    - style_refs: File[] (optional)
+    - style_preset_id: "ddi" (optional)
+    """
+    try:
+        auth_error = require_auth_response()
+        if auth_error is not None:
+            return auth_error
+
+        project = Project.query.filter_by(id=project_id, owner_id=get_current_user_id()).first()
+        if not project:
+            return not_found('Project')
+
+        style_refs = request.files.getlist('style_refs')
+        style_preset_id = (request.form.get('style_preset_id') or '').strip()
+
+        if not style_refs and not style_preset_id:
+            return bad_request("style_refs or style_preset_id is required")
+
+        from services import FileService
+        file_service = FileService(current_app.config['UPLOAD_FOLDER'])
+        project_dir = file_service._get_project_dir(project.id)
+        style_ref_dir = project_dir / 'style_refs'
+        style_ref_dir.mkdir(exist_ok=True, parents=True)
+
+        saved_paths = project.get_style_ref_image_paths()
+
+        if style_preset_id:
+            if style_preset_id != 'ddi':
+                return bad_request("Unsupported style_preset_id")
+            preset_source = Path(current_app.root_path).parent / 'assets' / 'style-presets' / 'ddi-base.png'
+            if not preset_source.exists():
+                return error_response('SERVER_ERROR', 'DDI style preset not found', 500)
+            preset_target = style_ref_dir / 'style_ref_preset_ddi.png'
+            shutil.copyfile(preset_source, preset_target)
+            rel_path = preset_target.relative_to(file_service.upload_folder).as_posix()
+            if rel_path not in saved_paths:
+                saved_paths.append(rel_path)
+
+        for i, ref in enumerate(style_refs):
+            if not ref.filename or not _allowed_style_ref_file(ref.filename):
+                return bad_request(f"Invalid style reference image: {ref.filename}")
+            ref_ext = Path(ref.filename).suffix.lower().lstrip('.') or 'png'
+            filename = f"style_ref_{len(saved_paths) + i + 1}.{ref_ext}"
+            ref_path = style_ref_dir / filename
+            ref.save(str(ref_path))
+            saved_paths.append(ref_path.relative_to(file_service.upload_folder).as_posix())
+
+        project.set_style_ref_image_paths(saved_paths[:5])
+        project.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        return success_response({
+            'style_ref_image_paths': project.get_style_ref_image_paths(),
+            'style_ref_image_urls': [f'/files/{path}' for path in project.get_style_ref_image_paths()]
+        })
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"upload_style_refs failed: {str(e)}", exc_info=True)
         return error_response('SERVER_ERROR', str(e), 500)
 
 
@@ -749,16 +825,16 @@ def generate_images(project_id):
         ref_image_path = None
         if use_template:
             ref_image_path = file_service.get_template_path(project_id)
+        style_ref_paths = project.get_style_ref_image_paths()
 
         if project.creation_type == 'restyle':
             # Restyle 项目：需要风格参考图
-            style_ref_paths = project.get_style_ref_image_paths()
             if not style_ref_paths:
                 return bad_request("Restyle 项目必须有风格参考图。")
         else:
-            # 非 restyle 项目：需要模板图片或风格描述
-            if not ref_image_path and not project.template_style:
-                return bad_request("请先上传模板图片或添加风格描述。")
+            # 非 restyle 项目：需要风格参考图、模板图片或风格描述
+            if not style_ref_paths and not ref_image_path and not project.template_style:
+                return bad_request("请先上传风格参考图或添加风格描述。")
         
         # Reconstruct outline from pages with part structure
         outline = _reconstruct_outline_from_pages(pages)

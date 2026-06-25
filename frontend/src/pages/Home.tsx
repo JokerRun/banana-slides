@@ -1,11 +1,10 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { Sparkles, FileText, FileEdit, ImagePlus, Paperclip, Palette, Lightbulb, Search, FolderOpen, HelpCircle, Sun, Moon, Globe, Monitor, ChevronDown, RefreshCw, Upload, LogOut } from 'lucide-react';
+import { Sparkles, FileText, FileEdit, ImagePlus, Paperclip, Lightbulb, Search, FolderOpen, HelpCircle, Sun, Moon, Globe, Monitor, ChevronDown, RefreshCw, Upload, LogOut } from 'lucide-react';
 import { Button, Textarea, Card, useToast, MaterialGeneratorModal, MaterialCenterModal, ReferenceFileList, ReferenceFileSelector, FilePreviewModal, HelpModal, Footer } from '@/components/shared';
 import { MarkdownTextarea, type MarkdownTextareaRef } from '@/components/shared/MarkdownTextarea';
-import { TemplateSelector, getTemplateFile } from '@/components/shared/TemplateSelector';
-import { getAuthMe, listUserTemplates, type UserTemplate, uploadReferenceFile, type ReferenceFile, associateFileToProject, triggerFileParse, associateMaterialsToProject, createRestyleProject, logoutAuth } from '@/api/endpoints';
+import { getAuthMe, uploadReferenceFile, type ReferenceFile, associateFileToProject, triggerFileParse, associateMaterialsToProject, createRestyleProject, logoutAuth } from '@/api/endpoints';
 import { useProjectStore } from '@/store/useProjectStore';
 import { useTheme } from '@/hooks/useTheme';
 import { useImagePaste } from '@/hooks/useImagePaste';
@@ -14,6 +13,81 @@ import { PRESET_STYLES } from '@/config/presetStyles';
 import { RESTYLE_PRESETS, getRestylePresetById } from '@/config/restylePresets';
 
 type CreationType = 'idea' | 'outline' | 'description' | 'restyle';
+
+const GENERATE_DDI_PROMPT = `# Role: 资深商业咨询级 PPT 内容架构师与视觉设计师
+
+# Inputs:
+- [图1] = 标准 PPT 模板（提供视觉风格与版式规范）
+- [文本] = 待转化为 PPT 的原始文字内容
+
+# Core Objective:
+基于 [文本] 的内容与业务逻辑，套用 [图1] 的 PPT 模板风格，
+从零设计页面的信息架构、视觉层级、空间关系与排版方式，
+输出具有麦肯锡 / BCG 咨询报告风格的专业商务 PPT 页面。
+
+---
+
+# Execution Rules (Strict Compliance Required):
+
+## 1. 模板风格提取与应用 (Highest Priority)
+- 深度解析 [图1] 的版式框架、色彩系统、字体规范、图形语言，
+  并将其完整应用于新页面的设计中。
+- 新页面须在视觉上与 [图1] 保持高度一致，呈现统一的品牌调性。
+- 背景、页眉/页脚区域的处理方式须与 [图1] 保持一致。
+
+## 2. 零创作内容原则 (Zero Text Fabrication)
+- 严格基于 [文本] 中的原始文字内容进行排版设计。
+- 绝对禁止：凭空新增、替换、总结或重写 [文本] 中未出现的文字信息。
+- 仅允许对内容进行视觉化拆分、归类、层级化呈现，
+  以及必要的版式适配（如将长句拆分为要点列表）。
+
+## 3. 内容解析与信息架构重组 (Structural Design - Critical)
+- 语义解析优先：深度理解 [文本] 的业务主题、逻辑关系
+  （并列 / 递进 / 包含 / 对比 / 因果），再决定版式。
+- 文本驱动计数：强制执行【文本条目与视觉区块的 1:1 映射】。
+  清点实际文本条目数，严格基于该数字生成对应数量的几何区块或层级，
+  禁止无中生有地填充占位内容。
+- 版式从内容生长：完全依据文本间的内在逻辑关系，
+  生成逻辑自洽、排列规整的全新版式，而非套用固定模板。
+
+## 4. 页面标题规范
+- 若 [文本] 中包含明确的主题或标题信息，须将其提炼作为页面标题。
+- 若 [文本] 无法识别明确标题，则严禁自行捏造标题文字。
+- 字体规范：微软雅黑 Bold，32pt，板岩蓝 (#3D4F5F)。
+- 布局关系：左对齐，贴近内容区左侧。
+
+## 5. 色系规范 (Strict Color Palette)
+- 所有图形、流程图、图标、模块底色、描边与强调元素，
+  必须统一使用以下规范色系，禁止引入色池外颜色。
+- 主色调：标题 / 页眉 / 结构线 / 主视觉使用 DDI 板岩蓝 #3D4F5F；强调色 / 流程箭头 / 重点标签使用 DDI 点缀橙 #F9A825。
+- 辅助分类色：科技蓝 #2D72B2 | 活力橙 #E67E22 | 自然绿 #88A02C | 品质紫 #662D7C | 橄榄绿 #8B9A46。
+- 基础文本与背景：正文 #333333 | 次要文本 #666666 | 分割线 #E0E0E0 | 背景色 #FFFFFF。
+
+## 6. 版式选择逻辑 (Layout Selection Guide)
+优先理解 [文本] 的真实业务逻辑，再匹配最优版式：时序/流程类用线性流程或路线图；两方对比类用二元左右对比；多维度对比用对比矩阵；优先级/层级架构用分层架构或冰山图；核心主题+分支内容用辐射布局或树状分支；板块概览用网格卡片；漏斗/转化流程用漏斗图；数据指标/KPI 用数据面板；交集/关联关系用维恩图；循环流程用环形流转图；问题到解决方案用衔接过渡版式；单一叙事内容用极简要点列表/图文注解；三项并列内容用三栏纵向布局/图标网格。
+
+## 7. 视觉元素与排版密度规范
+- 允许的图形：圆形节点、圆角矩形（圆角 8–10px）、房屋图标、粗体折线 / S 形箭头、带序号流程节点（1/2/3）、矩阵表格、金字塔、文档图示。须为纯扁平化矢量风格。
+- 视觉区块化：以岩蓝/橙色通栏色块作区域标题栏分区；主视觉区块控制在 3–5 个内，须容纳所有原文内容。
+- 空间与网格：整体留白 8%–10%；文字占比约 40%，结构化图形约 60%；所有线条粗细一致，严格网格对齐。
+- 层级递进：遵循「核心概念 → 分项要点 → 配套图标」的视觉递进逻辑。
+- 智能补偿：若 [文本] 缺乏视觉支撑，须深度理解文字语义，自动生成与内容高度匹配的扁平化图标或配图。图标须语义准确、边缘清晰、间距统一，且严禁与文字重叠。
+
+---
+
+# Output Format:
+请输出基于 [文本] 内容生成的 16:9 高保真商业 PPT 页面。
+确保所有视觉块清晰规整，具有明确的边界逻辑，
+整体呈现麦肯锡 / BCG 级别的专业咨询报告风格。`;
+
+const GENERATE_PRESETS = [
+  {
+    id: 'ddi-standard',
+    name: 'DDI 标准模板',
+    styleRefImageUrl: '/restyle-presets/ddi-base-v2.png',
+    prompt: GENERATE_DDI_PROMPT,
+  },
+];
 
 // 页面特有翻译 - AI 可以直接看到所有文案，保留原始 key 结构
 const homeI18n = {
@@ -259,22 +333,18 @@ export const Home: React.FC = () => {
   
   const [activeTab, setActiveTab] = useState<CreationType>('restyle');
   const [content, setContent] = useState('');
-  const [selectedTemplate, setSelectedTemplate] = useState<File | null>(null);
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
-  const [selectedPresetTemplateId, setSelectedPresetTemplateId] = useState<string | null>(null);
   const [isMaterialModalOpen, setIsMaterialModalOpen] = useState(false);
   const [isMaterialCenterOpen, setIsMaterialCenterOpen] = useState(false);
   const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
-  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
-  const [userTemplates, setUserTemplates] = useState<UserTemplate[]>([]);
   const [referenceFiles, setReferenceFiles] = useState<ReferenceFile[]>([]);
   const [isUploadingFile, setIsUploadingFile] = useState(false);
   const [isFileSelectorOpen, setIsFileSelectorOpen] = useState(false);
   const [previewFileId, setPreviewFileId] = useState<string | null>(null);
-  const [useTemplateStyle, setUseTemplateStyle] = useState(false);
-  const [templateStyle, setTemplateStyle] = useState('');
+  const [templateStyle, setTemplateStyle] = useState(GENERATE_DDI_PROMPT);
   const [hoveredPresetId, setHoveredPresetId] = useState<string | null>(null);
+  const [generateStyleRefs, setGenerateStyleRefs] = useState<File[]>([]);
+  const [selectedGeneratePresetId, setSelectedGeneratePresetId] = useState<string>('ddi-standard');
   const [restyleSourceFile, setRestyleSourceFile] = useState<File | null>(null);
   const [restyleStyleRefs, setRestyleStyleRefs] = useState<File[]>([]);
   const [selectedRestylePresetId, setSelectedRestylePresetId] = useState<string>('');
@@ -284,26 +354,12 @@ export const Home: React.FC = () => {
   const [authUserName, setAuthUserName] = useState('');
   const restyleSourceInputRef = useRef<HTMLInputElement>(null);
   const restyleStyleRefInputRef = useRef<HTMLInputElement>(null);
+  const generateStyleRefInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const themeMenuRef = useRef<HTMLDivElement>(null);
 
-  // 检查是否有当前项目 & 加载用户模板
+  // 加载登录用户
   useEffect(() => {
-    const projectId = localStorage.getItem('currentProjectId');
-    setCurrentProjectId(projectId);
-
-    // 加载用户模板列表（用于按需获取File）
-    const loadTemplates = async () => {
-      try {
-        const response = await listUserTemplates();
-        if (response.data?.templates) {
-          setUserTemplates(response.data.templates);
-        }
-      } catch (error) {
-        console.error('加载用户模板失败:', error);
-      }
-    };
-
     const loadAuthUser = async () => {
       try {
         const response = await getAuthMe();
@@ -322,7 +378,6 @@ export const Home: React.FC = () => {
       }
     };
 
-    loadTemplates();
     loadAuthUser();
   }, []);
 
@@ -580,6 +635,17 @@ export const Home: React.FC = () => {
     return new File([blob], fileName, { type: blob.type || 'image/png' });
   }, []);
 
+  const applyGeneratePreset = useCallback((presetId: string) => {
+    setSelectedGeneratePresetId(presetId);
+    const preset = GENERATE_PRESETS.find(item => item.id === presetId);
+    if (!preset) {
+      setGenerateStyleRefs([]);
+      return;
+    }
+    setGenerateStyleRefs([]);
+    setTemplateStyle(preset.prompt);
+  }, []);
+
   const applyRestylePreset = useCallback(async (presetId: string) => {
     setSelectedRestylePresetId(presetId);
     if (!presetId) {
@@ -607,34 +673,6 @@ export const Home: React.FC = () => {
       setIsApplyingRestylePreset(false);
     }
   }, [getPresetStyleRefFile, show, t]);
-
-  const handleTemplateSelect = async (templateFile: File | null, templateId?: string) => {
-    // 总是设置文件（如果提供）
-    if (templateFile) {
-      setSelectedTemplate(templateFile);
-    }
-    
-    // 处理模板 ID
-    if (templateId) {
-      // 判断是用户模板还是预设模板
-      // 预设模板 ID 通常是 '1', '2', '3' 等短字符串
-      // 用户模板 ID 通常较长（UUID 格式）
-      if (templateId.length <= 3 && /^\d+$/.test(templateId)) {
-        // 预设模板
-        setSelectedPresetTemplateId(templateId);
-        setSelectedTemplateId(null);
-      } else {
-        // 用户模板
-        setSelectedTemplateId(templateId);
-        setSelectedPresetTemplateId(null);
-      }
-    } else {
-      // 如果没有 templateId，可能是直接上传的文件
-      // 清空所有选择状态
-      setSelectedTemplateId(null);
-      setSelectedPresetTemplateId(null);
-    }
-  };
 
   // === Restyle submit handler ===
   const handleRestyleSubmit = async () => {
@@ -699,15 +737,6 @@ export const Home: React.FC = () => {
     }
 
     try {
-      // 如果有模板ID但没有File，按需加载
-      let templateFile = selectedTemplate;
-      if (!templateFile && (selectedTemplateId || selectedPresetTemplateId)) {
-        const templateId = selectedTemplateId || selectedPresetTemplateId;
-        if (templateId) {
-          templateFile = await getTemplateFile(templateId, userTemplates);
-        }
-      }
-      
       // 传递风格描述（只要有内容就传递，不管开关状态）
       const styleDesc = templateStyle.trim() ? templateStyle.trim() : undefined;
 
@@ -716,7 +745,15 @@ export const Home: React.FC = () => {
         .filter(f => f.parse_status === 'completed')
         .map(f => f.id);
 
-      await initializeProject(activeTab as 'idea' | 'outline' | 'description' | 'restyle', content, templateFile || undefined, styleDesc, refFileIds.length > 0 ? refFileIds : undefined);
+      await initializeProject(
+        activeTab as 'idea' | 'outline' | 'description' | 'restyle',
+        content,
+        undefined,
+        styleDesc,
+        refFileIds.length > 0 ? refFileIds : undefined,
+        generateStyleRefs,
+        selectedGeneratePresetId === 'ddi-standard' && generateStyleRefs.length === 0 ? 'ddi' : undefined
+      );
       
       // 根据类型跳转到不同页面
       const projectId = localStorage.getItem('currentProjectId');
@@ -1236,111 +1273,166 @@ export const Home: React.FC = () => {
             className="mb-4"
           />
 
-          {/* 模板选择 */}
+          {/* 生成新 PPT 模板选择 */}
           <div className="mb-6 md:mb-8 pt-4 border-t border-gray-100 dark:border-border-primary">
-            <div className="flex items-center justify-between mb-3 md:mb-4">
+            <div className="flex items-center gap-2 mb-3 md:mb-4">
+              <FolderOpen size={18} className="text-green-500 flex-shrink-0" />
+              <h3 className="text-base md:text-lg font-semibold text-gray-900 dark:text-white">
+                {i18n.language?.startsWith('zh') ? '模板选择' : 'Template'}
+              </h3>
+            </div>
+            <select
+              value={selectedGeneratePresetId}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === 'custom') {
+                  setSelectedGeneratePresetId('custom');
+                  setGenerateStyleRefs([]);
+                  return;
+                }
+                applyGeneratePreset(value);
+              }}
+              className="w-full md:w-1/2 rounded-lg border-2 border-gray-200 dark:border-border-primary bg-white dark:bg-background-tertiary px-4 py-3 text-sm md:text-base font-semibold text-gray-900 dark:text-white focus:border-banana-400 dark:focus:border-banana outline-none"
+            >
+              {GENERATE_PRESETS.map((preset) => (
+                <option key={preset.id} value={preset.id}>{preset.name}</option>
+              ))}
+              <option value="custom">{i18n.language?.startsWith('zh') ? '自定义模板' : 'Custom template'}</option>
+            </select>
+          </div>
+
+          {/* 生成新 PPT 风格参考图 */}
+          <div className="mb-6 md:mb-8 pt-4 border-t border-gray-100 dark:border-border-primary">
+            <div className="flex items-center mb-3 md:mb-4">
               <div className="flex items-center gap-2">
-                <Palette size={18} className="text-orange-600 dark:text-banana flex-shrink-0" />
+                <ImagePlus size={18} className="text-rose-500 flex-shrink-0" />
                 <h3 className="text-base md:text-lg font-semibold text-gray-900 dark:text-white">
-                  {t('home.template.title')}
+                  {i18n.language?.startsWith('zh') ? '风格参考图' : 'Style reference images'}
                 </h3>
               </div>
-              {/* 无模板图模式开关 */}
-              <label className="flex items-center gap-2 cursor-pointer group">
-                <span className="text-sm text-gray-600 dark:text-foreground-tertiary group-hover:text-gray-900 dark:group-hover:text-white transition-colors">
-                  {t('home.template.useTextStyle')}
-                </span>
-                <div className="relative">
-                  <input
-                    type="checkbox"
-                    checked={useTemplateStyle}
-                    onChange={(e) => {
-                      setUseTemplateStyle(e.target.checked);
-                      // 切换到无模板图模式时，清空模板选择
-                      if (e.target.checked) {
-                        setSelectedTemplate(null);
-                        setSelectedTemplateId(null);
-                        setSelectedPresetTemplateId(null);
-                      }
-                      // 不再清空风格描述，允许用户保留已输入的内容
-                    }}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 dark:bg-background-hover peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-banana-300 dark:peer-focus:ring-banana/30 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white dark:after:bg-foreground-secondary after:border-gray-300 dark:after:border-border-hover after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-banana"></div>
-                </div>
-              </label>
             </div>
-            
-            {/* 根据模式显示不同的内容 */}
-            {useTemplateStyle ? (
-              <div className="space-y-3">
-                <Textarea
-                  placeholder={t('home.template.stylePlaceholder')}
-                  value={templateStyle}
-                  onChange={(e) => setTemplateStyle(e.target.value)}
-                  rows={3}
-                  className="text-sm border-2 border-gray-200 dark:border-border-primary dark:bg-background-tertiary dark:text-white dark:placeholder-foreground-tertiary focus:border-banana-400 dark:focus:border-banana transition-colors duration-200"
-                />
-
-                {/* 预设风格按钮 */}
-                <div className="space-y-2">
-                  <p className="text-xs font-medium text-gray-600 dark:text-foreground-tertiary">
-                    {t('home.template.presetStyles')}
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {PRESET_STYLES.map((preset) => (
-                      <div key={preset.id} className="relative">
-                        <button
-                          type="button"
-                          onClick={() => setTemplateStyle(t(preset.descriptionKey))}
-                          onMouseEnter={() => setHoveredPresetId(preset.id)}
-                          onMouseLeave={() => setHoveredPresetId(null)}
-                          className="px-3 py-1.5 text-xs font-medium rounded-full border-2 border-gray-200 dark:border-border-primary dark:text-foreground-secondary hover:border-banana-400 dark:hover:border-banana hover:bg-banana-50 dark:hover:bg-background-hover transition-all duration-200 hover:shadow-sm dark:hover:shadow-none"
-                        >
-                          {t(preset.nameKey)}
-                        </button>
-                        
-                        {/* 悬停时显示预览图片 */}
-                        {hoveredPresetId === preset.id && preset.previewImage && (
-                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
-                            <div className="bg-white dark:bg-background-secondary rounded-lg shadow-2xl dark:shadow-none border-2 border-banana-400 dark:border-banana p-2.5 w-72">
-                              <img
-                                src={preset.previewImage}
-                                alt={t(preset.nameKey)}
-                                className="w-full h-40 object-cover rounded"
-                                onError={(e) => {
-                                  // 如果图片加载失败，隐藏预览
-                                  e.currentTarget.style.display = 'none';
-                                }}
-                              />
-                              <p className="text-xs text-gray-600 dark:text-foreground-tertiary mt-2 px-1 line-clamp-3">
-                                {t(preset.descriptionKey)}
-                              </p>
-                            </div>
-                            {/* 小三角形指示器 */}
-                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
-                              <div className="w-3 h-3 bg-white dark:bg-background-secondary border-r-2 border-b-2 border-banana-400 dark:border-banana transform rotate-45"></div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+            <div className="flex flex-wrap gap-3">
+              {selectedGeneratePresetId === 'ddi-standard' && generateStyleRefs.length === 0 && (
+                <div className="w-40 h-24 rounded-lg border-2 border-banana-400 overflow-hidden bg-slate-100 shadow-sm">
+                  <img
+                    src={GENERATE_PRESETS[0].styleRefImageUrl}
+                    alt="DDI standard template"
+                    className="w-full h-full object-cover"
+                  />
                 </div>
-                
-                <p className="text-xs text-gray-500 dark:text-foreground-tertiary">
-                  💡 {t('home.template.styleTip')}
-                </p>
-              </div>
-            ) : (
-              <TemplateSelector
-                onSelect={handleTemplateSelect}
-                selectedTemplateId={selectedTemplateId}
-                selectedPresetTemplateId={selectedPresetTemplateId}
-                showUpload={true} // 在主页上传的模板保存到用户模板库
-                projectId={currentProjectId}
+              )}
+              {generateStyleRefs.map((ref, i) => (
+                <div key={`${ref.name}-${i}`} className="relative w-32 h-20 rounded-lg overflow-hidden border-2 border-banana-300 dark:border-banana/50 group">
+                  <img
+                    src={URL.createObjectURL(ref)}
+                    alt={`generate style ref ${i + 1}`}
+                    className="w-full h-full object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setGenerateStyleRefs(prev => prev.filter((_, idx) => idx !== i))}
+                    className="absolute top-0 right-0 bg-black/50 text-white text-xs px-1 rounded-bl opacity-0 group-hover:opacity-100 transition-opacity"
+                  >✕</button>
+                </div>
+              ))}
+              {generateStyleRefs.length < 5 && (
+                <button
+                  type="button"
+                  onClick={() => generateStyleRefInputRef.current?.click()}
+                  className="w-32 h-20 border-2 border-dashed border-gray-300 dark:border-border-primary rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-banana-400 dark:hover:border-banana/50 transition-colors text-gray-400 hover:text-banana-600"
+                >
+                  <span className="text-2xl">+</span>
+                  <span className="text-xs font-medium">{i18n.language?.startsWith('zh') ? '上传自定义' : 'Upload'}</span>
+                </button>
+              )}
+            </div>
+            <input
+              ref={generateStyleRefInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={(e) => {
+                const files = Array.from(e.target.files || []);
+                if (files.length > 0) {
+                  setSelectedGeneratePresetId('custom');
+                  setGenerateStyleRefs(prev => [...prev, ...files].slice(0, 5));
+                }
+                e.target.value = '';
+              }}
+              className="hidden"
+            />
+            <p className="mt-2 text-xs text-gray-500 dark:text-foreground-tertiary">
+              {i18n.language?.startsWith('zh')
+                ? '风格参考图只控制版式、配色和视觉语言；内容仍来自上方主题/大纲/定稿文案。'
+                : 'Style references control layout, palette, and visual language; content still comes from the prompt above.'}
+            </p>
+          </div>
+
+          {/* 生成新 PPT 风格描述 */}
+          <div className="mb-6 md:mb-8 pt-4 border-t border-gray-100 dark:border-border-primary">
+            <div className="flex items-center gap-2 mb-3 md:mb-4">
+              <FileEdit size={18} className="text-indigo-500 flex-shrink-0" />
+              <h3 className="text-base md:text-lg font-semibold text-gray-900 dark:text-white">
+                {i18n.language?.startsWith('zh') ? '风格描述' : 'Style description'}
+              </h3>
+            </div>
+            <div className="space-y-3">
+              <Textarea
+                placeholder={i18n.language?.startsWith('zh')
+                  ? '请输入具体的排版、视觉风格或生成要求。留空时将使用 DDI 咨询风格默认提示词。'
+                  : 'Enter layout, visual style, or generation requirements. Leave blank to use the default DDI consulting style.'}
+                value={templateStyle}
+                onChange={(e) => setTemplateStyle(e.target.value)}
+                rows={5}
+                className="text-sm border-2 border-gray-200 dark:border-border-primary dark:bg-background-tertiary dark:text-white dark:placeholder-foreground-tertiary focus:border-banana-400 dark:focus:border-banana transition-colors duration-200"
               />
-            )}
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-gray-600 dark:text-foreground-tertiary">
+                  {t('home.template.presetStyles')}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {PRESET_STYLES.map((preset) => (
+                    <div key={preset.id} className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setTemplateStyle(t(preset.descriptionKey))}
+                        onMouseEnter={() => setHoveredPresetId(preset.id)}
+                        onMouseLeave={() => setHoveredPresetId(null)}
+                        className="px-3 py-1.5 text-xs font-medium rounded-full border-2 border-gray-200 dark:border-border-primary dark:text-foreground-secondary hover:border-banana-400 dark:hover:border-banana hover:bg-banana-50 dark:hover:bg-background-hover transition-all duration-200 hover:shadow-sm dark:hover:shadow-none"
+                      >
+                        {t(preset.nameKey)}
+                      </button>
+                      {hoveredPresetId === preset.id && preset.previewImage && (
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                          <div className="bg-white dark:bg-background-secondary rounded-lg shadow-2xl dark:shadow-none border-2 border-banana-400 dark:border-banana p-2.5 w-72">
+                            <img
+                              src={preset.previewImage}
+                              alt={t(preset.nameKey)}
+                              className="w-full h-40 object-cover rounded"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                            <p className="text-xs text-gray-600 dark:text-foreground-tertiary mt-2 px-1 line-clamp-3">
+                              {t(preset.descriptionKey)}
+                            </p>
+                          </div>
+                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1">
+                            <div className="w-3 h-3 bg-white dark:bg-background-secondary border-r-2 border-b-2 border-banana-400 dark:border-banana transform rotate-45"></div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-foreground-tertiary">
+                💡 {i18n.language?.startsWith('zh')
+                  ? '提示：风格描述会与风格参考图一起传给生成模型；不会再出现旧的模板库选择。'
+                  : 'Tip: the style description is combined with style reference images; the old template library selector is no longer used here.'}
+              </p>
+            </div>
           </div>
           </>
           )}

@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DDI PPT助手</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+
+        .selection-yellow::selection { background-color: #FFD166; color: #1e293b; }
+
+        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .animate-slide-up { animation: slideUp 0.4s ease-out; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        .tab-active { background-color: #FFD166; border-color: #FFD166; color: #0f172a; }
+        .tab-inactive { background-color: white; border-color: #f1f5f9; color: #64748b; }
+        .tab-inactive:hover { border-color: #cbd5e1; }
+
+        .category-active { background-color: #FFD166; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .category-inactive { background-color: white; border: 1px solid #e2e8f0; }
+        .category-inactive:hover { border-color: #FFD166; }
+
+        .btn-primary { background-color: #FFD166; color: #0f172a; }
+        .btn-primary:hover { filter: brightness(1.05); }
+        .btn-primary:active { transform: scale(0.99); }
+
+        .textarea-focus:focus { outline: none; ring: 2px; box-shadow: 0 0 0 2px #FFD166; border-color: #FFD166; }
+
+        .upload-zone:hover { background-color: #f8fafc; }
+        .upload-zone:hover .upload-icon { color: #FFD166; }
+
+        .ddi-preview { background: linear-gradient(135deg, #1e293b 0%, #334155 100%); }
+
+        .sticky-nav { position: sticky; top: 0; z-index: 50; }
+    </style>
+</head>
+<body class="min-h-screen bg-slate-50 selection-yellow">
+
+    <!-- 导航栏 -->
+    <nav id="navbar" class="h-16 bg-white border-b border-slate-200 px-8 flex items-center justify-between sticky-nav shadow-sm">
+        <div class="flex items-center gap-4 cursor-pointer group" onclick="goToStep('config')">
+            <div class="text-2xl group-hover:rotate-12 transition-transform duration-300">🍌</div>
+            <div class="text-slate-800 font-black text-xl tracking-tighter italic">DDI PPT助手</div>
+        </div>
+        <div class="flex items-center gap-6 text-sm font-medium text-slate-600">
+            <button class="flex items-center gap-2 hover:text-blue-600 transition-colors font-bold text-xs">
+                <i class="fas fa-image"></i> 素材生成
+            </button>
+            <button class="flex items-center gap-2 hover:text-blue-600 transition-colors font-bold text-xs">
+                <i class="fas fa-folder-open"></i> 素材中心
+            </button>
+            <button class="hover:text-blue-600 transition-colors font-bold text-xs">历史项目</button>
+            <div class="w-px h-4 bg-slate-200"></div>
+            <button class="flex items-center gap-1 hover:text-blue-600 font-black text-[10px]">
+                EN <i class="fas fa-globe text-xs"></i>
+            </button>
+            <button class="hover:text-blue-600 transition-colors"><i class="fas fa-sun"></i></button>
+            <div class="w-px h-4 bg-slate-200 ml-1"></div>
+            <div class="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-[10px] shadow-sm cursor-pointer">U</div>
+        </div>
+    </nav>
+
+    <!-- 主内容区 -->
+    <div id="main-container" class="animate-fade-in">
+
+        <!-- 配置页面 -->
+        <div id="step-config" class="max-w-4xl mx-auto pt-8 pb-20">
+            <div class="bg-[#f8fafc] rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-8">
+
+                <!-- 场景选择卡片 -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                    <div onclick="setCategory('beautify')" id="cat-beautify" class="p-5 rounded-xl cursor-pointer transition-all category-active">
+                        <h3 class="text-base font-bold mb-1 text-slate-900">美化现有PPT</h3>
+                        <p class="text-[11px] text-slate-800">统一模板格式，修复排版错位</p>
+                    </div>
+                    <div onclick="setCategory('generate')" id="cat-generate" class="p-5 rounded-xl cursor-pointer transition-all category-inactive">
+                        <h3 class="text-base font-bold mb-1 text-slate-700">生成新PPT</h3>
+                        <p class="text-[11px] text-slate-500">输入想法/大纲/描述，快速出稿</p>
+                    </div>
+                    <div onclick="setCategory('translate')" id="cat-translate" class="p-5 rounded-xl cursor-pointer transition-all category-inactive">
+                        <h3 class="text-base font-bold mb-1 text-slate-700">多语言翻译</h3>
+                        <p class="text-[11px] text-slate-500">精准翻译，锁定排版保真</p>
+                    </div>
+                </div>
+
+                <!-- 内容区域 -->
+                <div class="bg-white rounded-xl p-8 border border-slate-100 shadow-[0_2px_10px_rgba(0,0,0,0.02)]">
+
+                    <!-- 美化场景 -->
+                    <div id="view-beautify" class="space-y-6 animate-fade-in">
+                        <div class="flex items-start gap-2 text-sm text-slate-700 font-medium bg-yellow-50 p-3 rounded-lg border border-yellow-100">
+                            <i class="fas fa-lightbulb text-yellow-500 mt-0.5 shrink-0"></i>
+                            <span>上传已有 PPT/PDF，提供风格参考，AI 将逐页重绘为新风格，修复排版错位。</span>
+                        </div>
+
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                <i class="fas fa-cloud-upload-alt text-slate-400"></i> 上传 PPT/PDF 源文件
+                            </h3>
+                            <div class="border-2 border-dashed border-slate-300 rounded-xl py-10 text-center bg-slate-50/50 upload-zone cursor-pointer group transition-all">
+                                <i class="fas fa-cloud-upload-alt w-8 h-8 text-slate-400 mx-auto mb-2 upload-icon text-2xl transition-colors"></i>
+                                <p class="text-sm font-medium text-slate-600">点击或拖拽文件到此处</p>
+                            </div>
+                        </div>
+
+                        <div class="space-y-6 pt-2 border-t border-slate-100">
+                            <div class="pt-4 space-y-4">
+                                <div>
+                                    <h3 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                        <i class="fas fa-cube text-green-500"></i> 模板选择
+                                    </h3>
+                                    <select id="template-beautify" onchange="handleTemplateChange('beautify', this.value)" class="w-1/2 border border-slate-300 rounded-lg px-4 py-2.5 text-sm font-bold bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400 cursor-pointer shadow-sm">
+                                        <option value="ddi">DDI 标准模板</option>
+                                        <option value="custom">自定义模板</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <h3 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                        <i class="fas fa-image text-rose-400"></i> 上传风格参考图
+                                    </h3>
+                                    <div class="flex gap-4">
+                                        <div id="preview-beautify-ddi" class="w-40 h-24 border-2 border-yellow-400 rounded-lg ddi-preview p-3 relative shadow-sm flex flex-col justify-center">
+                                            <div class="w-full h-1 bg-yellow-400 mb-3"></div>
+                                            <div class="w-3/4 h-2 bg-slate-500 mb-1.5 rounded"></div>
+                                            <div class="w-1/2 h-2 bg-slate-600 rounded"></div>
+                                            <div class="absolute bottom-2 right-3 text-[10px] text-white/50 font-black italic">DDI</div>
+                                        </div>
+                                        <div id="preview-beautify-custom" class="hidden w-40 h-24 border-2 border-dashed border-slate-300 rounded-lg bg-slate-50 flex flex-col items-center justify-center text-slate-400 cursor-pointer hover:border-yellow-400 hover:text-yellow-500 transition-colors shadow-sm">
+                                            <i class="fas fa-cloud-upload-alt text-2xl mb-1"></i>
+                                            <span class="text-xs font-bold">点击上传底板</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                    <i class="fas fa-file-edit text-indigo-400"></i> 风格描述
+                                </h3>
+                                <textarea id="prompt-beautify" oninput="handlePromptChange('beautify', this.value)" placeholder="请输入您具体的排版、生成或调整指令..." class="w-full min-h-[120px] border rounded-lg p-4 text-xs font-mono resize-none focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-white text-slate-700 border-slate-300 shadow-sm transition-all textarea-focus"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="pt-6">
+                            <button onclick="handleProcess('audit')" class="w-full btn-primary py-3.5 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-sm">
+                                <i class="fas fa-sync-alt"></i> 开始美化与排版
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 生成场景 -->
+                    <div id="view-generate" class="hidden space-y-6 animate-fade-in">
+                        <div class="flex gap-2">
+                            <button onclick="setGenMethod('sentence')" id="btn-sentence" class="flex-1 py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 border-2 transition-all tab-active">
+                                <i class="fas fa-sparkles"></i> 一句话生成
+                            </button>
+                            <button onclick="setGenMethod('outline')" id="btn-outline" class="flex-1 py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 border-2 transition-all tab-inactive">
+                                <i class="fas fa-file-alt"></i> 从大纲生成
+                            </button>
+                            <button onclick="setGenMethod('description')" id="btn-description" class="flex-1 py-3 rounded-lg font-bold text-sm flex items-center justify-center gap-2 border-2 transition-all tab-inactive">
+                                <i class="fas fa-sticky-note"></i> 定稿文案生成
+                            </button>
+                        </div>
+
+                        <div class="flex items-start gap-2 text-sm text-slate-700 font-medium bg-yellow-50 p-3 rounded-lg border border-yellow-100">
+                            <i class="fas fa-lightbulb text-yellow-500 mt-0.5 shrink-0"></i>
+                            <span id="generate-hint">输入你的想法，AI 将为你构思大纲并生成完整的 PPT</span>
+                        </div>
+
+                        <div class="relative">
+                            <textarea id="generate-input" placeholder="例如：生成一份关于 DDI 数字化领导力转型的年度汇报 PPT..." class="w-full h-32 border border-slate-300 rounded-xl p-4 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400 resize-none shadow-sm textarea-focus"></textarea>
+                        </div>
+
+                        <div class="space-y-6 pt-2 border-t border-slate-100">
+                            <div class="pt-4 space-y-4">
+                                <div>
+                                    <h3 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                        <i class="fas fa-cube text-green-500"></i> 模板选择
+                                    </h3>
+                                    <select id="template-generate" onchange="handleTemplateChange('generate', this.value)" class="w-1/2 border border-slate-300 rounded-lg px-4 py-2.5 text-sm font-bold bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400 cursor-pointer shadow-sm">
+                                        <option value="ddi">DDI 标准模板</option>
+                                        <option value="custom">自定义模板</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <h3 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                        <i class="fas fa-image text-rose-400"></i> 上传风格参考图
+                                    </h3>
+                                    <div class="flex gap-4">
+                                        <div id="preview-generate-ddi" class="w-40 h-24 border-2 border-yellow-400 rounded-lg ddi-preview p-3 relative shadow-sm flex flex-col justify-center">
+                                            <div class="w-full h-1 bg-yellow-400 mb-3"></div>
+                                            <div class="w-3/4 h-2 bg-slate-500 mb-1.5 rounded"></div>
+                                            <div class="w-1/2 h-2 bg-slate-600 rounded"></div>
+                                            <div class="absolute bottom-2 right-3 text-[10px] text-white/50 font-black italic">DDI</div>
+                                        </div>
+                                        <div id="preview-generate-custom" class="hidden w-40 h-24 border-2 border-dashed border-slate-300 rounded-lg bg-slate-50 flex flex-col items-center justify-center text-slate-400 cursor-pointer hover:border-yellow-400 hover:text-yellow-500 transition-colors shadow-sm">
+                                            <i class="fas fa-cloud-upload-alt text-2xl mb-1"></i>
+                                            <span class="text-xs font-bold">点击上传底板</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                    <i class="fas fa-file-edit text-indigo-400"></i> 风格描述
+                                </h3>
+                                <textarea id="prompt-generate" oninput="handlePromptChange('generate', this.value)" placeholder="请输入您具体的排版、生成或调整指令..." class="w-full min-h-[120px] border rounded-lg p-4 text-xs font-mono resize-none focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-white text-slate-700 border-slate-300 shadow-sm transition-all textarea-focus"></textarea>
+                            </div>
+                            <div class="pt-2">
+                                <p class="text-sm text-slate-500 mb-3">快速选择预设风格：</p>
+                                <div class="flex flex-wrap gap-2 mb-3">
+                                    <button onclick="applyStylePreset('minimal')" class="px-4 py-1.5 rounded-full border border-slate-200 bg-white text-xs text-slate-600 hover:border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer">简约商务</button>
+                                    <button onclick="applyStylePreset('tech')" class="px-4 py-1.5 rounded-full border border-slate-200 bg-white text-xs text-slate-600 hover:border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer">现代科技</button>
+                                    <button onclick="applyStylePreset('academic')" class="px-4 py-1.5 rounded-full border border-slate-200 bg-white text-xs text-slate-600 hover:border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer">严谨学术</button>
+                                    <button onclick="applyStylePreset('creative')" class="px-4 py-1.5 rounded-full border border-slate-200 bg-white text-xs text-slate-600 hover:border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer">活泼创意</button>
+                                    <button onclick="applyStylePreset('clean')" class="px-4 py-1.5 rounded-full border border-slate-200 bg-white text-xs text-slate-600 hover:border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer">极简清爽</button>
+                                    <button onclick="applyStylePreset('luxury')" class="px-4 py-1.5 rounded-full border border-slate-200 bg-white text-xs text-slate-600 hover:border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer">高端奢华</button>
+                                    <button onclick="applyStylePreset('nature')" class="px-4 py-1.5 rounded-full border border-slate-200 bg-white text-xs text-slate-600 hover:border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer">自然清新</button>
+                                    <button onclick="applyStylePreset('gradient')" class="px-4 py-1.5 rounded-full border border-slate-200 bg-white text-xs text-slate-600 hover:border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer">渐变活力</button>
+                                </div>
+                                <p class="text-[11px] text-slate-400">💡 提示：点击预设风格快速填充，或自定义描述风格、配色、布局等要求</p>
+                            </div>
+                        </div>
+
+                        <div class="pt-6">
+                            <button onclick="handleProcess('audit')" class="w-full btn-primary py-3.5 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-sm">
+                                <i class="fas fa-magic"></i> 开始生成新 PPT
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 翻译场景 -->
+                    <div id="view-translate" class="hidden space-y-6 animate-fade-in">
+                        <div class="flex items-start gap-2 text-sm text-slate-700 font-medium bg-yellow-50 p-3 rounded-lg border border-yellow-100">
+                            <i class="fas fa-lightbulb text-yellow-500 mt-0.5 shrink-0"></i>
+                            <span>上传需要翻译的 PPT/PDF，指定目标语言，AI 将精准翻译并 100% 锁定原有的排版坐标。</span>
+                        </div>
+
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                <i class="fas fa-cloud-upload-alt text-slate-400"></i> 上传源文件
+                            </h3>
+                            <div class="border-2 border-dashed border-slate-300 rounded-xl py-8 text-center bg-slate-50/50 upload-zone cursor-pointer group transition-all">
+                                <i class="fas fa-cloud-upload-alt w-8 h-8 text-slate-400 mx-auto mb-2 upload-icon text-2xl transition-colors"></i>
+                                <p class="text-sm font-medium text-slate-600">点击或拖拽文件到此处</p>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                <i class="fas fa-globe text-blue-500"></i> 目标语言
+                            </h3>
+                            <div class="flex gap-4 items-center">
+                                <select id="target-lang" onchange="handleLangChange(this.value)" class="w-1/3 border border-slate-300 rounded-lg px-4 py-2.5 text-sm font-bold bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400 shadow-sm">
+                                    <option value="English (英文)">English (英文)</option>
+                                    <option value="中文 (Chinese)">中文 (Chinese)</option>
+                                    <option value="日本語 (日文)">日本語 (日文)</option>
+                                    <option value="custom">其他语言 (手动输入)</option>
+                                </select>
+                                <input id="custom-lang" type="text" placeholder="请输入目标语言..." class="hidden flex-1 border border-slate-300 rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-yellow-400 animate-fade-in shadow-sm" />
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                <i class="fas fa-bookmark text-orange-500"></i> 专属术语库（可选）
+                            </h3>
+                            <textarea id="glossary" oninput="handleGlossaryChange(this.value)" placeholder="请在此输入或粘贴术语映射，格式建议：
+原文 -> 译文
+Apple -> 苹果" class="w-full h-32 border border-slate-300 rounded-lg p-4 text-sm font-mono text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400 resize-none shadow-sm textarea-focus"></textarea>
+                            <p class="text-[11px] text-slate-500 mt-1">您可以自由修改上述预置词汇，或按格式批量粘贴新的术语映射。</p>
+                        </div>
+
+                        <div class="space-y-6 pt-2 border-t border-slate-100">
+                            <div class="pt-4 space-y-4">
+                                <div>
+                                    <h3 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                        <i class="fas fa-cube text-green-500"></i> 模板选择
+                                    </h3>
+                                    <select id="template-translate" onchange="handleTemplateChange('translate', this.value)" class="w-1/2 border border-slate-300 rounded-lg px-4 py-2.5 text-sm font-bold bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400 cursor-pointer shadow-sm">
+                                        <option value="ddi">DDI 标准模板</option>
+                                        <option value="custom">自定义模板</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <h3 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                        <i class="fas fa-image text-rose-400"></i> 上传风格参考图
+                                    </h3>
+                                    <div class="flex gap-4">
+                                        <div id="preview-translate-ddi" class="w-40 h-24 border-2 border-yellow-400 rounded-lg ddi-preview p-3 relative shadow-sm flex flex-col justify-center">
+                                            <div class="w-full h-1 bg-yellow-400 mb-3"></div>
+                                            <div class="w-3/4 h-2 bg-slate-500 mb-1.5 rounded"></div>
+                                            <div class="w-1/2 h-2 bg-slate-600 rounded"></div>
+                                            <div class="absolute bottom-2 right-3 text-[10px] text-white/50 font-black italic">DDI</div>
+                                        </div>
+                                        <div id="preview-translate-custom" class="hidden w-40 h-24 border-2 border-dashed border-slate-300 rounded-lg bg-slate-50 flex flex-col items-center justify-center text-slate-400 cursor-pointer hover:border-yellow-400 hover:text-yellow-500 transition-colors shadow-sm">
+                                            <i class="fas fa-cloud-upload-alt text-2xl mb-1"></i>
+                                            <span class="text-xs font-bold">点击上传底板</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <h3 class="text-sm font-bold text-slate-700 mb-2 flex items-center gap-2">
+                                    <i class="fas fa-file-edit text-indigo-400"></i> 风格描述
+                                </h3>
+                                <textarea id="prompt-translate" oninput="handlePromptChange('translate', this.value)" placeholder="请输入您具体的排版、生成或调整指令..." class="w-full min-h-[120px] border rounded-lg p-4 text-xs font-mono resize-none focus:outline-none focus:ring-2 focus:ring-yellow-400 bg-white text-slate-700 border-slate-300 shadow-sm transition-all textarea-focus"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="pt-6">
+                            <button onclick="handleProcess('audit')" class="w-full btn-primary py-3.5 rounded-xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-sm">
+                                <i class="fas fa-globe"></i> 开始翻译与排版
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- 审核页面 -->
+        <div id="step-audit" class="hidden max-w-5xl mx-auto pt-20 text-center animate-slide-up">
+            <div class="inline-flex items-center justify-center w-20 h-20 bg-yellow-100 rounded-full mb-6">
+                <i class="fas fa-check-circle text-4xl text-yellow-500"></i>
+            </div>
+            <h2 class="text-2xl font-bold mb-4">前端配置已收集完成</h2>
+            <p class="text-slate-500 mb-8">AI 引擎正在根据您设定的 Prompt 和上传的素材执行初始化...</p>
+            <button onclick="goToStep('editor')" class="btn-primary px-8 py-3 rounded-lg font-bold shadow-md hover:brightness-105 transition-all">
+                进入 Editor 微调模式
+            </button>
+        </div>
+
+        <!-- 编辑器页面 -->
+        <div id="step-editor" class="hidden h-screen bg-slate-800 flex items-center justify-center text-white flex-col">
+            <h1 class="text-4xl font-black mb-4">蕉幻 Editor 模式</h1>
+            <p class="text-slate-400 mb-8">您已进入单页深度调整工作流</p>
+            <button onclick="goToStep('config')" class="text-sm font-bold bg-white text-slate-900 px-6 py-2 rounded hover:bg-slate-100 transition-colors">
+                返回首页体验其他场景
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // 状态管理
+        let activeCategory = 'beautify';
+        let genMethod = 'sentence';
+        let currentStep = 'config';
+
+        const templateSettings = {
+            beautify: 'ddi',
+            generate: 'ddi',
+            translate: 'ddi'
+        };
+
+        const prompts = {
+            beautify: `【系统指令】\n1. 严格应用目标品牌视觉规范。\n2. 排版要求：主色调突出，强调色点缀。\n3. 使用模块化网格布局，确保高信息密度的专业呈现。`,
+            generate: `【系统指令】\n1. 角色设定：你是一个资深的业务顾问。\n2. 语调要求：权威、专业、具前瞻性的企业高管语调。\n3. 排版要求：内容密度高且结构化（多使用项目符号、对比矩阵、时间轴）。绝对不可捏造数据。`,
+            translate: `【系统指令】\n1. 语境要求：以专业语调将内容翻译为目标语言。\n2. 术语要求：严格遵循上方提供的术语映射表。\n3. 排版要求：输出字符串长度必须自适应，适应原始文本框限制，绝不溢出。`
+        };
+
+        const generateHints = {
+            sentence: "输入你的想法，AI 将为你构思大纲并生成完整的 PPT",
+            outline: "已有大纲？直接粘贴，AI 将自动切分为结构化大纲并生成",
+            description: "已有完整描述？AI 将自动解析并直接重绘，跳过大纲步骤"
+        };
+
+        const generatePlaceholders = {
+            sentence: "例如：生成一份关于 DDI 数字化领导力转型的年度汇报 PPT...",
+            outline: "在此粘贴您的结构化大纲...",
+            description: "在此粘贴您每个页面的完整定稿文案和排版预期..."
+        };
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('prompt-beautify').value = prompts.beautify;
+            document.getElementById('prompt-generate').value = prompts.generate;
+            document.getElementById('prompt-translate').value = prompts.translate;
+            document.getElementById('glossary').value = "";
+        });
+
+        // 场景切换
+        function setCategory(category) {
+            activeCategory = category;
+
+            // 更新卡片样式
+            ['beautify', 'generate', 'translate'].forEach(cat => {
+                const el = document.getElementById('cat-' + cat);
+                const title = el.querySelector('h3');
+                const desc = el.querySelector('p');
+
+                if (cat === category) {
+                    el.classList.remove('category-inactive');
+                    el.classList.add('category-active');
+                    title.classList.remove('text-slate-700');
+                    title.classList.add('text-slate-900');
+                    desc.classList.remove('text-slate-500');
+                    desc.classList.add('text-slate-800');
+                } else {
+                    el.classList.remove('category-active');
+                    el.classList.add('category-inactive');
+                    title.classList.remove('text-slate-900');
+                    title.classList.add('text-slate-700');
+                    desc.classList.remove('text-slate-800');
+                    desc.classList.add('text-slate-500');
+                }
+            });
+
+            // 显示对应视图
+            document.getElementById('view-beautify').classList.add('hidden');
+            document.getElementById('view-generate').classList.add('hidden');
+            document.getElementById('view-translate').classList.add('hidden');
+            document.getElementById('view-' + category).classList.remove('hidden');
+        }
+
+        // 生成方式切换
+        function setGenMethod(method) {
+            genMethod = method;
+
+            ['sentence', 'outline', 'description'].forEach(m => {
+                const btn = document.getElementById('btn-' + m);
+                if (m === method) {
+                    btn.classList.remove('tab-inactive');
+                    btn.classList.add('tab-active');
+                } else {
+                    btn.classList.remove('tab-active');
+                    btn.classList.add('tab-inactive');
+                }
+            });
+
+            document.getElementById('generate-hint').textContent = generateHints[method];
+            document.getElementById('generate-input').placeholder = generatePlaceholders[method];
+        }
+
+        // 模板切换
+        function handleTemplateChange(category, value) {
+            templateSettings[category] = value;
+            const isDDI = value === 'ddi';
+
+            document.getElementById('preview-' + category + '-ddi').classList.toggle('hidden', !isDDI);
+            document.getElementById('preview-' + category + '-custom').classList.toggle('hidden', isDDI);
+
+            // 选择自定义模板时，清空 prompt 中的预置内容
+            const promptEl = document.getElementById('prompt-' + category);
+            if (!isDDI) {
+                promptEl.value = '';
+                prompts[category] = '';
+            } else {
+                // 切回 DDI 时恢复预置内容
+                const defaultPrompts = {
+                    beautify: `【系统指令】\n1. 严格应用目标品牌视觉规范。\n2. 排版要求：主色调突出，强调色点缀。\n3. 使用模块化网格布局，确保高信息密度的专业呈现。`,
+                    generate: `【系统指令】\n1. 角色设定：你是一个资深的业务顾问。\n2. 语调要求：权威、专业、具前瞻性的企业高管语调。\n3. 排版要求：内容密度高且结构化（多使用项目符号、对比矩阵、时间轴）。绝对不可捏造数据。`,
+                    translate: `【系统指令】\n1. 语境要求：以专业语调将内容翻译为目标语言。\n2. 术语要求：严格遵循上方提供的术语映射表。\n3. 排版要求：输出字符串长度必须自适应，适应原始文本框限制，绝不溢出。`
+                };
+                promptEl.value = defaultPrompts[category];
+                prompts[category] = defaultPrompts[category];
+            }
+        }
+
+        // Prompt 编辑
+        function handlePromptChange(category, value) {
+            prompts[category] = value;
+        }
+
+        // 语言切换
+        function handleLangChange(value) {
+            const customInput = document.getElementById('custom-lang');
+            if (value === 'custom') {
+                customInput.classList.remove('hidden');
+            } else {
+                customInput.classList.add('hidden');
+            }
+        }
+
+        // 术语库编辑
+        function handleGlossaryChange(value) {
+            // 可扩展保存逻辑
+        }
+
+        // 处理流程
+        function handleProcess(nextStep) {
+            // 模拟处理中状态
+            const btn = event.target.closest('button');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 处理中...';
+            btn.disabled = true;
+
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                goToStep(nextStep);
+            }, 1500);
+        }
+
+        // 预设风格填充
+        const stylePresets = {
+            minimal: `【风格：简约商务】\n1. 配色：以白、灰、深蓝为主色调，强调色使用品牌蓝。\n2. 字体：无衬线字体，标题粗体、正文常规。\n3. 布局：留白充足，信息层级清晰，避免过多装饰元素。`,
+            tech: `【风格：现代科技】\n1. 配色：深色背景（深灰/藏青）+ 荧光蓝/青绿强调色。\n2. 字体：现代无衬线，标题可适度加宽字间距。\n3. 布局：卡片式模块化，可配合数据可视化图表，线条感强。`,
+            academic: `【风格：严谨学术】\n1. 配色：白底黑字，标题使用深蓝或深灰，图表使用学术配色。\n2. 字体：衬线字体（如宋体、Times）用于正文，无衬线用于标题。\n3. 布局：逻辑严密，层次分明，大量使用项目符号、编号、表格。`,
+            creative: `【风格：活泼创意】\n1. 配色：明亮对比色（橙、黄、粉、蓝）搭配，背景可带浅色纹理。\n2. 字体：标题使用有设计感的字体，正文保持可读性。\n3. 布局：打破常规网格，使用不规则形状、插画元素、大字号对比。`,
+            clean: `【风格：极简清爽】\n1. 配色：大面积纯白/浅灰，单色强调（如浅蓝或浅绿）。\n2. 字体：极简无衬线，字重对比强烈（极细 vs 极粗）。\n3. 布局：极度克制，每页仅聚焦一个核心信息，大量留白。`,
+            luxury: `【风格：高端奢华】\n1. 配色：深黑/深棕/酒红底色 + 金色/香槟色/玫瑰金强调。\n2. 字体：优雅衬线字体，标题可适度使用大写或斜体。\n3. 布局：精致细腻，使用高质量图片、细线框、渐变光影，避免拥挤。`,
+            nature: `【风格：自然清新】\n1. 配色：大地色系（米白、浅绿、浅棕、天蓝），低饱和度。\n2. 字体：柔和无衬线，字重适中，行距宽松。\n3. 布局：融入自然元素（植物、水彩、手绘），排版轻松舒适，图文融合。`,
+            gradient: `【风格：渐变活力】\n1. 配色：大胆使用渐变色（蓝紫渐变、橙粉渐变、青绿渐变）作为背景或强调。\n2. 字体：现代无衬线，标题可配合渐变填充效果。\n3. 布局：动态感强，使用圆角、阴影、悬浮卡片，整体年轻有活力。`
+        };
+
+        function applyStylePreset(styleKey) {
+            const preset = stylePresets[styleKey];
+            const el = document.getElementById('prompt-generate');
+            if (el) {
+                el.value = preset;
+                prompts.generate = preset;
+                // 高亮反馈
+                el.classList.add('ring-2', 'ring-yellow-400');
+                setTimeout(() => el.classList.remove('ring-2', 'ring-yellow-400'), 600);
+            }
+        }
+
+        // 步骤切换
+        function goToStep(step) {
+            currentStep = step;
+
+            // 隐藏所有步骤
+            document.getElementById('step-config').classList.add('hidden');
+            document.getElementById('step-audit').classList.add('hidden');
+            document.getElementById('step-editor').classList.add('hidden');
+
+            // 显示目标步骤
+            document.getElementById('step-' + step).classList.remove('hidden');
+
+            // 导航栏控制
+            const navbar = document.getElementById('navbar');
+            if (step === 'editor') {
+                navbar.classList.add('hidden');
+            } else {
+                navbar.classList.remove('hidden');
+            }
+
+            // 滚动到顶部
+            window.scrollTo(0, 0);
+        }
+    </script>
+</body>
+</html>

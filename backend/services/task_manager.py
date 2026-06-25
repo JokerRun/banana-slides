@@ -11,7 +11,7 @@ from typing import Callable, List, Dict, Any, Optional
 from datetime import datetime
 from sqlalchemy import func
 from PIL import Image
-from models import db, Task, Page, Material, PageImageVersion
+from models import db, Task, Page, Material, PageImageVersion, Project
 from utils import get_filtered_pages
 from utils.image_utils import check_image_resolution
 from pathlib import Path
@@ -270,7 +270,6 @@ def generate_descriptions_task(task_id: str, project_id: str, ai_service,
                 logger.info(f"Task {task_id} COMPLETED - {completed} pages generated, {failed} failed")
             
             # Update project status
-            from models import Project
             project = Project.query.get(project_id)
             if project and failed == 0:
                 project.status = 'DESCRIPTIONS_GENERATED'
@@ -391,10 +390,22 @@ def generate_images_task(task_id: str, project_id: str, ai_service, file_service
                         
                         # 在子线程中动态获取模板路径，确保使用最新模板
                         page_ref_image_path = None
+                        style_ref_paths = []
                         if use_template:
                             page_ref_image_path = file_service.get_template_path(project_id)
+                            project_obj = Project.query.get(project_id)
+                            if project_obj:
+                                upload_folder = file_service.upload_folder
+                                for rel_path in project_obj.get_style_ref_image_paths():
+                                    abs_path = upload_folder / rel_path
+                                    if abs_path.exists() and abs_path.is_file():
+                                        style_ref_paths.append(str(abs_path))
                             # 注意：如果有风格描述，即使没有模板图片也允许生成
                             # 这个检查已经在 controller 层完成，这里不再检查
+                        if not page_ref_image_path and style_ref_paths:
+                            page_ref_image_path = style_ref_paths[0]
+                            style_ref_paths = style_ref_paths[1:]
+                        has_style_reference_image = bool(page_ref_image_path or style_ref_paths)
                         
                         # Generate image prompt
                         prompt = ai_service.generate_image_prompt(
@@ -402,7 +413,7 @@ def generate_images_task(task_id: str, project_id: str, ai_service, file_service
                             has_material_images=has_material_images,
                             extra_requirements=extra_requirements,
                             language=language,
-                            has_template=use_template
+                            has_template=has_style_reference_image
                         )
                         logger.debug(f"Generated image prompt for page {page_id}")
                         
@@ -410,7 +421,7 @@ def generate_images_task(task_id: str, project_id: str, ai_service, file_service
                         logger.info(f"🎨 Calling AI service to generate image for page {page_index}/{len(pages)}...")
                         image = ai_service.generate_image(
                             prompt, page_ref_image_path, aspect_ratio, resolution,
-                            additional_ref_images=page_additional_ref_images if page_additional_ref_images else None
+                            additional_ref_images=[*style_ref_paths, *page_additional_ref_images] if (style_ref_paths or page_additional_ref_images) else None
                         )
                         logger.info(f"✅ Image generated successfully for page {page_index}")
                         
@@ -493,7 +504,6 @@ def generate_images_task(task_id: str, project_id: str, ai_service, file_service
                 logger.info(f"Task {task_id} COMPLETED - {completed} images generated, {failed} failed")
             
             # Update project status
-            from models import Project
             project = Project.query.get(project_id)
             if project and failed == 0:
                 project.status = 'COMPLETED'
@@ -570,10 +580,22 @@ def generate_single_page_image_task(task_id: str, project_id: str, page_id: str,
             
             # Get template path if use_template
             ref_image_path = None
+            style_ref_paths = []
             if use_template:
                 ref_image_path = file_service.get_template_path(project_id)
+                project_obj = Project.query.get(project_id)
+                if project_obj:
+                    upload_folder = file_service.upload_folder
+                    for rel_path in project_obj.get_style_ref_image_paths():
+                        abs_path = upload_folder / rel_path
+                        if abs_path.exists() and abs_path.is_file():
+                            style_ref_paths.append(str(abs_path))
                 # 注意：如果有风格描述，即使没有模板图片也允许生成
                 # 这个检查已经在 controller 层完成，这里不再检查
+            if not ref_image_path and style_ref_paths:
+                ref_image_path = style_ref_paths[0]
+                style_ref_paths = style_ref_paths[1:]
+            has_style_reference_image = bool(ref_image_path or style_ref_paths)
             
             # Generate image prompt
             page_data = page.get_outline_content() or {}
@@ -585,14 +607,14 @@ def generate_single_page_image_task(task_id: str, project_id: str, page_id: str,
                 has_material_images=has_material_images,
                 extra_requirements=extra_requirements,
                 language=language,
-                has_template=use_template
+                has_template=has_style_reference_image
             )
             
             # Generate image
             logger.info(f"🎨 Generating image for page {page_id}...")
             image = ai_service.generate_image(
                 prompt, ref_image_path, aspect_ratio, resolution,
-                additional_ref_images=additional_ref_images if additional_ref_images else None
+                additional_ref_images=[*style_ref_paths, *additional_ref_images] if (style_ref_paths or additional_ref_images) else None
             )
             
             if not image:
@@ -680,7 +702,6 @@ def edit_page_image_task(task_id: str, project_id: str, page_id: str,
             trace = None
             try:
                 # Check if this is a restyle project
-                from models import Project
                 project = Project.query.get(project_id)
                 
                 if project and project.creation_type == 'restyle':
@@ -1018,7 +1039,6 @@ def export_editable_pptx_with_recursive_analysis_task(
         import os
         from datetime import datetime
         from PIL import Image
-        from models import Project
         from services.export_service import ExportService, ExportError
 
         logger.info(f"开始递归分析导出任务 {task_id} for project {project_id}")
@@ -1255,7 +1275,6 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
     with app.app_context():
         try:
             from config import get_config
-            from models import Project
             from services.prompts import get_restyle_prompt
             from services.restyle_edit_debug import (
                 build_page_artifact_path_components,

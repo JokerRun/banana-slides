@@ -113,6 +113,8 @@ export interface CreateProjectRequest {
   description_text?: string;
   template_image?: File;
   template_style?: string;
+  style_ref_images?: File[];
+  style_preset_id?: string;
 }
 
 // API响应

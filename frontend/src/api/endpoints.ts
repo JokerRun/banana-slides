@@ -62,6 +62,27 @@ export const uploadTemplate = async (
 };
 
 /**
+ * 上传项目风格参考图（生成新 PPT / restyle 共用 Project.style_ref_image_paths）
+ */
+export const uploadStyleRefs = async (
+  projectId: string,
+  styleRefs: File[] = [],
+  stylePresetId?: string
+): Promise<ApiResponse<{ style_ref_image_paths: string[]; style_ref_image_urls: string[] }>> => {
+  const formData = new FormData();
+  styleRefs.forEach(ref => formData.append('style_refs', ref));
+  if (stylePresetId) {
+    formData.append('style_preset_id', stylePresetId);
+  }
+
+  const response = await apiClient.post<ApiResponse<{ style_ref_image_paths: string[]; style_ref_image_urls: string[] }>>(
+    `/api/projects/${projectId}/style-refs`,
+    formData
+  );
+  return response.data;
+};
+
+/**
  * 获取项目列表（历史项目）
  */
 export const listProjects = async (limit?: number, offset?: number): Promise<ApiResponse<{ projects: Project[]; total: number }>> => {
