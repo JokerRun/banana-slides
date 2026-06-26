@@ -111,6 +111,8 @@ class GenAITextProvider(TextProvider):
             contents=prompt,
             config=types.GenerateContentConfig(**config_params) if config_params else None,
         )
+        logger.info(f"[GenAITextProvider.generate_text] Final generated_text:\n{response}")
+
         return _validate_response(response)
     
     @retry(

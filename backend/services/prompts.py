@@ -495,12 +495,18 @@ You can organize the content in two ways:
     }}
 ]
 
-Important rules:
-- Extract the outline structure from the description text
-- Identify page titles and key points
-- If the text has clear sections/parts, use the part-based format
-- Preserve the logical structure and organization from the original text
-- The points should be concise summaries of the main content for each page
+Page detection rules (recognize ALL of these as page delimiters, not as body text):
+- Chinese numbering: 第一页 / 第1页 / 第 1 页
+- Letter+number: P1 / P2 / p1 / Page1 / Page 1 / Slide 1 / Slide1
+- Ordered list: 1. / 1、 / ① / 1) when each top-level item is a page heading
+- A line is a page heading ONLY when it is followed by that page's content; do not treat a numbered list inside one page as multiple pages.
+
+Fidelity rules (CRITICAL — do not paraphrase):
+- titles and points must be copied VERBATIM from the description text. Do NOT rewrite, summarize, polish, or "improve" wording. If the source uses "钩子句", keep "钩子句"; do not rename it to "核心价值" or anything else.
+- points are short extracts of the page's body content, but each point must reuse the source's own phrasing. You may trim filler, but you may not change terminology, numbers, names, or quoted speech.
+- Design / layout / style / visual instructions (排版、风格、素材、版式、视觉元素、配色) are NOT body content. Do NOT put them in points. They will be handled later by another step.
+- If the page references an image (e.g. "内容可见上传的图片" / "见图" / "见上传图片" / "详见设计图" / "见附图"), preserve that reference as one explicit point in the form: "【需上传图片】<原句照抄>". Do NOT rewrite it into a fabricated description of the image content.
+- If a page has no body content in the source text, set points to [] (empty array). Do NOT invent content.
 
 Now extract the outline structure from the description text above. Return only the JSON, don't include any other text.
 {get_language_instruction(language)}
@@ -563,10 +569,16 @@ Example output format:
 Important rules:
 - Split the description text according to the outline structure
 - Each page description should match the corresponding page in the outline
-- Preserve all important content from the original text, including layout details (排版细节), style requirements (风格要求), material specifications (素材说明), and any other design requirements
-- If the user described layout, style, or materials for a page, include them in the "其他页面素材" section
-- Keep the format consistent with the example above
-- If a page in the outline doesn't have a clear description in the text, create a reasonable description based on the outline
+
+Fidelity rules (CRITICAL — do not paraphrase or invent):
+- "页面文字" must be copied VERBATIM from the original description text. Do NOT rewrite, polish, summarize, or change wording. Keep the source's exact phrasing, terminology, numbers, names, and quoted speech. Where the source uses "钩子句", output "钩子句"; do not rename it.
+- Design / layout / style / material / visual instructions (排版、风格、素材、版式、视觉元素、配色、Logo 尺寸) belong ONLY in the "其他页面素材" section. They must NEVER appear in "页面文字". Conversely, body copy must NEVER appear in "其他页面素材".
+- If a page references an image (e.g. "内容可见上传的图片" / "见图" / "见上传图片" / "详见设计图" / "见附图"), preserve that reference VERBATIM inside "页面文字" as one line in the form: "【需上传图片】<原句照抄>". Do NOT rewrite it into a fabricated description of what the image shows.
+- If a page in the outline has NO corresponding description in the original text, output only:
+  页面标题：[页面标题]
+  页面文字：
+  （原文未提供）
+  Do NOT invent or hallucinate content based on the outline title. Do NOT describe images that the user never described.
 
 Now split the description text into individual page descriptions. Return only the JSON array, don't include any other text.
 {get_language_instruction(language)}
