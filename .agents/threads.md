@@ -13,3 +13,4 @@
 | 2026-06-21 | https://ampcode.com/threads/T-019ee9fd-1bc2-76b8-9578-6be1415a8163 | Force Azure Responses image tool choice for CLIProxy restyle edits |
 | 2026-06-21 | https://ampcode.com/threads/T-019eea1a-c5ba-73c9-a92c-c04e9cabe137 | Unify image generation on OpenAI SDK backends and remove Azure provider legacy path |
 | 2026-06-24 | https://ampcode.com/threads/T-019ef890-453a-75fe-ab95-89905af5e3c2 | DDI branding refresh, new PPT workflow alignment, env rendering, and preview style-reference polish |
+| 2026-06-26 | https://ampcode.com/threads/T-019f02f3-0f23-75c5-936f-8ddca7a9dca6 | Move Home generate-mode submit button to bottom to align with Restyle layout |

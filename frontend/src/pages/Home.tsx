@@ -1160,23 +1160,6 @@ export const Home: React.FC = () => {
                   <Paperclip size={18} />
                 </button>
               }
-              toolbarRight={
-                <Button
-                  size="sm"
-                  onClick={handleSubmit}
-                  loading={isGlobalLoading}
-                  disabled={
-                    !content.trim() ||
-                    isUploadingImage ||
-                    referenceFiles.some(f => f.parse_status === 'pending' || f.parse_status === 'parsing')
-                  }
-                  className="shadow-sm dark:shadow-background-primary/30 text-xs md:text-sm px-3 md:px-4"
-                >
-                  {referenceFiles.some(f => f.parse_status === 'pending' || f.parse_status === 'parsing')
-                    ? t('home.actions.parsing')
-                    : t('common.next')}
-                </Button>
-              }
             />
           </div>
 
@@ -1360,6 +1343,23 @@ export const Home: React.FC = () => {
               </p>
             </div>
           </div>
+
+          {/* 提交按钮 - 与 Restyle 一致：放在所有风格选项最底部 */}
+          <Button
+            onClick={handleSubmit}
+            loading={isGlobalLoading}
+            disabled={
+              !content.trim() ||
+              isUploadingImage ||
+              referenceFiles.some(f => f.parse_status === 'pending' || f.parse_status === 'parsing')
+            }
+            className="w-full py-3 text-base font-semibold"
+          >
+            <Sparkles size={18} className="mr-2" />
+            {referenceFiles.some(f => f.parse_status === 'pending' || f.parse_status === 'parsing')
+              ? t('home.actions.parsing')
+              : (i18n.language?.startsWith('zh') ? '开始生成新 PPT' : 'Generate new PPT')}
+          </Button>
           </>
           )}
 
