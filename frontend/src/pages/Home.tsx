@@ -273,7 +273,7 @@ export const Home: React.FC = () => {
   const [selectedGeneratePresetId, setSelectedGeneratePresetId] = useState<string>('ddi-standard');
   const [restyleSourceFile, setRestyleSourceFile] = useState<File | null>(null);
   const [restyleStyleRefs, setRestyleStyleRefs] = useState<File[]>([]);
-  const [selectedRestylePresetId, setSelectedRestylePresetId] = useState<string>('');
+  const [selectedRestylePresetId, setSelectedRestylePresetId] = useState<string>(RESTYLE_PRESETS[0]?.id ?? '');
   const [restylePrompt, setRestylePrompt] = useState('');
   const [isApplyingRestylePreset, setIsApplyingRestylePreset] = useState(false);
   const [isRestyleSubmitting, setIsRestyleSubmitting] = useState(false);
@@ -572,7 +572,7 @@ export const Home: React.FC = () => {
     setTemplateStyle(preset.prompt);
   }, []);
 
-  const applyRestylePreset = useCallback(async (presetId: string) => {
+  const applyRestylePreset = useCallback(async (presetId: string, silent = false) => {
     setSelectedRestylePresetId(presetId);
     if (!presetId) {
       return;
@@ -591,7 +591,9 @@ export const Home: React.FC = () => {
       );
       setRestyleStyleRefs([presetStyleRef]);
       setRestylePrompt(preset.prompt);
-      show({ message: t('home.messages.restylePresetApplied'), type: 'success' });
+      if (!silent) {
+        show({ message: t('home.messages.restylePresetApplied'), type: 'success' });
+      }
     } catch (error) {
       console.error('应用 restyle 预制模板失败:', error);
       show({ message: t('home.messages.restylePresetApplyFailed'), type: 'error' });
@@ -599,6 +601,14 @@ export const Home: React.FC = () => {
       setIsApplyingRestylePreset(false);
     }
   }, [getPresetStyleRefFile, show, t]);
+
+  // 默认静默应用 DDI 预制模板（填充 prompt + 参考图），与生成模式默认 DDI 行为一致
+  useEffect(() => {
+    const defaultId = RESTYLE_PRESETS[0]?.id;
+    if (defaultId) {
+      void applyRestylePreset(defaultId, true);
+    }
+  }, [applyRestylePreset]);
 
   // === Restyle submit handler ===
   const handleRestyleSubmit = async () => {
