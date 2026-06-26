@@ -501,8 +501,21 @@ Page detection rules (recognize ALL of these as page delimiters, not as body tex
 - Ordered list: 1. / 1、 / ① / 1) when each top-level item is a page heading
 - A line is a page heading ONLY when it is followed by that page's content; do not treat a numbered list inside one page as multiple pages.
 
+Title extraction rules (CRITICAL — the delimiter prefix MUST be stripped from title):
+- The page delimiter prefix is NOT part of the title. Strip the prefix AND its trailing separator.
+- Delimiter prefixes to strip: 第一页 / 第1页 / 第 1 页 / P1 / Page 1 / Slide 1 / 1. / 1、 / 1) / ① etc.
+- Separators to strip after the prefix: ：: 、 - — and surrounding whitespace.
+- The remaining text after stripping is the title, copied verbatim.
+- If a page heading has no text after the delimiter (e.g. just "第一页："), set title to "" (empty string).
+- WRONG vs RIGHT examples:
+    source "第一页：封面"    → title "封面"    (NOT "第一页：封面")
+    source "P1：项目背景"    → title "项目背景" (NOT "P1：项目背景")
+    source "Page 1: Welcome" → title "Welcome" (NOT "Page 1: Welcome")
+    source "1. 封面"         → title "封面"    (NOT "1. 封面")
+    source "①项目背景"       → title "项目背景" (NOT "①项目背景")
+
 Fidelity rules (CRITICAL — do not paraphrase):
-- titles and points must be copied VERBATIM from the description text. Do NOT rewrite, summarize, polish, or "improve" wording. If the source uses "钩子句", keep "钩子句"; do not rename it to "核心价值" or anything else.
+- titles (after stripping the delimiter prefix) and points must be copied VERBATIM from the description text. Do NOT rewrite, summarize, polish, or "improve" wording. If the source uses "钩子句", keep "钩子句"; do not rename it to "核心价值" or anything else.
 - points are short extracts of the page's body content, but each point must reuse the source's own phrasing. You may trim filler, but you may not change terminology, numbers, names, or quoted speech.
 - Design / layout / style / visual instructions (排版、风格、素材、版式、视觉元素、配色) are NOT body content. Do NOT put them in points. They will be handled later by another step.
 - If the page references an image (e.g. "内容可见上传的图片" / "见图" / "见上传图片" / "详见设计图" / "见附图"), preserve that reference as one explicit point in the form: "【需上传图片】<原句照抄>". Do NOT rewrite it into a fabricated description of the image content.

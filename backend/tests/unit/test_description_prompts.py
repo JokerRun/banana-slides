@@ -51,6 +51,16 @@ class TestDescriptionToOutlinePrompt:
         prompt = get_description_to_outline_prompt(_ctx("第一页：A"))
         assert "empty array" in prompt or "[]" in prompt
 
+    def test_title_strips_delimiter_prefix(self):
+        prompt = get_description_to_outline_prompt(_ctx("第一页：封面"))
+        # 必须明确要求剥离前缀，并给出 WRONG/RIGHT 对照
+        assert "第一页：封面" in prompt
+        assert "title \"封面\"" in prompt
+        assert "NOT \"第一页：封面\"" in prompt
+        # 覆盖多种 delimiter 形式的剥离示例
+        for src in ["P1：项目背景", "Page 1: Welcome", "1. 封面", "①项目背景"]:
+            assert src in prompt
+
 
 class TestDescriptionSplitPrompt:
     def test_contains_verbatim_fidelity_rule(self):
