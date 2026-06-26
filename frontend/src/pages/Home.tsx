@@ -608,7 +608,9 @@ export const Home: React.FC = () => {
     if (defaultId) {
       void applyRestylePreset(defaultId, true);
     }
-  }, [applyRestylePreset]);
+    // 仅在 mount 时应用一次默认模板，避免依赖 show/t 引用变化导致重复触发
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // === Restyle submit handler ===
   const handleRestyleSubmit = async () => {
