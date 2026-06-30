@@ -271,11 +271,11 @@ class TestImageRefNormalization:
     def test_preserves_non_image_markdown(self):
         from services.ai_service import AIService
 
-        text = '链接：[点击这里](http://example.com) 和 ![图片](/files/img.png)'
+        text = "链接：[点击这里](http://example.com) 和 ![图片](/files/img.png)"
         normalized, refs = AIService.normalize_markdown_image_references(text)
 
         # 普通链接应该保持不变
-        assert '[点击这里](http://example.com)' in normalized
+        assert "[点击这里](http://example.com)" in normalized
         # 图片应该被转换
         assert '[IMAGE_REF:image_1 alt="图片"]' in normalized
         assert len(refs) == 1
@@ -283,11 +283,11 @@ class TestImageRefNormalization:
     def test_skips_unsupported_urls(self):
         from services.ai_service import AIService
 
-        text = '![内部链接](ftp://server.com/image.png) 和 ![图片](/files/img.png)'
+        text = "![内部链接](ftp://server.com/image.png) 和 ![图片](/files/img.png)"
         normalized, refs = AIService.normalize_markdown_image_references(text)
 
         # 不支持的 URL 应该保持不变
-        assert '![内部链接](ftp://server.com/image.png)' in normalized
+        assert "![内部链接](ftp://server.com/image.png)" in normalized
         # 支持的 URL 应该被转换
         assert '[IMAGE_REF:image_1 alt="图片"]' in normalized
         assert len(refs) == 1
@@ -307,7 +307,12 @@ class TestImageGenerationPromptWithImageRefs:
 
     def test_includes_image_ref_manifest_when_refs_provided(self):
         image_refs = [
-            {"id": "image_1", "alt": "公司Logo", "url": "/files/logo.png", "source_index": 1}
+            {
+                "id": "image_1",
+                "alt": "公司Logo",
+                "url": "/files/logo.png",
+                "source_index": 1,
+            }
         ]
         prompt = get_image_generation_prompt(
             page_desc='页面文字：\n- 我们的Logo：[IMAGE_REF:image_1 alt="公司Logo"]',
@@ -321,7 +326,7 @@ class TestImageGenerationPromptWithImageRefs:
         assert "caption: 公司Logo" in prompt
         assert "source: /files/logo.png" in prompt
         assert "attached_as_reference_image: true" in prompt
-        assert "[IMAGE_REF:image_1 alt=\"公司Logo\"]" in prompt
+        assert '[IMAGE_REF:image_1 alt="公司Logo"]' in prompt
 
     def test_omits_manifest_when_no_refs(self):
         prompt = get_image_generation_prompt(
@@ -335,12 +340,22 @@ class TestImageGenerationPromptWithImageRefs:
 
     def test_multiple_image_refs_in_manifest(self):
         image_refs = [
-            {"id": "image_1", "alt": "封面", "url": "/files/cover.png", "source_index": 1},
-            {"id": "image_2", "alt": "图表", "url": "https://example.com/chart.jpg", "source_index": 2},
+            {
+                "id": "image_1",
+                "alt": "封面",
+                "url": "/files/cover.png",
+                "source_index": 1,
+            },
+            {
+                "id": "image_2",
+                "alt": "图表",
+                "url": "https://example.com/chart.jpg",
+                "source_index": 2,
+            },
         ]
         prompt = get_image_generation_prompt(
             page_desc=(
-                '页面文字：\n'
+                "页面文字：\n"
                 '- [IMAGE_REF:image_1 alt="封面"]\n'
                 '- [IMAGE_REF:image_2 alt="图表"]'
             ),

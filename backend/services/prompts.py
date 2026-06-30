@@ -368,22 +368,28 @@ def get_image_generation_prompt(
     image_ref_manifest = ""
     if image_refs:
         manifest_lines = ["\n\n# Image Reference Manifest:"]
-        manifest_lines.append("The following user-provided images are attached as reference images. "
-                              "Use them according to the IMAGE_REF markers in the page text.")
+        manifest_lines.append(
+            "The following user-provided images are attached as reference images. "
+            "Use them according to the IMAGE_REF markers in the page text."
+        )
         manifest_lines.append("")
         for ref in image_refs:
             manifest_lines.append(f"- {ref['id']}")
             manifest_lines.append(f'  caption: {ref.get("alt", "user provided image")}')
             manifest_lines.append(f'  source: {ref.get("url", "")}')
-            manifest_lines.append(f'  attached_as_reference_image: true')
-            manifest_lines.append(f'  usage: Use this attached reference image at the semantic location '
-                                  f'of the [IMAGE_REF:{ref["id"]}] marker in the page text.')
+            manifest_lines.append(f"  attached_as_reference_image: true")
+            manifest_lines.append(
+                f"  usage: Use this attached reference image at the semantic location "
+                f'of the [IMAGE_REF:{ref["id"]}] marker in the page text.'
+            )
             manifest_lines.append("")
-        manifest_lines.append("Important: IMAGE_REF markers in the page text correspond to attached "
-                              "reference images. Place each image at its marker's semantic location. "
-                              "Preserve the image subject/identity; do not replace with unrelated "
-                              "generated imagery. The image data is already attached; do not attempt "
-                              "to fetch from the source URL.")
+        manifest_lines.append(
+            "Important: IMAGE_REF markers in the page text correspond to attached "
+            "reference images. Place each image at its marker's semantic location. "
+            "Preserve the image subject/identity; do not replace with unrelated "
+            "generated imagery. The image data is already attached; do not attempt "
+            "to fetch from the source URL."
+        )
         image_ref_manifest = "\n".join(manifest_lines)
 
     # 添加额外要求到提示词
