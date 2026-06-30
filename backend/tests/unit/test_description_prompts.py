@@ -13,6 +13,7 @@ from services.ai_service import ProjectContext
 from services.prompts import (
     get_description_to_outline_prompt,
     get_description_split_prompt,
+    get_page_description_prompt,
 )
 
 
@@ -91,3 +92,56 @@ class TestDescriptionSplitPrompt:
         assert "create a reasonable description" not in prompt
         assert "（原文未提供）" in prompt
         assert "hallucinate" in prompt
+
+    def test_requires_ascii_layout_recommendation_without_changing_user_constraints(self):
+        prompt = get_description_split_prompt(
+            _ctx("第一页：A\n配色：black and gold\n模板：investor report"),
+            [{"title": "A", "points": []}],
+            language="en",
+        )
+
+        assert "ASCII Diagram" in prompt
+        assert "Layout Recommendation" in prompt
+        for region in [
+            "title area",
+            "visual area",
+            "key message area",
+            "bullet list",
+            "chart/image area",
+        ]:
+            assert region in prompt
+        assert "must not modify user-provided content" in prompt
+        assert "must not modify user-provided color scheme" in prompt
+        assert "must not modify user-provided base template constraints" in prompt
+
+
+class TestPageDescriptionPrompt:
+    def test_requires_ascii_layout_recommendation_without_changing_user_constraints(self):
+        ctx = ProjectContext(
+            {
+                "creation_type": "outline",
+                "outline_text": "Color scheme: black and gold\nBase template: investor report",
+            },
+            [],
+        )
+        prompt = get_page_description_prompt(
+            project_context=ctx,
+            outline=[{"title": "Market Growth", "points": ["Revenue up 30%"]}],
+            page_outline={"title": "Market Growth", "points": ["Revenue up 30%"]},
+            page_index=2,
+            language="en",
+        )
+
+        assert "ASCII Diagram" in prompt
+        assert "Layout Recommendation" in prompt
+        for region in [
+            "title area",
+            "visual area",
+            "key message area",
+            "bullet list",
+            "chart/image area",
+        ]:
+            assert region in prompt
+        assert "must not modify user-provided content" in prompt
+        assert "must not modify user-provided color scheme" in prompt
+        assert "must not modify user-provided base template constraints" in prompt

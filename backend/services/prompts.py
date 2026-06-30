@@ -280,6 +280,12 @@ def get_page_description_prompt(
 4. 确保内容可读性强，适合在演示时展示
 5. 不要包含任何额外的说明性文字或注释
 
+【硬性约束】请同时遵守：
+- must not modify user-provided content：不得改写、删减、替换或新增用户提供的事实、术语、数字、标题和要点
+- must not modify user-provided color scheme：不得改变用户提供的配色方案
+- must not modify user-provided base template constraints：不得改变用户提供的基础模板约束
+- 仅基于当前页内容、完整大纲和上下文分析最合适的版式
+
 输出格式示例：
 页面标题：原始社会：与自然共生
 {"副标题：人类祖先和自然的相处之道" if page_index == 1 else ""}
@@ -289,6 +295,15 @@ def get_page_description_prompt(
 - 依赖性强：生活完全依赖自然资源的直接供给
 - 适应而非改造：通过观察学习自然，发展生存技能
 - 影响特点：局部、短期、低强度，生态可自我恢复
+
+布局建议（Layout Recommendation - ASCII Diagram）：
++--------------------------------------------------+
+| title area                                       |
++---------------------------+----------------------+
+| key message area          | visual area          |
+| bullet list               | chart/image area     |
++---------------------------+----------------------+
+说明：用 ASCII Diagram 表达页面区域、层级和内容映射，可按内容选择标题区、主视觉区、关键结论区、要点列表、图表/图片区、对比区、流程区等结构。
 
 其他页面素材（如果文件中存在请积极添加，包括markdown图片链接、公式、表格等）
 
@@ -570,11 +585,19 @@ Each element should be a string containing the page description in the following
 - [要点2]
 ...
 
+布局建议（Layout Recommendation - ASCII Diagram）：
++--------------------------------------------------+
+| title area                                       |
++---------------------------+----------------------+
+| key message area          | visual area          |
+| bullet list               | chart/image area     |
++---------------------------+----------------------+
+
 其他页面素材（如果有排版、风格、素材等细节）
 
 Example output format:
 [
-    "页面标题：人工智能的诞生\\n页面文字：\\n- 1950 年，图灵提出"图灵测试"\\n- 奠定了AI的理论基础\\n\\n其他页面素材：\\n排版：标题居中，大字号\\n风格：科技感蓝色背景",
+    "页面标题：人工智能的诞生\\n页面文字：\\n- 1950 年，图灵提出"图灵测试"\\n- 奠定了AI的理论基础\\n\\n布局建议（Layout Recommendation - ASCII Diagram）：\\n+----------------------+----------------------+\\n| title area           | key message area     |\\n+----------------------+----------------------+\\n| visual area          | bullet list          |\\n| chart/image area     | bullet list          |\\n+----------------------+----------------------+\\n\\n其他页面素材：\\n排版：标题居中，大字号\\n风格：科技感蓝色背景",
     "页面标题：AI 的发展历程\\n页面文字：\\n- 1950年代：符号主义...",
     ...
 ]
@@ -585,12 +608,20 @@ Important rules:
 
 Fidelity rules (CRITICAL — do not paraphrase or invent):
 - "页面文字" must be copied VERBATIM from the original description text. Do NOT rewrite, polish, summarize, or change wording. Keep the source's exact phrasing, terminology, numbers, names, and quoted speech. Where the source uses "钩子句", output "钩子句"; do not rename it.
-- Design / layout / style / material / visual instructions (排版、风格、素材、版式、视觉元素、配色、Logo 尺寸) belong ONLY in the "其他页面素材" section. They must NEVER appear in "页面文字". Conversely, body copy must NEVER appear in "其他页面素材".
+- must not modify user-provided content: preserve user-provided facts, terms, numbers, titles, and bullet text; do not rewrite, delete, replace, or add body content.
+- must not modify user-provided color scheme: preserve any user-provided color scheme exactly.
+- must not modify user-provided base template constraints: preserve any user-provided base template constraints exactly.
+- Design / style / material / visual instructions (排版、风格、素材、视觉元素、配色、Logo 尺寸) belong ONLY in the "其他页面素材" section. They must NEVER appear in "页面文字". Conversely, body copy must NEVER appear in "其他页面素材".
+- Layout instructions must be expressed in the separate "布局建议（Layout Recommendation - ASCII Diagram）" section. Analyze the page content and context, then recommend a layout using ASCII Diagram boxes/regions such as title area, visual area, key message area, bullet list, and chart/image area. Do NOT change the preserved user content, color scheme, or base template constraints while creating this recommendation.
 - If a page references an image (e.g. "内容可见上传的图片" / "见图" / "见上传图片" / "详见设计图" / "见附图"), preserve that reference VERBATIM inside "页面文字" as one line in the form: "【需上传图片】<原句照抄>". Do NOT rewrite it into a fabricated description of what the image shows.
-- If a page in the outline has NO corresponding description in the original text, output only:
+- If a page in the outline has NO corresponding description in the original text, output only the unavailable-content marker plus a minimal title-only layout:
   页面标题：[页面标题]
   页面文字：
   （原文未提供）
+  布局建议（Layout Recommendation - ASCII Diagram）：
+  +--------------------------------------------------+
+  | title area                                       |
+  +--------------------------------------------------+
   Do NOT invent or hallucinate content based on the outline title. Do NOT describe images that the user never described.
 
 Now split the description text into individual page descriptions. Return only the JSON array, don't include any other text.
