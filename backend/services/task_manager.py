@@ -1712,3 +1712,235 @@ def restyle_images_task(task_id: str, project_id: str, ai_service, file_service,
                 path_components=build_task_artifact_path_components(),
                 error=True,
             )
+
+
+def translate_images_task(task_id: str, project_id: str, ai_service, file_service,
+                          page_ids: list = None, max_workers: int = 4,
+                          aspect_ratio: str = "16:9", resolution: str = "2K",
+                          target_language: str = "English",
+                          translate_mode: str = "pure",
+                          app=None):
+    """
+    Background task for translate — 逐页翻译
+
+    将原始slide图片 → Gemini Image-to-Image → 翻译后的slide
+    支持两种模式：
+    - pure: 纯翻译模式，只翻译文本，保持原风格和布局
+    - restyle: 翻译+风格转换模式，翻译文本并应用新风格
+
+    Args:
+        task_id: Task ID
+        project_id: Project ID
+        ai_service: AI service instance
+        file_service: File service instance
+        page_ids: Optional list of page IDs to translate (default: all)
+        max_workers: Max parallel workers
+        aspect_ratio: Output aspect ratio
+        resolution: Output resolution
+        target_language: Target language for translation
+        translate_mode: 'pure' or 'restyle'
+        app: Flask app instance
+    """
+    if app is None:
+        raise ValueError("Flask app instance must be provided")
+
+    with app.app_context():
+        try:
+            from services.prompts import get_translate_prompt
+            from config import get_config
+
+            config = get_config()
+
+            # Update task status
+            task = Task.query.get(task_id)
+            if not task:
+                return
+            task.status = 'PROCESSING'
+            db.session.commit()
+
+            # Get project
+            project = Project.query.get(project_id)
+            if not project:
+                raise ValueError(f"Project {project_id} not found")
+
+            # Get pages
+            pages = get_filtered_pages(project_id, page_ids)
+            if not pages:
+                raise ValueError("No pages found for project")
+
+            total_pages = len(pages)
+
+            # Get style ref images (only for restyle mode)
+            style_ref_paths = project.get_style_ref_image_paths() if translate_mode == 'restyle' else []
+            translate_prompt = project.restyle_prompt or ""
+
+            logger.info(f"🚀 Translate task started: project={project_id}, pages={total_pages}, "
+                        f"mode={translate_mode}, lang={target_language}, "
+                        f"style_refs={len(style_ref_paths)}, prompt={'yes' if translate_prompt else 'no'}")
+
+            # Initialize progress
+            task.set_progress({
+                "total": total_pages,
+                "completed": 0,
+                "failed": 0
+            })
+            db.session.commit()
+
+            completed = 0
+            failed = 0
+
+            # Load style ref images as PIL Images (only for restyle mode)
+            style_ref_images = []
+            if translate_mode == 'restyle' and style_ref_paths:
+                for ref_path in style_ref_paths:
+                    abs_path = file_service.get_absolute_path(ref_path)
+                    if os.path.exists(abs_path):
+                        img = Image.open(abs_path)
+                        img.load()  # Force decode into memory
+                        style_ref_images.append(img)
+                        logger.info(f"🖼️  Style ref loaded: {ref_path} ({img.size[0]}x{img.size[1]})")
+                    else:
+                        logger.warning(f"⚠️  Style ref not found: {abs_path}")
+
+            def translate_single_page(page_id, page_index):
+                """Translate a single page"""
+                with app.app_context():
+                    try:
+                        from services.ai_service_manager import get_ai_service
+                        ai_svc = get_ai_service()
+
+                        page_obj = Page.query.get(page_id)
+                        if not page_obj:
+                            raise ValueError(f"Page {page_id} not found")
+
+                        page_obj.status = 'GENERATING'
+                        db.session.commit()
+
+                        # Get original slide image
+                        if not page_obj.original_slide_image_path:
+                            raise ValueError(f"Page {page_id} has no original slide image")
+
+                        original_path = file_service.get_absolute_path(page_obj.original_slide_image_path)
+                        if not os.path.exists(original_path):
+                            raise ValueError(f"Original slide image not found: {original_path}")
+
+                        original_image = Image.open(original_path)
+                        original_image.load()  # Force decode into memory
+
+                        # Build prompt
+                        prompt = get_translate_prompt(
+                            page_index=page_index,
+                            total_pages=total_pages,
+                            target_language=target_language,
+                            num_style_refs=len(style_ref_images),
+                            custom_prompt=translate_prompt
+                        )
+
+                        # Build ref_images: original slide first, then style refs (if restyle mode)
+                        ref_images = [original_image]
+                        if style_ref_images:
+                            ref_images.extend(style_ref_images)
+
+                        # Generate translated image
+                        thinking_level = ai_svc._get_image_thinking_level()
+                        logger.info(f"🎨 Translating page {page_index}/{total_pages} (page_id={page_id}): "
+                                    f"original={original_path}, mode={translate_mode}, "
+                                    f"lang={target_language}, thinking={thinking_level}")
+
+                        t0 = time.time()
+                        image = ai_svc.image_provider.generate_image(
+                            prompt=prompt,
+                            ref_images=ref_images,
+                            aspect_ratio=aspect_ratio,
+                            resolution=resolution,
+                            thinking_level=thinking_level
+                        )
+                        elapsed = time.time() - t0
+
+                        if not image:
+                            raise ValueError("Failed to generate translated image")
+
+                        # Save with version management
+                        image_path, version = save_image_with_version(
+                            image, project_id, page_id, file_service, page_obj=page_obj
+                        )
+
+                        logger.info(f"✅ Translate page {page_index}/{total_pages} completed in {elapsed:.1f}s → {image_path}")
+                        return {
+                            'page_id': page_id,
+                            'page_order_index': page_obj.order_index + 1,
+                            'image_path': image_path,
+                            'version_number': version,
+                            'error': None,
+                        }
+
+                    except Exception as e:
+                        import traceback
+                        logger.error(f"Failed to translate page {page_id}: {traceback.format_exc()}")
+                        return {
+                            'page_id': page_id,
+                            'page_order_index': page_obj.order_index + 1 if page_obj else page_index,
+                            'image_path': None,
+                            'version_number': None,
+                            'error': str(e),
+                        }
+
+            # Parallel execution
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = [
+                    executor.submit(translate_single_page, page.id, i)
+                    for i, page in enumerate(pages, 1)
+                ]
+
+                for future in as_completed(futures):
+                    page_result = future.result()
+                    page_id = page_result['page_id']
+                    error = page_result['error']
+
+                    db.session.expire_all()
+                    page = Page.query.get(page_id)
+                    if page:
+                        if error:
+                            page.status = 'FAILED'
+                            failed += 1
+                            db.session.commit()
+                        else:
+                            completed += 1
+                            db.session.refresh(page)
+
+                    # Update task progress
+                    task = Task.query.get(task_id)
+                    if task:
+                        task.update_progress(completed=completed, failed=failed)
+                        db.session.commit()
+                        logger.info(f"📊 Translate progress: {completed}/{total_pages} completed, {failed} failed")
+
+            # Mark task as completed
+            task = Task.query.get(task_id)
+            if task:
+                all_pages_failed = failed == total_pages and total_pages > 0
+                task_status = 'FAILED' if all_pages_failed else 'COMPLETED'
+                task_error_message = None
+                if all_pages_failed:
+                    task_error_message = f'{failed}/{total_pages} pages failed during translation'
+
+                task.status = task_status
+                task.error_message = task_error_message
+                task.completed_at = datetime.utcnow()
+                db.session.commit()
+                logger.info(f"🏁 Translate task {task_id} {task_status} - {completed}/{total_pages} pages translated, {failed} failed")
+
+            # Update project status
+            project = Project.query.get(project_id)
+            if project and failed == 0:
+                project.status = 'COMPLETED'
+                db.session.commit()
+
+        except Exception as e:
+            task = Task.query.get(task_id)
+            if task:
+                task.status = 'FAILED'
+                task.error_message = str(e)
+                task.completed_at = datetime.utcnow()
+                db.session.commit()
+            logger.error(f"Translate task {task_id} failed: {str(e)}", exc_info=True)

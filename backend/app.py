@@ -26,6 +26,7 @@ from config import Config
 from controllers.material_controller import material_bp, material_global_bp
 from controllers.reference_file_controller import reference_file_bp
 from controllers.settings_controller import settings_bp
+from controllers.translate_controller import translate_bp
 from controllers import project_bp, page_bp, template_bp, user_template_bp, export_bp, file_bp, restyle_bp, auth_bp, task_bp
 
 
@@ -128,6 +129,7 @@ def create_app():
     app.register_blueprint(reference_file_bp, url_prefix='/api/reference-files')
     app.register_blueprint(settings_bp)
     app.register_blueprint(restyle_bp)
+    app.register_blueprint(translate_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(task_bp)
 

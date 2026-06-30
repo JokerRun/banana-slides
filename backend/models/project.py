@@ -19,14 +19,17 @@ class Project(db.Model):
     outline_text = db.Column(db.Text, nullable=True)  # 用户输入的大纲文本（用于outline类型）
     description_text = db.Column(db.Text, nullable=True)  # 用户输入的描述文本（用于description类型）
     extra_requirements = db.Column(db.Text, nullable=True)  # 额外要求，应用到每个页面的AI提示词
-    creation_type = db.Column(db.String(20), nullable=False, default='idea')  # idea|outline|descriptions|restyle
+    creation_type = db.Column(db.String(20), nullable=False, default='idea')  # idea|outline|descriptions|restyle|translate
     template_image_path = db.Column(db.String(500), nullable=True)
     template_style = db.Column(db.Text, nullable=True)  # 风格描述文本（无模板图模式）
-    # Restyle 模式专用字段
+    # Restyle/Translate 模式专用字段
     source_file_path = db.Column(db.String(500), nullable=True)  # 上传的原始PPT/PDF路径
     style_ref_image_paths = db.Column(db.Text, nullable=True)  # JSON: 风格参考图路径列表
     brand_guidelines = db.Column(db.Text, nullable=True)  # 品牌风格规范文本
-    restyle_prompt = db.Column(db.Text, nullable=True)  # Restyle 自定义提示词
+    restyle_prompt = db.Column(db.Text, nullable=True)  # Restyle/Translate 自定义提示词
+    # Translate 模式专用字段
+    translate_mode = db.Column(db.String(20), nullable=True)  # 'pure' | 'restyle'
+    target_language = db.Column(db.String(50), nullable=True)  # 翻译目标语言
     # 导出设置
     export_extractor_method = db.Column(db.String(50), nullable=True, default='hybrid')  # 组件提取方法: mineru, hybrid
     export_inpaint_method = db.Column(db.String(50), nullable=True, default='hybrid')  # 背景图获取方法: generative, baidu, hybrid
@@ -89,6 +92,8 @@ class Project(db.Model):
             'style_ref_image_urls': [f'/files/{path}' for path in self.get_style_ref_image_paths()],
             'brand_guidelines': self.brand_guidelines,
             'restyle_prompt': self.restyle_prompt,
+            'translate_mode': self.translate_mode,
+            'target_language': self.target_language,
             'status': self.status,
             'created_at': created_at_str,
             'updated_at': updated_at_str,
