@@ -61,6 +61,8 @@ interface ProjectState {
 }
 
 export const useProjectStore = create<ProjectState>((set, get) => {
+  const getProjectId = (project: Project): string => project.id || project.project_id;
+
   // 防抖的API更新函数（在store内部定义，以便访问syncProject）
 const debouncedUpdatePage = debounce(
   async (projectId: string, pageId: string, data: any) => {
@@ -297,7 +299,7 @@ const debouncedUpdatePage = debounce(
     });
 
     // 防抖后调用API
-    debouncedUpdatePage(currentProject.id, pageId, data);
+    debouncedUpdatePage(getProjectId(currentProject), pageId, data);
   },
 
   // 立即保存所有页面的更改（用于保存按钮）
@@ -310,7 +312,7 @@ const debouncedUpdatePage = debounce(
     await new Promise(resolve => setTimeout(resolve, 1500));
     
     // 同步项目状态，这会从后端获取最新的updated_at
-    await get().syncProject(currentProject.id);
+    await get().syncProject(getProjectId(currentProject));
   },
 
   // 重新排序页面
@@ -331,7 +333,7 @@ const debouncedUpdatePage = debounce(
     });
 
     try {
-      await api.updatePagesOrder(currentProject.id, newOrder);
+      await api.updatePagesOrder(getProjectId(currentProject), newOrder);
     } catch (error: any) {
       set({ error: error.message || '更新顺序失败' });
       // 失败后重新同步
@@ -350,7 +352,7 @@ const debouncedUpdatePage = debounce(
         order_index: currentProject.pages.length,
       };
 
-      const response = await api.addPage(currentProject.id, newPage);
+      const response = await api.addPage(getProjectId(currentProject), newPage);
       if (response.data) {
         await get().syncProject();
       }
@@ -365,7 +367,7 @@ const debouncedUpdatePage = debounce(
     if (!currentProject) return;
 
     try {
-      await api.deletePage(currentProject.id, pageId);
+      await api.deletePage(getProjectId(currentProject), pageId);
       await get().syncProject();
     } catch (error: any) {
       set({ error: error.message || '删除页面失败' });
@@ -693,7 +695,7 @@ const debouncedUpdatePage = debounce(
 
     try {
       // 传递 force_regenerate=true 以允许重新生成已有描述
-      const response = await api.generatePageDescription(currentProject.id, pageId, true);
+      const response = await api.generatePageDescription(getProjectId(currentProject), pageId, true);
 
       // 使用 API 返回的页面数据直接更新 store（避免额外的同步请求）
       if (response.data) {
@@ -923,7 +925,7 @@ const debouncedUpdatePage = debounce(
 
     set({ error: null });
     try {
-      const response = await api.editPageImage(currentProject.id, pageId, editPrompt, contextImages);
+      const response = await api.editPageImage(getProjectId(currentProject), pageId, editPrompt, contextImages);
       const taskId = response.data?.task_id;
       
       if (taskId) {
@@ -958,7 +960,7 @@ const debouncedUpdatePage = debounce(
 
     set({ isGlobalLoading: true, error: null });
     try {
-      const response = await api.exportPPTX(currentProject.id, pageIds);
+      const response = await api.exportPPTX(getProjectId(currentProject), pageIds);
       // 优先使用相对路径，避免 Docker 环境下的端口问题
       const downloadUrl =
         response.data?.download_url || response.data?.download_url_absolute;
@@ -983,7 +985,7 @@ const debouncedUpdatePage = debounce(
 
     set({ isGlobalLoading: true, error: null });
     try {
-      const response = await api.exportPDF(currentProject.id, pageIds);
+      const response = await api.exportPDF(getProjectId(currentProject), pageIds);
       // 优先使用相对路径，避免 Docker 环境下的端口问题
       const downloadUrl =
         response.data?.download_url || response.data?.download_url_absolute;
@@ -1009,7 +1011,7 @@ const debouncedUpdatePage = debounce(
     try {
       console.log('[导出可编辑PPTX] 启动异步导出任务...');
       // startAsyncTask 中的 pollTask 会在任务完成时自动处理下载
-      await startAsyncTask(() => api.exportEditablePPTX(currentProject.id, filename, pageIds));
+      await startAsyncTask(() => api.exportEditablePPTX(getProjectId(currentProject), filename, pageIds));
       console.log('[导出可编辑PPTX] 异步任务完成');
     } catch (error: any) {
       console.error('[导出可编辑PPTX] 导出失败:', error);

@@ -1440,15 +1440,21 @@ def get_translate_prompt(
     # Build image role labels
     image_labels = []
     image_num = 1
-    image_labels.append(f"IMAGE {image_num}: Original PPT slide (content source to translate)")
+    image_labels.append(
+        f"IMAGE {image_num}: Original PPT slide (content source to translate)"
+    )
 
     if num_style_refs > 0:
         for i in range(1, num_style_refs + 1):
             image_num += 1
             if num_style_refs == 1:
-                image_labels.append(f"IMAGE {image_num}: Style reference (target style template)")
+                image_labels.append(
+                    f"IMAGE {image_num}: Style reference (target style template)"
+                )
             else:
-                image_labels.append(f"IMAGE {image_num}: Style reference #{i} (target style template)")
+                image_labels.append(
+                    f"IMAGE {image_num}: Style reference #{i} (target style template)"
+                )
 
     image_section = "\n".join(image_labels)
 

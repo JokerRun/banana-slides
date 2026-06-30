@@ -64,7 +64,7 @@ export function useT<T extends Translations>(translations: T) {
 
   // 兼容 react-i18next 的多种调用方式：
   // t('key') / t('key', '默认值') / t('key', { param: value })
-  return (key: string, defaultOrParams?: string | Record<string, string | number>): string => {
+  return (key: string, defaultOrParams?: string | Record<string, string | number | boolean>): string => {
     // 解析第二个参数
     const params = typeof defaultOrParams === 'object' ? defaultOrParams : undefined;
     
@@ -83,6 +83,6 @@ export function useT<T extends Translations>(translations: T) {
     }
     
     // 组件内没找到，fallback 到全局翻译（保持原始参数传递）
-    return globalT(key, defaultOrParams as any);
+    return String(globalT(key, defaultOrParams as any));
   };
 }
