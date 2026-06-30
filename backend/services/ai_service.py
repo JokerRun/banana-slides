@@ -159,35 +159,6 @@ class AIService:
         return urls
     
     @staticmethod
-    def remove_markdown_images(text: str) -> str:
-        """
-        从文本中移除 Markdown 图片链接，只保留 alt text（描述文字）
-        
-        Args:
-            text: 包含 Markdown 图片语法的文本
-            
-        Returns:
-            移除图片链接后的文本，保留描述文字
-        """
-        if not text:
-            return text
-        
-        # 将 ![描述文字](url) 替换为 描述文字
-        # 如果没有描述文字（空的 alt text），则完全删除该图片链接
-        def replace_image(match):
-            alt_text = match.group(1).strip()
-            # 如果有描述文字，保留它；否则删除整个链接
-            return alt_text if alt_text else ''
-        
-        pattern = r'!\[(.*?)\]\([^\)]+\)'
-        cleaned_text = re.sub(pattern, replace_image, text)
-        
-        # 清理可能产生的多余空行
-        cleaned_text = re.sub(r'\n\s*\n\s*\n', '\n\n', cleaned_text)
-        
-        return cleaned_text
-
-    @staticmethod
     def _is_supported_image_url(url: str) -> bool:
         """
         检查 URL 是否为支持的图片 URL

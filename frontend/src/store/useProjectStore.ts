@@ -60,8 +60,9 @@ interface ProjectState {
   exportEditablePPTX: (filename?: string, pageIds?: string[]) => Promise<void>;
 }
 
+const getProjectId = (project: Project): string => project.id || project.project_id;
+
 export const useProjectStore = create<ProjectState>((set, get) => {
-  const getProjectId = (project: Project): string => project.id || project.project_id;
 
   // 防抖的API更新函数（在store内部定义，以便访问syncProject）
 const debouncedUpdatePage = debounce(
