@@ -19,4 +19,4 @@
 - Error handling：backend 优先复用 `success_response` / `error_response` helpers，并记录带上下文的异常日志；frontend 依赖 axios interceptors、store 层错误归一化、以及 toast-friendly 用户提示。
 - Formatting/types：保持现有风格，不做无关重排；frontend ESLint 允许 `_ignored` 形式的 unused params，`any` 仅在难以避免时使用；backend 没有强制 formatter，改动应尽量小且贴合上下文。
 - Auth/config：frontend 使用相对 API URL 且启用 `withCredentials`；不要重新引入 `VITE_API_BASE_URL`；运行时配置主要来自 `.env` / Docker，少量 settings/OAuth 字段会持久化到 DB。
-- Rule files：生成本文件时，仓库内未发现 repo-local `AGENT.md`、Cursor、Claude、Windsurf、Cline、Goose 或 Copilot instruction files。
+- Rule files：仓库内 `CLAUDE.md` 指向 `AGENTS.md`；未发现 repo-local `AGENT.md`、Cursor、Windsurf、Cline、Goose 或 Copilot instruction files。

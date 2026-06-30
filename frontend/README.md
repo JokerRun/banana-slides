@@ -93,6 +93,7 @@ src/
 - 批量生成页面描述
 - 编辑单页描述
 - 网格展示所有页面
+- 页面描述可包含 `布局建议（Layout Recommendation - ASCII Diagram）`，用于指导后续图片排版，不作为页面正文渲染
 
 ### 4. 预览页 (/project/:id/preview)
 - 查看生成的图片
@@ -135,4 +136,3 @@ python app.py
 - Firefox
 - Safari
 - Edge
-

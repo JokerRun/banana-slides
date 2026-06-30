@@ -239,7 +239,10 @@ def get_page_description_prompt(
     language: str = None,
 ) -> str:
     """
-    生成单个页面描述的 prompt
+    生成单个页面描述的 prompt。
+
+    输出要求包含页面标题、页面文字、ASCII Diagram 版式建议和其他页面素材；
+    版式建议用于后续图片生成，不应作为幻灯片正文渲染。
 
     Args:
         project_context: 项目上下文对象，包含所有原始信息
@@ -328,7 +331,10 @@ def get_image_generation_prompt(
     page_index: int = 1,
 ) -> str:
     """
-    生成图片生成 prompt
+    生成图片生成 prompt。
+
+    如果页面描述包含 ASCII Diagram 版式建议，该区块只作为 layout-only
+    instruction，不能渲染为页面文字或可见 ASCII 边框。
 
     Args:
         page_desc: 页面描述文本
@@ -553,7 +559,10 @@ def get_description_split_prompt(
     project_context: "ProjectContext", outline: List[Dict], language: str = None
 ) -> str:
     """
-    从描述文本切分出每页描述的 prompt
+    从描述文本切分出每页描述的 prompt。
+
+    每页输出应保留用户正文、配色和基础模板约束，并单独生成 ASCII
+    Diagram 版式建议供图片生成步骤使用。
 
     Args:
         project_context: 项目上下文对象，包含所有原始信息

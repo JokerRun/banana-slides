@@ -142,9 +142,11 @@ uv run python app.py
 
 基于 Google Gemini API，支持：
 - 自动生成PPT大纲
-- 并行生成页面描述
+- 并行生成页面描述，并在描述中附带 ASCII Diagram 版式建议
 - 根据参考模板生成图片
 - 自然语言编辑图片
+
+页面描述中的 `布局建议（Layout Recommendation - ASCII Diagram）` 是给图片生成步骤使用的版式指令，不会作为幻灯片正文渲染；正文、用户配色和基础模板约束应保持原样。
 
 ### 2. 异步任务处理
 
@@ -340,4 +342,3 @@ OFL 许可证允许自由使用、修改和分发该字体。
 ## 联系方式
 
 如有问题或建议，请通过 GitHub Issues 反馈。
-

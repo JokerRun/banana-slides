@@ -82,6 +82,7 @@ Supports three starting methods—**Idea**, **Outline**, and **Page Description*
 - **One-Sentence Generation**: Simply input a topic, and the AI will automatically generate a well-structured outline and page-by-page content descriptions.
 - **Natural Language Editing**: Supports modifying outlines or descriptions via "Vibe" commands (e.g., "Change the third page to a case study"), with the AI responding and adjusting in real-time.
 - **Outline/Description Modes**: Supports both one-click batch generation and manual refinement of details.
+- **Layout Recommendations**: Page descriptions include ASCII Diagram layout recommendations to guide later page generation; these recommendations are not rendered as slide text.
 
 <img width="2000" height="1125" alt="image" src="https://github.com/user-attachments/assets/7fc1ecc6-433d-4157-b4ca-95fcebac66ba" />
 
@@ -157,6 +158,7 @@ No longer restricted by complex menu buttons; issue modification commands direct
 1. **Garbled or blurry text on generated pages**
     - You can select a higher output resolution (the OpenAI format may not support increasing the resolution; Gemini format is recommended). According to tests, increasing the resolution from 1k to 2k before generating the page significantly improves text rendering quality.
     - Please ensure that the page description includes the specific text content you want to render.
+    - `Layout Recommendation - ASCII Diagram` blocks in page descriptions are layout guidance only and are not rendered as slide body text.
 
 2. **Poor results when exporting editable PPT, such as overlapping text or missing styles**
     - In 90% of cases, this is due to API configuration issues. You can refer to the troubleshooting and solutions in [issue 121](https://github.com/Anionex/banana-slides/issues/121).
@@ -178,7 +180,7 @@ No longer restricted by complex menu buttons; issue modification commands direct
 
 | Status | Milestone |
 | --- | --- |
-| ✅ Completed | Create PPT via three paths: idea, outline, and page description |
+| ✅ Completed | Create PPT via three paths: idea, outline, and page description, with ASCII layout recommendations in page descriptions |
 | ✅ Completed | Parse Markdown-formatted images in text |
 | ✅ Completed | Add more assets to single PPT slides |
 | ✅ Completed | Vibe oral editing for selected areas on single slides |
