@@ -18,19 +18,29 @@ vi.mock('@/api/endpoints', () => ({
   generateOutline: vi.fn(),
   generateDescriptions: vi.fn(),
   generateImages: vi.fn(),
+  translateGenerate: vi.fn(),
+  translateSinglePage: vi.fn(),
   getTaskStatus: vi.fn(),
   exportPPTX: vi.fn(),
   exportPDF: vi.fn(),
 }))
 
+const api = await import('@/api/endpoints')
+
 describe('useProjectStore', () => {
   beforeEach(() => {
+    vi.clearAllMocks()
     // 重置store状态
     const { result } = renderHook(() => useProjectStore())
     act(() => {
       result.current.setCurrentProject(null)
       result.current.setError(null)
       result.current.setGlobalLoading(false)
+      useProjectStore.setState({
+        pageGeneratingTasks: {},
+        pageDescriptionGeneratingTasks: {},
+        warningMessage: null,
+      })
     })
   })
 
@@ -145,5 +155,106 @@ describe('useProjectStore', () => {
       expect(result.current.currentProject).toBeNull()
     })
   })
-})
 
+  describe('图片生成', () => {
+    it('should route translate projects to translate batch generation API', async () => {
+      vi.mocked(api.translateGenerate).mockResolvedValue({
+        data: { task_id: 'task-translate', status: 'PENDING', total_pages: 2, translate_mode: 'pure', target_language: 'English' },
+      } as any)
+      vi.mocked(api.getTaskStatus).mockResolvedValue({
+        data: { task_id: 'task-translate', status: 'PROCESSING', progress: { total: 2, completed: 0 } },
+      } as any)
+      vi.mocked(api.getProject).mockResolvedValue({
+        data: {
+          project_id: 'proj-translate',
+          id: 'proj-translate',
+          creation_type: 'translate',
+          pages: [
+            { page_id: 'page-1', id: 'page-1', order_index: 0, outline_content: { title: 'A', points: [] }, status: 'DRAFT' },
+            { page_id: 'page-2', id: 'page-2', order_index: 1, outline_content: { title: 'B', points: [] }, status: 'DRAFT' },
+          ],
+          status: 'SLIDES_EXTRACTED',
+          created_at: '',
+          updated_at: '',
+        },
+      } as any)
+
+      const { result } = renderHook(() => useProjectStore())
+      act(() => {
+        result.current.setCurrentProject({
+          project_id: 'proj-translate',
+          id: 'proj-translate',
+          idea_prompt: '',
+          creation_type: 'translate',
+          pages: [
+            { page_id: 'page-1', id: 'page-1', order_index: 0, outline_content: { title: 'A', points: [] }, status: 'DRAFT' },
+            { page_id: 'page-2', id: 'page-2', order_index: 1, outline_content: { title: 'B', points: [] }, status: 'DRAFT' },
+          ],
+          status: 'SLIDES_EXTRACTED',
+          created_at: '',
+          updated_at: '',
+        } as any)
+      })
+
+      await act(async () => {
+        await result.current.generateImages()
+      })
+
+      expect(api.translateGenerate).toHaveBeenCalledWith('proj-translate', undefined)
+      expect(api.generateImages).not.toHaveBeenCalled()
+      expect(result.current.pageGeneratingTasks).toEqual({
+        'page-1': 'task-translate',
+        'page-2': 'task-translate',
+      })
+    })
+
+    it('should route translate single page generation to translate API', async () => {
+      vi.mocked(api.translateSinglePage).mockResolvedValue({
+        data: { task_id: 'task-single', status: 'PENDING', translate_mode: 'pure', target_language: 'English' },
+      } as any)
+      vi.mocked(api.getTaskStatus).mockResolvedValue({
+        data: { task_id: 'task-single', status: 'PROCESSING', progress: { total: 1, completed: 0 } },
+      } as any)
+      vi.mocked(api.getProject).mockResolvedValue({
+        data: {
+          project_id: 'proj-translate',
+          id: 'proj-translate',
+          creation_type: 'translate',
+          pages: [
+            { page_id: 'page-1', id: 'page-1', order_index: 0, outline_content: { title: 'A', points: [] }, status: 'DRAFT' },
+            { page_id: 'page-2', id: 'page-2', order_index: 1, outline_content: { title: 'B', points: [] }, status: 'DRAFT' },
+          ],
+          status: 'SLIDES_EXTRACTED',
+          created_at: '',
+          updated_at: '',
+        },
+      } as any)
+
+      const { result } = renderHook(() => useProjectStore())
+      act(() => {
+        result.current.setCurrentProject({
+          project_id: 'proj-translate',
+          id: 'proj-translate',
+          idea_prompt: '',
+          creation_type: 'translate',
+          pages: [
+            { page_id: 'page-1', id: 'page-1', order_index: 0, outline_content: { title: 'A', points: [] }, status: 'DRAFT' },
+            { page_id: 'page-2', id: 'page-2', order_index: 1, outline_content: { title: 'B', points: [] }, status: 'DRAFT' },
+          ],
+          status: 'SLIDES_EXTRACTED',
+          created_at: '',
+          updated_at: '',
+        } as any)
+      })
+
+      await act(async () => {
+        await result.current.generateImages(['page-2'])
+      })
+
+      expect(api.translateSinglePage).toHaveBeenCalledWith('proj-translate', 'page-2')
+      expect(api.translateGenerate).not.toHaveBeenCalled()
+      expect(api.generateImages).not.toHaveBeenCalled()
+      expect(result.current.pageGeneratingTasks).toEqual({ 'page-2': 'task-single' })
+    })
+  })
+})

@@ -23,6 +23,19 @@ ALLOWED_SOURCE_EXTENSIONS = {'pptx', 'ppt', 'pdf'}
 ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'bmp'}
 MAX_SOURCE_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 MAX_STYLE_REFS = 5
+TARGET_LANGUAGE_NAMES = {
+    'en': 'English',
+    'zh': '中文',
+    'ja': '日本語',
+    'ko': '한국어',
+    'es': 'Español',
+    'fr': 'Français',
+    'de': 'Deutsch',
+    'pt': 'Português',
+    'ru': 'Русский',
+    'it': 'Italiano',
+    'ar': 'العربية',
+}
 
 
 @translate_bp.before_request
@@ -48,6 +61,13 @@ def _safe_filename_with_original_ext(filename: str, default_stem: str) -> str:
     if not safe_stem:
         safe_stem = default_stem
     return f"{safe_stem}{ext}"
+
+
+def _normalize_target_language(value: str) -> str | None:
+    target = (value or '').strip()
+    if not target or target == 'custom':
+        return None
+    return TARGET_LANGUAGE_NAMES.get(target, target)
 
 
 @translate_bp.route('/translate', methods=['POST'])
@@ -79,7 +99,7 @@ def create_translate_project():
             return bad_request(f"Invalid source file. Supported: {', '.join(ALLOWED_SOURCE_EXTENSIONS)}")
 
         # Validate target language
-        target_language = request.form.get('target_language', '').strip()
+        target_language = _normalize_target_language(request.form.get('target_language', ''))
         if not target_language:
             return bad_request("target_language is required")
 

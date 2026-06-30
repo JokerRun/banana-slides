@@ -11,7 +11,7 @@ import { useImagePaste } from '@/hooks/useImagePaste';
 import { useT } from '@/hooks/useT';
 import { PRESET_STYLES } from '@/config/presetStyles';
 import { RESTYLE_PRESETS, getRestylePresetById } from '@/config/restylePresets';
-import { TRANSLATE_PRESETS, TARGET_LANGUAGES } from '@/config/translatePresets';
+import { TRANSLATE_PRESETS, TARGET_LANGUAGES, getTargetLanguageByCode } from '@/config/translatePresets';
 import { GENERATE_DDI_PROMPT, GENERATE_PRESETS } from '@/config/generatePresets';
 
 type CreationType = 'idea' | 'outline' | 'description' | 'restyle' | 'translate';
@@ -680,13 +680,18 @@ export const Home: React.FC = () => {
       show({ message: '翻译+风格转换模式需要至少上传一张风格参考图', type: 'error' });
       return;
     }
+    const selectedTargetLanguage = getTargetLanguageByCode(translateTargetLanguage);
+    if (!selectedTargetLanguage || selectedTargetLanguage.code === 'custom') {
+      show({ message: '请选择有效的目标语言', type: 'error' });
+      return;
+    }
 
     setIsTranslateSubmitting(true);
     try {
       const response = await createTranslateProject(
         translateSourceFile,
         {
-          targetLanguage: translateTargetLanguage,
+          targetLanguage: selectedTargetLanguage.nativeName || selectedTargetLanguage.name,
           translateMode: translateMode,
           styleRefs: translateMode === 'restyle' ? translateStyleRefs : undefined,
           translatePrompt: translatePrompt.trim() || undefined,
@@ -1265,7 +1270,7 @@ export const Home: React.FC = () => {
                   className="w-full rounded-lg border-2 border-gray-200 dark:border-border-primary bg-white dark:bg-background-tertiary px-3 py-2 text-sm text-gray-800 dark:text-white focus:border-banana-400 dark:focus:border-banana"
                 >
                   {TARGET_LANGUAGES.map((lang) => (
-                    <option key={lang.code} value={lang.code}>
+                    <option key={lang.code} value={lang.code} disabled={lang.code === 'custom'}>
                       {i18n.language?.startsWith('zh') ? lang.nativeName : lang.name}
                     </option>
                   ))}

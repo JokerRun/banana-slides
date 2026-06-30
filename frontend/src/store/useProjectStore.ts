@@ -728,6 +728,8 @@ const debouncedUpdatePage = debounce(
   generateImages: async (pageIds?: string[]) => {
     const { currentProject, pageGeneratingTasks } = get();
     if (!currentProject) return;
+    const projectId = currentProject.id;
+    if (!projectId) return;
 
     // 确定要生成的页面ID列表
     const targetPageIds = pageIds || currentProject.pages.map(p => p.id).filter((id): id is string => !!id);
@@ -747,8 +749,11 @@ const debouncedUpdatePage = debounce(
     set({ error: null, warningMessage: null });
     
     try {
-      // 调用批量生成 API
-      const response = await api.generateImages(currentProject.id, undefined, pageIds);
+      const response = currentProject.creation_type === 'translate'
+        ? pageIds?.length === 1
+          ? await api.translateSinglePage(projectId, pageIds[0])
+          : await api.translateGenerate(projectId, pageIds)
+        : await api.generateImages(projectId, undefined, pageIds);
       const taskId = response.data?.task_id;
       
       if (taskId) {
