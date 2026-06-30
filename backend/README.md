@@ -27,10 +27,12 @@ backend/
 │   ├── ai_service.py        # AI相关服务
 │   ├── file_service.py      # 文件管理服务
 │   ├── export_service.py    # 导出服务
+│   ├── prompts.py           # AI提示词模板
 │   └── task_manager.py      # 异步任务管理
 ├── controllers/              # 控制器层
 │   ├── __init__.py
 │   ├── project_controller.py
+│   ├── translate_controller.py
 │   ├── page_controller.py
 │   ├── template_controller.py
 │   ├── export_controller.py
@@ -125,6 +127,11 @@ uv run python app.py
 - `POST /api/projects/{project_id}/pages/{page_id}/generate/image` - 单页生成
 - `POST /api/projects/{project_id}/pages/{page_id}/edit/image` - 编辑图片
 
+#### PPT/PDF 翻译
+- `POST /api/projects/translate` - 创建翻译项目，上传 `source_file`（PPT/PPTX/PDF）、`target_language`、`translate_mode`（`pure` 或 `restyle`），`restyle` 模式可上传最多 5 张 `style_refs`
+- `POST /api/projects/{project_id}/translate/generate` - 批量翻译页面（异步），可传 `page_ids`
+- `POST /api/projects/{project_id}/pages/{page_id}/translate/generate` - 单页翻译（异步）
+
 #### 模板管理
 - `POST /api/projects/{project_id}/template` - 上传模板
 - `DELETE /api/projects/{project_id}/template` - 删除模板
@@ -145,6 +152,7 @@ uv run python app.py
 - 并行生成页面描述，并在描述中附带 ASCII Diagram 版式建议
 - 根据参考模板生成图片
 - 自然语言编辑图片
+- 基于 image-to-image 的 PPT/PDF 逐页翻译，支持纯翻译和翻译+风格转换
 
 页面描述中的 `布局建议（Layout Recommendation - ASCII Diagram）` 是给图片生成步骤使用的版式指令，不会作为幻灯片正文渲染；正文、用户配色和基础模板约束应保持原样。
 
@@ -153,6 +161,7 @@ uv run python app.py
 使用 `ThreadPoolExecutor` 实现简单但高效的异步任务处理：
 - 并行生成多个页面描述
 - 并行生成多个页面图片
+- 并行翻译多个 PPT/PDF 页面
 - 实时任务进度跟踪
 
 ### 3. 文件管理
@@ -160,6 +169,7 @@ uv run python app.py
 完整的文件管理系统：
 - 项目级文件隔离
 - 模板图片管理
+- 翻译/风格转换源文件和风格参考图管理
 - 生成图片管理
 - 自动清理机制
 
@@ -200,6 +210,8 @@ result = remove_regions(image, bboxes, expand_pixels=5)
 #### Project（项目）
 - 项目基本信息
 - 模板图片路径
+- `creation_type` 支持 `idea`、`outline`、`descriptions`、`restyle`、`translate`
+- 翻译项目会保存源文件路径、目标语言、翻译模式和可选风格参考图
 - 项目状态
 - 关联的页面和任务
 
@@ -211,7 +223,7 @@ result = remove_regions(image, bboxes, expand_pixels=5)
 - 页面状态
 
 #### Task（任务）
-- 任务类型（生成描述/生成图片）
+- 任务类型（生成描述/生成图片/Restyle图片/翻译图片）
 - 任务状态
 - 进度信息（JSON）
 - 错误信息
@@ -221,6 +233,7 @@ result = remove_regions(image, bboxes, expand_pixels=5)
 #### 项目状态
 ```
 DRAFT → OUTLINE_GENERATED → DESCRIPTIONS_GENERATED → GENERATING_IMAGES → COMPLETED
+DRAFT → SLIDES_EXTRACTED → GENERATING_IMAGES → COMPLETED   # restyle / translate
 ```
 
 #### 页面状态
