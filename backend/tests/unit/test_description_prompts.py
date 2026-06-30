@@ -7,6 +7,7 @@ description"等诱导改写/幻觉的措辞。对应产品反馈：
 - P1/P2 等页码格式不识别
 - 标题/要点被改写、图片信息被臆造
 """
+
 import pytest
 
 from services.ai_service import ProjectContext
@@ -40,7 +41,9 @@ class TestDescriptionToOutlinePrompt:
         assert "NOT body content" in prompt
 
     def test_image_reference_preserved_as_point(self):
-        prompt = get_description_to_outline_prompt(_ctx("第一页：A\n内容可见上传的图片"))
+        prompt = get_description_to_outline_prompt(
+            _ctx("第一页：A\n内容可见上传的图片")
+        )
         assert "需上传图片" in prompt
         assert "内容可见上传的图片" in prompt  # 原句作为反例保留
 
@@ -57,8 +60,8 @@ class TestDescriptionToOutlinePrompt:
         prompt = get_description_to_outline_prompt(_ctx("第一页：封面"))
         # 必须明确要求剥离前缀，并给出 WRONG/RIGHT 对照
         assert "第一页：封面" in prompt
-        assert "title \"封面\"" in prompt
-        assert "NOT \"第一页：封面\"" in prompt
+        assert 'title "封面"' in prompt
+        assert 'NOT "第一页：封面"' in prompt
         # 覆盖多种 delimiter 形式的剥离示例
         for src in ["P1：项目背景", "Page 1: Welcome", "1. 封面", "①项目背景"]:
             assert src in prompt
@@ -87,14 +90,17 @@ class TestDescriptionSplitPrompt:
 
     def test_no_hallucination_for_missing_page(self):
         prompt = get_description_split_prompt(
-            _ctx("第一页：A"), [{"title": "A", "points": []}, {"title": "B", "points": []}]
+            _ctx("第一页：A"),
+            [{"title": "A", "points": []}, {"title": "B", "points": []}],
         )
         # 旧的 "create a reasonable description based on the outline" 必须移除
         assert "create a reasonable description" not in prompt
         assert "（原文未提供）" in prompt
         assert "hallucinate" in prompt
 
-    def test_requires_ascii_layout_recommendation_without_changing_user_constraints(self):
+    def test_requires_ascii_layout_recommendation_without_changing_user_constraints(
+        self,
+    ):
         prompt = get_description_split_prompt(
             _ctx("第一页：A\n配色：black and gold\n模板：investor report"),
             [{"title": "A", "points": []}],
@@ -117,7 +123,9 @@ class TestDescriptionSplitPrompt:
 
 
 class TestPageDescriptionPrompt:
-    def test_requires_ascii_layout_recommendation_without_changing_user_constraints(self):
+    def test_requires_ascii_layout_recommendation_without_changing_user_constraints(
+        self,
+    ):
         ctx = ProjectContext(
             {
                 "creation_type": "outline",

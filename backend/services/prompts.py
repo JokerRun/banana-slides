@@ -899,9 +899,13 @@ def get_restyle_prompt(
         if num_style_refs == 1:
             image_labels.append(f"IMAGE {img_num}: [底版.png] base template reference")
         else:
-            image_labels.append(f"IMAGE {img_num}: [底版.png] base template reference #{i}")
+            image_labels.append(
+                f"IMAGE {img_num}: [底版.png] base template reference #{i}"
+            )
     original_image_num = num_style_refs + 1
-    image_labels.append(f"IMAGE {original_image_num}: Original PPT slide (content source)")
+    image_labels.append(
+        f"IMAGE {original_image_num}: Original PPT slide (content source)"
+    )
 
     image_section = "\n".join(image_labels)
     template_ref_note = (
@@ -1212,7 +1216,9 @@ def get_text_attribute_extraction_prompt(content_hint: str = "") -> str:
     ]
 }}
 ```
-""".format(content_hint=content_hint)
+""".format(
+        content_hint=content_hint
+    )
 
     # logger.info(f"[get_text_attribute_extraction_prompt] Final prompt:\n{prompt}")
     return prompt
