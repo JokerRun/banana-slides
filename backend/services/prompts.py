@@ -414,8 +414,8 @@ def get_image_generation_prompt(
 - 深度理解 [文本] 的业务主题、逻辑关系（并列 / 递进 / 包含 / 对比 / 因果），再决定版式。
 - 强制执行文本条目与视觉区块的 1:1 映射，严格基于实际文本条目数生成对应数量的几何区块或层级。
 - 若 [文本] 中包含明确主题或标题，将其作为页面标题；若无法识别明确标题，严禁自行捏造标题。
-- 标题规范：微软雅黑 Bold，32pt，DDI 板岩蓝 #3D4F5F，左对齐，贴近内容区左侧。
-- 色系限定：标题/页眉/结构线/主视觉使用 #3D4F5F；强调色/流程箭头/重点标签使用 #F9A825；辅助色仅使用 #2D72B2 / #E67E22 / #88A02C / #662D7C / #8B9A46；正文 #333333，次要文本 #666666，分割线 #E0E0E0，背景 #FFFFFF。
+- 标题规范：默认微软雅黑 Bold，32pt，左对齐，贴近内容区左侧；若用户提供标题样式或配色，以用户要求为准。
+- Preserve any user-provided color scheme exactly. Use the default DDI palette only when [文本]、额外要求和参考信息均未指定配色：标题/页眉/结构线/主视觉使用 #3D4F5F；强调色/流程箭头/重点标签使用 #F9A825；辅助色仅使用 #2D72B2 / #E67E22 / #88A02C / #662D7C / #8B9A46；正文 #333333，次要文本 #666666，分割线 #E0E0E0，背景 #FFFFFF。
 - 优先理解内容逻辑并匹配最优版式：流程用路线图，对比用左右/矩阵，层级用分层/冰山，核心主题用辐射/树状，概览用网格卡片，指标用 dashboard，循环用环形流转，问题到解决方案用桥接版式。
 - 允许图形：圆形节点、圆角矩形、房屋图标、粗体折线/S形箭头、带序号流程节点、矩阵表格、金字塔、文档图示；必须为纯扁平化矢量风格。
 - 主视觉区块控制在 3–5 个内并容纳所有原文内容；整体留白 8%–10%；文字约 40%，结构化图形约 60%；线条粗细一致，严格网格对齐。
@@ -450,9 +450,10 @@ def get_image_edit_prompt(
         格式化后的 prompt 字符串
     """
     if original_description:
-        # 删除"其他页面素材："之后的内容，避免被前面的图影响
         if "其他页面素材" in original_description:
             original_description = original_description.split("其他页面素材")[0].strip()
+        if "布局建议" in original_description:
+            original_description = original_description.split("布局建议")[0].strip()
 
         prompt = f"""\
 该PPT页面的原始页面描述为：

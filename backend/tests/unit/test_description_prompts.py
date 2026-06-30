@@ -13,6 +13,7 @@ import pytest
 from services.ai_service import ProjectContext
 from services.prompts import (
     get_description_to_outline_prompt,
+    get_image_edit_prompt,
     get_description_split_prompt,
     get_image_generation_prompt,
     get_page_description_prompt,
@@ -179,3 +180,45 @@ class TestImageGenerationPrompt:
         assert "layout-only instruction" in prompt
         assert "must not be rendered as slide text" in prompt
         assert "Do not draw ASCII borders" in prompt
+
+    def test_user_color_scheme_takes_priority_over_default_ddi_palette(self):
+        prompt = get_image_generation_prompt(
+            page_desc=(
+                "页面标题：Market Growth\n"
+                "页面文字：\n"
+                "- Revenue up 30%\n"
+                "其他页面素材：\n"
+                "配色：black and gold\n"
+            ),
+            outline_text="1. Market Growth",
+            current_section="Market Growth",
+            language="en",
+        )
+
+        assert "user-provided color scheme" in prompt
+        assert "default DDI palette" in prompt
+        assert "only when" in prompt
+
+
+class TestImageEditPrompt:
+    def test_strips_ascii_layout_recommendation_from_original_description(self):
+        prompt = get_image_edit_prompt(
+            edit_instruction="make title larger",
+            original_description=(
+                "页面标题：Market Growth\n"
+                "页面文字：\n"
+                "- Revenue up 30%\n\n"
+                "布局建议（Layout Recommendation - ASCII Diagram）：\n"
+                "+----------------------+----------------------+\n"
+                "| title area           | key message area     |\n"
+                "+----------------------+----------------------+\n\n"
+                "其他页面素材：\n"
+                "配色：black and gold\n"
+            ),
+        )
+
+        assert "页面标题：Market Growth" in prompt
+        assert "- Revenue up 30%" in prompt
+        assert "布局建议" not in prompt
+        assert "ASCII Diagram" not in prompt
+        assert "title area" not in prompt
