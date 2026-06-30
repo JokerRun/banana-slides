@@ -222,3 +222,136 @@ class TestImageEditPrompt:
         assert "布局建议" not in prompt
         assert "ASCII Diagram" not in prompt
         assert "title area" not in prompt
+
+
+class TestImageRefNormalization:
+    """Tests for markdown image reference normalization (Hybrid fix for image context loss)"""
+
+    def test_normalize_single_markdown_image(self):
+        from services.ai_service import AIService
+
+        text = "我们的Logo：![公司Logo](/files/logo.png)"
+        normalized, refs = AIService.normalize_markdown_image_references(text)
+
+        assert '[IMAGE_REF:image_1 alt="公司Logo"]' in normalized
+        assert "![公司Logo](/files/logo.png)" not in normalized
+        assert len(refs) == 1
+        assert refs[0].id == "image_1"
+        assert refs[0].alt == "公司Logo"
+        assert refs[0].url == "/files/logo.png"
+        assert refs[0].source_index == 1
+
+    def test_normalize_multiple_markdown_images(self):
+        from services.ai_service import AIService
+
+        text = (
+            "第一页：![封面图](/files/cover.png)\n"
+            "第二页：![示意图](https://example.com/diagram.jpg)"
+        )
+        normalized, refs = AIService.normalize_markdown_image_references(text)
+
+        assert '[IMAGE_REF:image_1 alt="封面图"]' in normalized
+        assert '[IMAGE_REF:image_2 alt="示意图"]' in normalized
+        assert len(refs) == 2
+        assert refs[0].id == "image_1"
+        assert refs[1].id == "image_2"
+        assert refs[0].url == "/files/cover.png"
+        assert refs[1].url == "https://example.com/diagram.jpg"
+
+    def test_handles_empty_alt_text(self):
+        from services.ai_service import AIService
+
+        text = "内容：![](/files/image.png)"
+        normalized, refs = AIService.normalize_markdown_image_references(text)
+
+        assert '[IMAGE_REF:image_1 alt="user provided image"]' in normalized
+        assert len(refs) == 1
+        assert refs[0].alt == "user provided image"
+
+    def test_preserves_non_image_markdown(self):
+        from services.ai_service import AIService
+
+        text = '链接：[点击这里](http://example.com) 和 ![图片](/files/img.png)'
+        normalized, refs = AIService.normalize_markdown_image_references(text)
+
+        # 普通链接应该保持不变
+        assert '[点击这里](http://example.com)' in normalized
+        # 图片应该被转换
+        assert '[IMAGE_REF:image_1 alt="图片"]' in normalized
+        assert len(refs) == 1
+
+    def test_skips_unsupported_urls(self):
+        from services.ai_service import AIService
+
+        text = '![内部链接](ftp://server.com/image.png) 和 ![图片](/files/img.png)'
+        normalized, refs = AIService.normalize_markdown_image_references(text)
+
+        # 不支持的 URL 应该保持不变
+        assert '![内部链接](ftp://server.com/image.png)' in normalized
+        # 支持的 URL 应该被转换
+        assert '[IMAGE_REF:image_1 alt="图片"]' in normalized
+        assert len(refs) == 1
+
+    def test_handles_empty_text(self):
+        from services.ai_service import AIService
+
+        text = ""
+        normalized, refs = AIService.normalize_markdown_image_references(text)
+
+        assert normalized == ""
+        assert refs == []
+
+
+class TestImageGenerationPromptWithImageRefs:
+    """Tests for image generation prompt with image reference manifest"""
+
+    def test_includes_image_ref_manifest_when_refs_provided(self):
+        image_refs = [
+            {"id": "image_1", "alt": "公司Logo", "url": "/files/logo.png", "source_index": 1}
+        ]
+        prompt = get_image_generation_prompt(
+            page_desc='页面文字：\n- 我们的Logo：[IMAGE_REF:image_1 alt="公司Logo"]',
+            outline_text="1. 封面",
+            current_section="封面",
+            image_refs=image_refs,
+        )
+
+        assert "Image Reference Manifest:" in prompt
+        assert "image_1" in prompt
+        assert "caption: 公司Logo" in prompt
+        assert "source: /files/logo.png" in prompt
+        assert "attached_as_reference_image: true" in prompt
+        assert "[IMAGE_REF:image_1 alt=\"公司Logo\"]" in prompt
+
+    def test_omits_manifest_when_no_refs(self):
+        prompt = get_image_generation_prompt(
+            page_desc="页面文字：\n- 普通文本",
+            outline_text="1. 封面",
+            current_section="封面",
+            image_refs=[],
+        )
+
+        assert "Image Reference Manifest:" not in prompt
+
+    def test_multiple_image_refs_in_manifest(self):
+        image_refs = [
+            {"id": "image_1", "alt": "封面", "url": "/files/cover.png", "source_index": 1},
+            {"id": "image_2", "alt": "图表", "url": "https://example.com/chart.jpg", "source_index": 2},
+        ]
+        prompt = get_image_generation_prompt(
+            page_desc=(
+                '页面文字：\n'
+                '- [IMAGE_REF:image_1 alt="封面"]\n'
+                '- [IMAGE_REF:image_2 alt="图表"]'
+            ),
+            outline_text="1. 封面\n2. 数据",
+            current_section="数据",
+            image_refs=image_refs,
+        )
+
+        assert "image_1" in prompt
+        assert "image_2" in prompt
+        assert "caption: 封面" in prompt
+        assert "caption: 图表" in prompt
+        assert "/files/cover.png" in prompt
+        assert "https://example.com/chart.jpg" in prompt

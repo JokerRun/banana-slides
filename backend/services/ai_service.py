@@ -8,6 +8,7 @@ import json
 import re
 import logging
 import requests
+from dataclasses import dataclass
 from typing import List, Dict, Optional, Union
 from textwrap import dedent
 from PIL import Image
@@ -25,6 +26,15 @@ from .prompts import (
 )
 from .ai_providers import get_text_provider, get_image_provider, TextProvider, ImageProvider
 from config import get_config
+
+
+@dataclass
+class ImageRef:
+    """Image reference metadata for markdown image normalization"""
+    id: str
+    alt: str
+    url: str
+    source_index: int
 
 logger = logging.getLogger(__name__)
 
@@ -176,7 +186,70 @@ class AIService:
         cleaned_text = re.sub(r'\n\s*\n\s*\n', '\n\n', cleaned_text)
         
         return cleaned_text
-    
+
+    @staticmethod
+    def _is_supported_image_url(url: str) -> bool:
+        """
+        检查 URL 是否为支持的图片 URL
+
+        Args:
+            url: 要检查的 URL
+
+        Returns:
+            如果 URL 是受支持的图片 URL 则返回 True
+        """
+        if not url:
+            return False
+        url = url.strip()
+        return (
+            url.startswith('http://')
+            or url.startswith('https://')
+            or url.startswith('/files/')
+        )
+
+    @staticmethod
+    def normalize_markdown_image_references(text: str) -> tuple[str, List[ImageRef]]:
+        """
+        将 Markdown 图片语法转换为结构化图片引用标记
+
+        将 ![alt](url) 转换为 [IMAGE_REF:image_N alt="alt"] 格式，
+        同时返回图片引用元数据列表。
+
+        Args:
+            text: 包含 Markdown 图片语法的文本
+
+        Returns:
+            元组 (normalized_text, image_refs)
+            - normalized_text: 替换后的文本，包含 IMAGE_REF 标记
+            - image_refs: ImageRef 对象列表，包含 id, alt, url, source_index
+        """
+        if not text:
+            return text, []
+
+        refs: List[ImageRef] = []
+        MARKDOWN_IMAGE_RE = re.compile(r'!\[(.*?)\]\(([^\)]+)\)')
+
+        def repl(match):
+            alt = match.group(1).strip()
+            url = match.group(2).strip()
+
+            # 只处理受支持的图片 URL
+            if not AIService._is_supported_image_url(url):
+                return match.group(0)
+
+            ref = ImageRef(
+                id=f"image_{len(refs) + 1}",
+                alt=alt or "user provided image",
+                url=url,
+                source_index=len(refs) + 1,
+            )
+            refs.append(ref)
+            # 返回结构化标记，保留语义位置
+            return f'[IMAGE_REF:{ref.id} alt="{ref.alt}"]'
+
+        normalized_text = MARKDOWN_IMAGE_RE.sub(repl, text)
+        return normalized_text, refs
+
     @retry(
         stop=stop_after_attempt(3),
         retry=retry_if_exception_type((json.JSONDecodeError, ValueError)),
@@ -392,8 +465,8 @@ class AIService:
         result = "\n".join(text_parts)
         return dedent(result)
     
-    def generate_image_prompt(self, outline: List[Dict], page: Dict, 
-                            page_desc: str, page_index: int, 
+    def generate_image_prompt(self, outline: List[Dict], page: Dict,
+                            page_desc: str, page_index: int,
                             has_material_images: bool = False,
                             extra_requirements: Optional[str] = None,
                             language='zh',
@@ -401,7 +474,7 @@ class AIService:
         """
         Generate image generation prompt for a page
         Based on demo.py gen_prompts()
-        
+
         Args:
             outline: Complete outline
             page: Page outline data
@@ -411,33 +484,40 @@ class AIService:
             extra_requirements: Optional extra requirements to apply to all pages
             language: Output language
             has_template: 是否有模板图片（False表示无模板图模式）
-        
+
         Returns:
             Image generation prompt
         """
         outline_text = self.generate_outline_text(outline)
-        
+
         # Determine current section
         if 'part' in page:
             current_section = page['part']
         else:
             current_section = f"{page.get('title', 'Untitled')}"
-        
-        # 在传给文生图模型之前，移除 Markdown 图片链接
-        # 图片本身已经通过 additional_ref_images 传递，只保留文字描述
-        cleaned_page_desc = self.remove_markdown_images(page_desc)
-        
+
+        # 将 Markdown 图片语法转换为结构化引用标记
+        # 保留语义位置信息，同时获取图片引用元数据用于生成图片清单
+        normalized_page_desc, image_refs = self.normalize_markdown_image_references(page_desc)
+
+        # 将 ImageRef 对象转换为字典列表
+        image_refs_dict = [
+            {"id": ref.id, "alt": ref.alt, "url": ref.url, "source_index": ref.source_index}
+            for ref in image_refs
+        ]
+
         prompt = get_image_generation_prompt(
-            page_desc=cleaned_page_desc,
+            page_desc=normalized_page_desc,
             outline_text=outline_text,
             current_section=current_section,
             has_material_images=has_material_images,
             extra_requirements=extra_requirements,
             language=language,
             has_template=has_template,
-            page_index=page_index
+            page_index=page_index,
+            image_refs=image_refs_dict
         )
-        
+
         return prompt
     
     def generate_image(self, prompt: str, ref_image_path: Optional[str] = None, 
