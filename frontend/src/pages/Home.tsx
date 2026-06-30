@@ -620,6 +620,25 @@ export const Home: React.FC = () => {
     }
   }, [getPresetStyleRefFile, show, t]);
 
+  const applyDefaultTranslateRestylePreset = useCallback(async () => {
+    const preset = RESTYLE_PRESETS[0];
+    if (!preset) {
+      return;
+    }
+
+    try {
+      const presetStyleRef = await getPresetStyleRefFile(
+        preset.styleRefImageUrl,
+        preset.styleRefFileName
+      );
+      setTranslateStyleRefs([presetStyleRef]);
+      setTranslatePrompt(prev => prev.trim() ? prev : preset.prompt);
+    } catch (error) {
+      console.error('应用 translate restyle 默认模板失败:', error);
+      show({ message: t('home.messages.restylePresetApplyFailed'), type: 'error' });
+    }
+  }, [getPresetStyleRefFile, show, t]);
+
   // 默认静默应用 DDI 预制模板（填充 prompt + 参考图），与生成模式默认 DDI 行为一致
   useEffect(() => {
     const defaultId = RESTYLE_PRESETS[0]?.id;
@@ -1288,7 +1307,15 @@ export const Home: React.FC = () => {
                       key={preset.id}
                       onClick={() => {
                         setSelectedTranslatePresetId(preset.id);
-                        setTranslateMode(preset.id === 'pure-translation' ? 'pure' : 'restyle');
+                        if (preset.id === 'pure-translation') {
+                          setTranslateMode('pure');
+                          setTranslatePrompt(prev => prev === RESTYLE_PRESETS[0]?.prompt ? '' : prev);
+                        } else {
+                          setTranslateMode('restyle');
+                          if (translateStyleRefs.length === 0) {
+                            void applyDefaultTranslateRestylePreset();
+                          }
+                        }
                       }}
                       className={`flex-1 p-4 rounded-lg border-2 cursor-pointer transition-all ${
                         selectedTranslatePresetId === preset.id
