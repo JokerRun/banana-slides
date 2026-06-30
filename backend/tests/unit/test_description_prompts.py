@@ -13,6 +13,7 @@ from services.ai_service import ProjectContext
 from services.prompts import (
     get_description_to_outline_prompt,
     get_description_split_prompt,
+    get_image_generation_prompt,
     get_page_description_prompt,
 )
 
@@ -145,3 +146,28 @@ class TestPageDescriptionPrompt:
         assert "must not modify user-provided content" in prompt
         assert "must not modify user-provided color scheme" in prompt
         assert "must not modify user-provided base template constraints" in prompt
+
+
+class TestImageGenerationPrompt:
+    def test_treats_ascii_layout_recommendation_as_non_rendered_instruction(self):
+        prompt = get_image_generation_prompt(
+            page_desc=(
+                "页面标题：Market Growth\n"
+                "页面文字：\n"
+                "- Revenue up 30%\n\n"
+                "布局建议（Layout Recommendation - ASCII Diagram）：\n"
+                "+----------------------+----------------------+\n"
+                "| title area           | key message area     |\n"
+                "+----------------------+----------------------+\n"
+                "| visual area          | bullet list          |\n"
+                "+----------------------+----------------------+\n"
+            ),
+            outline_text="1. Market Growth",
+            current_section="Market Growth",
+            language="en",
+        )
+
+        assert "Layout Recommendation" in prompt
+        assert "layout-only instruction" in prompt
+        assert "must not be rendered as slide text" in prompt
+        assert "Do not draw ASCII borders" in prompt

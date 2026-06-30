@@ -377,6 +377,7 @@ def get_image_generation_prompt(
 # Inputs:
 - 参考图片 = 标准 PPT 模板 / 风格参考图（若提供）
 - [文本] = 当前页需要转化为 PPT 的原始页面内容
+- [布局建议 / Layout Recommendation - ASCII Diagram] = layout-only instruction, not slide text
 
 # Core Objective:
 基于 [文本] 的内容与业务逻辑，套用参考图片的 PPT 模板风格，
@@ -400,6 +401,9 @@ def get_image_generation_prompt(
 - 要求文字清晰锐利，画面为高分辨率，16:9比例。
 {template_style_guideline}
 - 严格基于 [文本] 中的原始文字内容进行排版设计，禁止凭空新增、替换、总结或重写未出现的文字信息。
+- 若 [文本] 包含"布局建议（Layout Recommendation - ASCII Diagram）"，该区块仅作为版式指令使用，must not be rendered as slide text。
+- Do not draw ASCII borders, plus signs, pipes, labels such as "title area" / "visual area" / "bullet list" / "chart/image area", or the layout recommendation heading as visible slide content.
+- 文本条目与视觉区块的 1:1 映射只适用于"页面标题"、"页面文字"和用户明确要求展示的内容，不适用于布局建议区块。
 - 可以对内容进行视觉化拆分、归类、层级化呈现，以及必要的版式适配（如将长句拆分为要点列表）。
 - 深度理解 [文本] 的业务主题、逻辑关系（并列 / 递进 / 包含 / 对比 / 因果），再决定版式。
 - 强制执行文本条目与视觉区块的 1:1 映射，严格基于实际文本条目数生成对应数量的几何区块或层级。
