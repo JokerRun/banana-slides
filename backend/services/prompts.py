@@ -329,6 +329,7 @@ def get_image_generation_prompt(
     language: str = None,
     has_template: bool = True,
     page_index: int = 1,
+    image_refs: list = None,
 ) -> str:
     """
     生成图片生成 prompt。
@@ -344,6 +345,7 @@ def get_image_generation_prompt(
         extra_requirements: 额外的要求（可能包含风格描述）
         language: 输出语言
         has_template: 是否有模板图片（False表示无模板图模式）
+        image_refs: 图片引用列表，包含 id, alt, url, source_index
 
     Returns:
         格式化后的 prompt 字符串
@@ -361,6 +363,34 @@ def get_image_generation_prompt(
             + "这些素材图片是可供挑选和使用的元素，你可以从这些素材图片中选择合适的图片、图标、图表或其他视觉元素"
             "直接整合到生成的PPT页面中。请根据页面内容的需要，智能地选择和组合这些素材图片中的元素。"
         )
+
+    # 构建图片引用清单（如果存在）
+    image_ref_manifest = ""
+    if image_refs:
+        manifest_lines = ["\n\n# Image Reference Manifest:"]
+        manifest_lines.append(
+            "The following user-provided images are attached as reference images. "
+            "Use them according to the IMAGE_REF markers in the page text."
+        )
+        manifest_lines.append("")
+        for ref in image_refs:
+            manifest_lines.append(f"- {ref['id']}")
+            manifest_lines.append(f'  caption: {ref.get("alt", "user provided image")}')
+            manifest_lines.append(f'  source: {ref.get("url", "")}')
+            manifest_lines.append(f"  attached_as_reference_image: true")
+            manifest_lines.append(
+                f"  usage: Use this attached reference image at the semantic location "
+                f'of the [IMAGE_REF:{ref["id"]}] marker in the page text.'
+            )
+            manifest_lines.append("")
+        manifest_lines.append(
+            "Important: IMAGE_REF markers in the page text correspond to attached "
+            "reference images. Place each image at its marker's semantic location. "
+            "Preserve the image subject/identity; do not replace with unrelated "
+            "generated imagery. The image data is already attached; do not attempt "
+            "to fetch from the source URL."
+        )
+        image_ref_manifest = "\n".join(manifest_lines)
 
     # 添加额外要求到提示词
     extra_req_text = ""
@@ -384,6 +414,7 @@ def get_image_generation_prompt(
 - 参考图片 = 标准 PPT 模板 / 风格参考图（若提供）
 - [文本] = 当前页需要转化为 PPT 的原始页面内容
 - [布局建议 / Layout Recommendation - ASCII Diagram] = layout-only instruction, not slide text
+{image_ref_manifest}
 
 # Core Objective:
 基于 [文本] 的内容与业务逻辑，套用参考图片的 PPT 模板风格，
