@@ -4,16 +4,17 @@ import { useTranslation } from 'react-i18next';
 import { Sparkles, FileText, FileEdit, ImagePlus, Paperclip, Lightbulb, Search, FolderOpen, HelpCircle, Sun, Moon, Globe, Monitor, ChevronDown, RefreshCw, Upload, LogOut } from 'lucide-react';
 import { Button, Textarea, Card, useToast, MaterialGeneratorModal, MaterialCenterModal, ReferenceFileList, ReferenceFileSelector, FilePreviewModal, HelpModal, Footer } from '@/components/shared';
 import { MarkdownTextarea, type MarkdownTextareaRef } from '@/components/shared/MarkdownTextarea';
-import { getAuthMe, uploadReferenceFile, type ReferenceFile, associateFileToProject, triggerFileParse, associateMaterialsToProject, createRestyleProject, logoutAuth } from '@/api/endpoints';
+import { createRestyleProject, createTranslateProject, getAuthMe, uploadReferenceFile, type ReferenceFile, associateFileToProject, triggerFileParse, associateMaterialsToProject, logoutAuth } from '@/api/endpoints';
 import { useProjectStore } from '@/store/useProjectStore';
 import { useTheme } from '@/hooks/useTheme';
 import { useImagePaste } from '@/hooks/useImagePaste';
 import { useT } from '@/hooks/useT';
 import { PRESET_STYLES } from '@/config/presetStyles';
 import { RESTYLE_PRESETS, getRestylePresetById } from '@/config/restylePresets';
+import { TRANSLATE_PRESETS, TARGET_LANGUAGES, getTargetLanguageByCode } from '@/config/translatePresets';
 import { GENERATE_DDI_PROMPT, GENERATE_PRESETS } from '@/config/generatePresets';
 
-type CreationType = 'idea' | 'outline' | 'description' | 'restyle';
+type CreationType = 'idea' | 'outline' | 'description' | 'restyle' | 'translate';
 
 // 页面特有翻译 - AI 可以直接看到所有文案，保留原始 key 结构
 const homeI18n = {
@@ -278,6 +279,16 @@ export const Home: React.FC = () => {
   const [isApplyingRestylePreset, setIsApplyingRestylePreset] = useState(false);
   const [isRestyleSubmitting, setIsRestyleSubmitting] = useState(false);
   const [authUserName, setAuthUserName] = useState('');
+  // Translate 相关状态
+  const [translateSourceFile, setTranslateSourceFile] = useState<File | null>(null);
+  const [translateTargetLanguage, setTranslateTargetLanguage] = useState('en');
+  const [translateMode, setTranslateMode] = useState<'pure' | 'restyle'>('pure');
+  const [translateStyleRefs, setTranslateStyleRefs] = useState<File[]>([]);
+  const [translatePrompt, setTranslatePrompt] = useState('');
+  const [selectedTranslatePresetId, setSelectedTranslatePresetId] = useState<string>(TRANSLATE_PRESETS[0]?.id ?? 'pure-translation');
+  const [isTranslateSubmitting, setIsTranslateSubmitting] = useState(false);
+  const translateSourceInputRef = useRef<HTMLInputElement>(null);
+  const translateStyleRefInputRef = useRef<HTMLInputElement>(null);
   const restyleSourceInputRef = useRef<HTMLInputElement>(null);
   const restyleStyleRefInputRef = useRef<HTMLInputElement>(null);
   const generateStyleRefInputRef = useRef<HTMLInputElement>(null);
@@ -543,6 +554,13 @@ export const Home: React.FC = () => {
       description: t('home.tabDescriptions.restyle'),
       example: null as string | null,
     },
+    translate: {
+      icon: <Globe size={20} />,
+      label: '多语言翻译',
+      placeholder: '',
+      description: '上传 PPT/PDF，选择目标语言，AI 将逐页翻译并锁定版式',
+      example: null as string | null,
+    },
   };
 
   const selectedRestylePreset = useMemo(() => {
@@ -602,6 +620,25 @@ export const Home: React.FC = () => {
     }
   }, [getPresetStyleRefFile, show, t]);
 
+  const applyDefaultTranslateRestylePreset = useCallback(async () => {
+    const preset = RESTYLE_PRESETS[0];
+    if (!preset) {
+      return;
+    }
+
+    try {
+      const presetStyleRef = await getPresetStyleRefFile(
+        preset.styleRefImageUrl,
+        preset.styleRefFileName
+      );
+      setTranslateStyleRefs([presetStyleRef]);
+      setTranslatePrompt(prev => prev.trim() ? prev : preset.prompt);
+    } catch (error) {
+      console.error('应用 translate restyle 默认模板失败:', error);
+      show({ message: t('home.messages.restylePresetApplyFailed'), type: 'error' });
+    }
+  }, [getPresetStyleRefFile, show, t]);
+
   // 默认静默应用 DDI 预制模板（填充 prompt + 参考图），与生成模式默认 DDI 行为一致
   useEffect(() => {
     const defaultId = RESTYLE_PRESETS[0]?.id;
@@ -609,50 +646,95 @@ export const Home: React.FC = () => {
       void applyRestylePreset(defaultId, true);
     }
     // 仅在 mount 时应用一次默认模板，避免依赖 show/t 引用变化导致重复触发
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, []);
 
   // === Restyle submit handler ===
   const handleRestyleSubmit = async () => {
     if (!restyleSourceFile) {
-      show({ message: t('home.messages.restyleSourceRequired'), type: 'error' });
+      show({ message: '请上传 PPT/PDF 源文件', type: 'error' });
       return;
     }
     if (restyleStyleRefs.length === 0) {
-      show({ message: t('home.messages.restyleStyleRefRequired'), type: 'error' });
+      show({ message: '请至少上传一张风格参考图', type: 'error' });
       return;
     }
 
     setIsRestyleSubmitting(true);
     try {
-      // Step 1: Create restyle project (upload + convert)
       const response = await createRestyleProject(
         restyleSourceFile,
         restyleStyleRefs,
-        {
-          restylePrompt: restylePrompt.trim() || undefined,
-        }
+        { restylePrompt: restylePrompt.trim() || undefined }
       );
 
       if (!response.data?.project_id) {
-        show({ message: t('home.messages.restyleFailed'), type: 'error' });
+        show({ message: 'Restyle 项目创建失败', type: 'error' });
         return;
       }
 
       const projectId = response.data.project_id;
       localStorage.setItem('currentProjectId', projectId);
-      show({ message: t('home.messages.restyleCreated'), type: 'success' });
+      show({ message: 'Restyle 项目创建成功', type: 'success' });
 
-      // Step 2: Navigate to SlidePreview (restyle 跳过 outline/detail，先预览原始页)
       navigate(`/project/${projectId}/preview`);
     } catch (error: any) {
       console.error('Restyle failed:', error);
       show({
-        message: `${t('home.messages.restyleFailed')}: ${error?.response?.data?.error?.message || error.message || '未知错误'}`,
+        message: `Restyle 项目创建失败: ${error?.response?.data?.error?.message || error.message || '未知错误'}`,
         type: 'error'
       });
     } finally {
       setIsRestyleSubmitting(false);
+    }
+  };
+
+  // === Translate submit handler ===
+  const handleTranslateSubmit = async () => {
+    if (!translateSourceFile) {
+      show({ message: '请上传 PPT/PDF 源文件', type: 'error' });
+      return;
+    }
+    if (translateMode === 'restyle' && translateStyleRefs.length === 0) {
+      show({ message: '翻译+风格转换模式需要至少上传一张风格参考图', type: 'error' });
+      return;
+    }
+    const selectedTargetLanguage = getTargetLanguageByCode(translateTargetLanguage);
+    if (!selectedTargetLanguage || selectedTargetLanguage.code === 'custom') {
+      show({ message: '请选择有效的目标语言', type: 'error' });
+      return;
+    }
+
+    setIsTranslateSubmitting(true);
+    try {
+      const response = await createTranslateProject(
+        translateSourceFile,
+        {
+          targetLanguage: selectedTargetLanguage.nativeName || selectedTargetLanguage.name,
+          translateMode: translateMode,
+          styleRefs: translateMode === 'restyle' ? translateStyleRefs : undefined,
+          translatePrompt: translatePrompt.trim() || undefined,
+        }
+      );
+
+      if (!response.data?.project_id) {
+        show({ message: '翻译项目创建失败', type: 'error' });
+        return;
+      }
+
+      const projectId = response.data.project_id;
+      localStorage.setItem('currentProjectId', projectId);
+      show({ message: '翻译项目创建成功，请在预览页点击"开始翻译"继续', type: 'success' });
+
+      navigate(`/project/${projectId}/preview`);
+    } catch (error: any) {
+      console.error('Translate failed:', error);
+      show({
+        message: `翻译项目创建失败: ${error?.response?.data?.error?.message || error.message || '未知错误'}`,
+        type: 'error'
+      });
+    } finally {
+      setIsTranslateSubmitting(false);
     }
   };
 
@@ -954,12 +1036,12 @@ export const Home: React.FC = () => {
               <p className={`text-xs ${['idea', 'outline', 'description'].includes(activeTab) ? 'text-slate-800' : 'text-slate-500 dark:text-foreground-tertiary'}`}>输入想法/大纲/描述，快速出稿</p>
             </div>
 
-            <div className="bg-white dark:bg-background-elevated border border-slate-100 p-6 rounded-xl cursor-not-allowed opacity-60 relative md:col-span-2 text-left">
-              <div className="absolute top-3 right-3 flex items-center gap-1 bg-slate-100 px-2 py-0.5 rounded text-[10px] font-bold text-slate-400 border border-slate-200">
-                敬请期待
-              </div>
-              <h3 className="text-lg font-bold text-slate-400 mb-1">多语言翻译</h3>
-              <p className="text-xs text-slate-400">精准翻译，锁定排版保真</p>
+            <div
+              onClick={() => setActiveTab('translate')}
+              className={`p-6 rounded-xl cursor-pointer shadow-sm relative overflow-hidden transition-all text-left ${activeTab === 'translate' ? 'bg-[#FFC000] scale-[1.02]' : 'bg-white dark:bg-background-elevated border border-slate-200 hover:border-[#FFC000]'}`}
+            >
+              <h3 className={`text-lg font-bold mb-1 ${activeTab === 'translate' ? 'text-slate-900' : 'text-slate-700 dark:text-foreground-primary'}`}>多语言翻译</h3>
+              <p className={`text-xs ${activeTab === 'translate' ? 'text-slate-800' : 'text-slate-500 dark:text-foreground-tertiary'}`}>精准翻译，锁定排版保真</p>
             </div>
           </div>
           
@@ -1147,6 +1229,186 @@ export const Home: React.FC = () => {
               >
                 <RefreshCw size={18} className="mr-2" />
                 {isRestyleSubmitting ? t('home.actions.converting') : t('home.actions.startRestyle')}
+              </Button>
+            </div>
+          ) : activeTab === 'translate' ? (
+            /* ===== Translate 模式 UI ===== */
+            <div className="mb-6 space-y-4">
+              {/* 源文件上传 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-foreground-secondary mb-2">
+                  📄 {i18n.language?.startsWith('zh') ? '上传 PPT/PDF 源文件' : 'Upload PPT/PDF Source'}
+                </label>
+                <div
+                  onClick={() => translateSourceInputRef.current?.click()}
+                  className={`relative border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-200
+                    ${translateSourceFile
+                      ? 'border-banana-400 bg-banana-50/50 dark:bg-banana/5 dark:border-banana/50'
+                      : 'border-gray-300 dark:border-border-primary hover:border-banana-400 hover:bg-banana-50/30 dark:hover:border-banana/50'
+                    }`}
+                >
+                  <input
+                    ref={translateSourceInputRef}
+                    type="file"
+                    accept=".pptx,.ppt,.pdf"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) setTranslateSourceFile(file);
+                      e.target.value = '';
+                    }}
+                    className="hidden"
+                  />
+                  {translateSourceFile ? (
+                    <div className="flex items-center justify-center gap-2">
+                      <FileText size={20} className="text-banana-600 dark:text-banana" />
+                      <span className="text-sm font-medium text-gray-800 dark:text-white">{translateSourceFile.name}</span>
+                      <span className="text-xs text-gray-500 dark:text-foreground-tertiary">({(translateSourceFile.size / 1024 / 1024).toFixed(1)} MB)</span>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setTranslateSourceFile(null); }}
+                        className="ml-2 text-gray-400 hover:text-red-500 transition-colors"
+                      >✕</button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center gap-1">
+                      <Upload size={24} className="text-gray-400 dark:text-foreground-tertiary" />
+                      <span className="text-sm text-gray-500 dark:text-foreground-tertiary">PPT / PPTX / PDF</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 目标语言选择 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-foreground-secondary mb-2">
+                  🌐 {i18n.language?.startsWith('zh') ? '目标语言' : 'Target Language'}
+                </label>
+                <select
+                  value={translateTargetLanguage}
+                  onChange={(e) => setTranslateTargetLanguage(e.target.value)}
+                  disabled={isTranslateSubmitting}
+                  className="w-full rounded-lg border-2 border-gray-200 dark:border-border-primary bg-white dark:bg-background-tertiary px-3 py-2 text-sm text-gray-800 dark:text-white focus:border-banana-400 dark:focus:border-banana"
+                >
+                  {TARGET_LANGUAGES.map((lang) => (
+                    <option key={lang.code} value={lang.code} disabled={lang.code === 'custom'}>
+                      {i18n.language?.startsWith('zh') ? lang.nativeName : lang.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 翻译模式选择 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-foreground-secondary mb-2">
+                  🔄 {i18n.language?.startsWith('zh') ? '翻译模式' : 'Translation Mode'}
+                </label>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  {TRANSLATE_PRESETS.map((preset) => (
+                    <div
+                      key={preset.id}
+                      onClick={() => {
+                        setSelectedTranslatePresetId(preset.id);
+                        if (preset.id === 'pure-translation') {
+                          setTranslateMode('pure');
+                          setTranslatePrompt(prev => prev === RESTYLE_PRESETS[0]?.prompt ? '' : prev);
+                        } else {
+                          setTranslateMode('restyle');
+                          if (translateStyleRefs.length === 0) {
+                            void applyDefaultTranslateRestylePreset();
+                          }
+                        }
+                      }}
+                      className={`flex-1 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                        selectedTranslatePresetId === preset.id
+                          ? 'border-banana-400 bg-banana-50/50 dark:bg-banana/5 dark:border-banana/50'
+                          : 'border-gray-200 dark:border-border-primary hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                          selectedTranslatePresetId === preset.id ? 'border-banana-400' : 'border-gray-300'
+                        }`}>
+                          {selectedTranslatePresetId === preset.id && <div className="w-2 h-2 rounded-full bg-banana-400" />}
+                        </div>
+                        <span className="font-medium text-gray-800 dark:text-white">{preset.name}</span>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-foreground-tertiary ml-6">{preset.description}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 风格参考图上传 - 仅在 restyle 模式显示 */}
+              {translateMode === 'restyle' && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-foreground-secondary mb-2">
+                    🎨 {i18n.language?.startsWith('zh') ? '风格参考图（可选）' : 'Style Reference Images (Optional)'}
+                  </label>
+                  <div className="flex flex-wrap gap-3">
+                    {translateStyleRefs.map((ref, i) => (
+                      <div key={i} className="relative w-24 h-16 rounded-lg overflow-hidden border-2 border-banana-300 dark:border-banana/50 group">
+                        <img
+                          src={URL.createObjectURL(ref)}
+                          alt={`style ref ${i + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <button
+                          onClick={() => setTranslateStyleRefs(prev => prev.filter((_, idx) => idx !== i))}
+                          className="absolute top-0 right-0 bg-black/50 text-white text-xs px-1 rounded-bl opacity-0 group-hover:opacity-100 transition-opacity"
+                        >✕</button>
+                      </div>
+                    ))}
+                    {translateStyleRefs.length < 5 && (
+                      <div
+                        onClick={() => translateStyleRefInputRef.current?.click()}
+                        className="w-24 h-16 border-2 border-dashed border-gray-300 dark:border-border-primary rounded-lg flex items-center justify-center cursor-pointer hover:border-banana-400 dark:hover:border-banana/50 transition-colors"
+                      >
+                        <span className="text-2xl text-gray-400">+</span>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={translateStyleRefInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      setTranslateStyleRefs(prev => [...prev, ...files].slice(0, 5));
+                      e.target.value = '';
+                    }}
+                    className="hidden"
+                  />
+                </div>
+              )}
+
+              {/* 翻译提示词 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-foreground-secondary mb-2">
+                  📝 {i18n.language?.startsWith('zh') ? '自定义翻译提示（可选）' : 'Custom Translation Prompt (Optional)'}
+                </label>
+                <Textarea
+                  placeholder={i18n.language?.startsWith('zh')
+                    ? '可输入额外的翻译要求，如专业术语、语气风格等。留空将使用默认提示词。'
+                    : 'Enter additional translation requirements, such as terminology, tone, etc. Leave empty to use default prompts.'}
+                  value={translatePrompt}
+                  onChange={(e) => setTranslatePrompt(e.target.value)}
+                  rows={4}
+                  className="text-sm border-2 border-gray-200 dark:border-border-primary dark:bg-background-tertiary dark:text-white focus:border-banana-400 dark:focus:border-banana transition-colors"
+                />
+              </div>
+
+              {/* 提交按钮 */}
+              <Button
+                onClick={handleTranslateSubmit}
+                loading={isTranslateSubmitting}
+                disabled={!translateSourceFile || (translateMode === 'restyle' && translateStyleRefs.length === 0)}
+                className="w-full py-3 text-base font-semibold"
+              >
+                <Globe size={18} className="mr-2" />
+                {isTranslateSubmitting
+                  ? (i18n.language?.startsWith('zh') ? '处理中...' : 'Processing...')
+                  : (i18n.language?.startsWith('zh') ? '开始翻译' : 'Start Translation')
+                }
               </Button>
             </div>
           ) : (

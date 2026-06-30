@@ -21,7 +21,7 @@
 </p> 
 
 <b>一个基于nano banana pro🍌的原生AI PPT生成应用，支持想法/大纲/页面描述生成完整PPT演示文稿，<br></b>
-<b> 自动提取附件图表、上传任意素材、口头提出修改，迈向真正的"Vibe PPT" </b>
+<b> 自动提取附件图表、上传任意素材、口头提出修改，并支持 PPT/PDF 翻译与风格转换，迈向真正的"Vibe PPT" </b>
 
 <b>🎯 降低PPT制作门槛，让每个人都能快速创作出美观专业的演示文稿</b>
 
@@ -104,15 +104,19 @@
 
 <img width="2000" height="1125" alt="image" src="https://github.com/user-attachments/assets/929ba24a-996c-4f6d-9ec6-818be6b08ea3" />
 
+### 4. PPT/PDF 翻译与风格转换
+- **源文件翻译**：上传 PPT/PPTX/PDF 后，系统会先转换为逐页图片，再通过 image-to-image 生成翻译页。
+- **多语言目标**：支持 English、中文、日本語、한국어、Español、Français、Deutsch、Português、Русский、Italiano、العربية。
+- **两种模式**：纯翻译模式尽量锁定原布局和视觉元素；翻译+风格转换模式会同时应用风格参考图，默认可复用 DDI 预设。
 
-### 4. 开箱即用的格式导出
+### 5. 开箱即用的格式导出
 - **多格式支持**：一键导出标准 **PPTX** 或 **PDF** 文件。
 - **完美适配**：默认 16:9 比例，排版无需二次调整，直接演示。
 
 <img width="1000" alt="image" src="https://github.com/user-attachments/assets/3e54bbba-88be-4f69-90a1-02e875c25420" />
 <img width="1748" height="538" alt="PPT与PDF导出" src="https://github.com/user-attachments/assets/647eb9b1-d0b6-42cb-a898-378ebe06c984" />
 
-### 5. 可自由编辑的pptx导出（Beta迭代中）
+### 6. 可自由编辑的pptx导出（Beta迭代中）
 - **导出图像为高还原度、背景干净的、可自由编辑图像和文字的PPT页面**
 - 相关更新见 https://github.com/Anionex/banana-slides/issues/121
 - **若出现可编辑 ppt 效果不佳，如文字重叠、文字无样式等问题，一般为配置问题导致，可参考[可编辑PPTX导出常见问题及排查解决方案](https://github.com/Anionex/banana-slides/issues/121#issuecomment-3708872527) 进行排查**
@@ -189,6 +193,7 @@
 | ✅ 已完成 | PPT 单页框选区域Vibe口头编辑 |
 | ✅ 已完成 | 素材模块: 素材生成、上传等 |
 | ✅ 已完成 | 支持多种文件的上传+解析 |
+| ✅ 已完成 | 支持 PPT/PDF 多语言翻译与翻译+风格转换 |
 | ✅ 已完成 | 支持Vibe口头调整大纲和描述 |
 | ✅ 已完成 | 初步支持可编辑版本pptx文件导出 |
 | 🔄 进行中 | 支持多层次、精确抠图的可编辑pptx导出 |
@@ -197,7 +202,7 @@
 | 🚍 部分 | 优化前端加载速度 |
 | 🧭 规划中 | 在线播放功能 |
 | 🧭 规划中 | 简单的动画和页面切换效果 |
-| 🚍 部分支持 | 多语种支持 |
+| 🚍 部分支持 | 多语种界面与内容生成 |
 | 🏢商业版功能 | 用户系统 |
 
 ## 📦 使用方法
@@ -539,6 +544,7 @@ banana-slides/
 │   │   ├── types/              # TypeScript类型定义
 │   │   ├── utils/              # 工具函数
 │   │   ├── constants/          # 常量定义
+│   │   ├── config/             # 前端预设配置（含翻译语言/模式）
 │   │   └── styles/             # 样式文件
 │   ├── public/                 # 静态资源
 │   ├── package.json
@@ -567,6 +573,7 @@ banana-slides/
 │   │   ├── prompts.py          # AI提示词模板
 │   ├── controllers/            # API控制器
 │   │   ├── project_controller.py      # 项目管理
+│   │   ├── translate_controller.py    # PPT/PDF 翻译
 │   │   ├── page_controller.py         # 页面管理
 │   │   ├── material_controller.py     # 素材管理
 │   │   ├── template_controller.py     # 模板管理

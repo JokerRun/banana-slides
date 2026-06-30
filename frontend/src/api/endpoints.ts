@@ -843,6 +843,81 @@ export const dissociateFileFromProject = async (
 
 // ===== 输出语言设置 =====
 
+// ===== Translate 相关 API =====
+
+export interface CreateTranslateProjectOptions {
+  targetLanguage: string;
+  translateMode: 'pure' | 'restyle';
+  styleRefs?: File[];
+  translatePrompt?: string;
+}
+
+/**
+ * 创建翻译项目（上传原始PPT/PDF + 可选风格参考图）
+ */
+export const createTranslateProject = async (
+  sourceFile: File,
+  options: CreateTranslateProjectOptions
+): Promise<ApiResponse<{
+  project_id: string;
+  creation_type: string;
+  status: string;
+  translate_mode: string;
+  target_language: string;
+  pages: Page[];
+  total_pages: number;
+}>> => {
+  const formData = new FormData();
+  formData.append('source_file', sourceFile);
+  formData.append('target_language', options.targetLanguage);
+  formData.append('translate_mode', options.translateMode);
+
+  if (options.styleRefs && options.styleRefs.length > 0) {
+    options.styleRefs.forEach(ref => formData.append('style_refs', ref));
+  }
+  if (options.translatePrompt) {
+    formData.append('translate_prompt', options.translatePrompt);
+  }
+
+  const response = await apiClient.post<ApiResponse<{
+    project_id: string;
+    creation_type: string;
+    status: string;
+    translate_mode: string;
+    target_language: string;
+    pages: Page[];
+    total_pages: number;
+  }>>('/api/projects/translate', formData);
+  return response.data;
+};
+
+/**
+ * 启动翻译生成（批量）
+ */
+export const translateGenerate = async (
+  projectId: string,
+  pageIds?: string[]
+): Promise<ApiResponse<{ task_id: string; status: string; total_pages: number; translate_mode: string; target_language: string }>> => {
+  const response = await apiClient.post<ApiResponse<{ task_id: string; status: string; total_pages: number; translate_mode: string; target_language: string }>>(
+    `/api/projects/${projectId}/translate/generate`,
+    { page_ids: pageIds }
+  );
+  return response.data;
+};
+
+/**
+ * 启动单页翻译生成
+ */
+export const translateSinglePage = async (
+  projectId: string,
+  pageId: string
+): Promise<ApiResponse<{ task_id: string; status: string; translate_mode: string; target_language: string }>> => {
+  const response = await apiClient.post<ApiResponse<{ task_id: string; status: string; translate_mode: string; target_language: string }>>(
+    `/api/projects/${projectId}/pages/${pageId}/translate/generate`
+  );
+  return response.data;
+};
+
 // ===== Restyle 相关 API =====
 
 /**

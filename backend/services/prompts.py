@@ -1358,3 +1358,186 @@ def get_quality_enhancement_prompt(inpainted_regions: list = None) -> str:
     # {regions_info}
     # """
     return prompt
+
+
+def get_translate_prompt(
+    page_index: int,
+    total_pages: int,
+    target_language: str,
+    num_style_refs: int = 0,
+    custom_prompt: str = "",
+) -> str:
+    """
+    Generate prompt for PPT page translation via image-to-image generation.
+
+    The translation workflow uses image-to-image generation to translate visible text
+    while preserving the original layout and visual elements.
+
+    Args:
+        page_index: Current page number (1-indexed)
+        total_pages: Total number of pages
+        target_language: Target language for translation (e.g., "English", "中文", "日本語")
+        num_style_refs: Number of style reference images (0 for pure translation)
+        custom_prompt: User-provided custom translation prompt (optional)
+
+    Returns:
+        Formatted prompt string
+    """
+    custom_prompt_text = (custom_prompt or "").strip()
+
+    # Base translation instruction
+    base_instruction = f"""# Role: 专业PPT翻译与排版保真专家
+
+# Core Objective:
+将原始PPT页面中的所有可见文本精准翻译为{target_language}，同时严格保留原始页面的版式布局、视觉层次、图片、图表、Logo、背景及所有非文本元素。
+
+# Inputs:
+- ORIGINAL_SLIDE = 原始PPT页面图片（包含需要翻译的文本）
+{f"- STYLE_REFERENCE = 风格参考图（用于Translation+Restyle模式）" if num_style_refs > 0 else ""}
+
+# Execution Rules (Strict Compliance Required):
+
+## 1. 精准翻译原则 (Text Translation)
+- 识别并翻译ORIGINAL_SLIDE中的所有可见文本内容（标题、正文、标签、按钮文字、图表标注等）
+- 翻译必须准确、专业，保持原文的语气和语境
+- 保持专业术语的准确性，使用目标语言中行业通用的表达方式
+- 不得添加、删除、总结或改写原文内容，必须保持信息完整性
+
+## 2. 版式锁定原则 (Layout Preservation - CRITICAL)
+- 必须100%保留原始页面的版式布局、空间关系、视觉层次
+- 保持文本框的原始位置和大小，确保翻译后的文本在原始区域内恰当显示
+- 保持字体大小、颜色、粗细等文本样式的一致性
+- 保持图表、图片、图标、Logo等视觉元素的原始位置和样式
+- 保持背景、色块、装饰线条等所有非文本元素的完整性
+
+## 3. 文本适配原则 (Text Fitting)
+- 翻译后的文本应当适配原始文本框区域，避免明显的溢出或截断
+- 如果目标语言的文本长度显著不同，可适当调整字号或行距，但必须保持视觉平衡
+- 保持文本的对齐方式（左对齐、居中、右对齐）与原始一致
+- 保持段落间距和列表缩进与原始一致
+
+## 4. 视觉元素保护 (Visual Element Protection)
+- 严禁修改、移动或删除任何图片、图表、Logo、图标、背景图案
+- 严禁修改配色方案、渐变效果、阴影效果等视觉样式
+- 保持所有视觉元素的原始位置和大小
+
+## 5. 输出规范 (Output Requirements)
+- 输出16:9比例的高清PPT页面图片
+- 确保文字清晰可读，边缘锐利
+- 确保整体视觉效果专业、美观"""
+
+    # Add style reference instructions if in Translation+Restyle mode
+    style_instruction = ""
+    if num_style_refs > 0:
+        style_instruction = f"""
+
+## 6. 风格应用原则 (Style Application - Translation+Restyle Mode)
+- 在翻译的同时，应用STYLE_REFERENCE的风格特征
+- 参考风格图的版式框架、配色方案、字体规范、图形语言
+- 将翻译后的内容迁移到目标风格模板中，保持内容逻辑和视觉层级
+- 确保翻译后的内容在新的风格框架下显示得当、美观"""
+
+    # Build image role labels
+    image_labels = []
+    image_num = 1
+    image_labels.append(
+        f"IMAGE {image_num}: Original PPT slide (content source to translate)"
+    )
+
+    if num_style_refs > 0:
+        for i in range(1, num_style_refs + 1):
+            image_num += 1
+            if num_style_refs == 1:
+                image_labels.append(
+                    f"IMAGE {image_num}: Style reference (target style template)"
+                )
+            else:
+                image_labels.append(
+                    f"IMAGE {image_num}: Style reference #{i} (target style template)"
+                )
+
+    image_section = "\n".join(image_labels)
+
+    # Build final prompt
+    prompt = f"""{image_section}
+
+{base_instruction}{style_instruction}
+
+Page {page_index}/{total_pages}.
+
+# Output:
+输出翻译后的16:9高保真商业PPT页面，所有文本已翻译为{target_language}，版式、视觉元素和原始页面保持一致。"""
+
+    # Add custom prompt if provided
+    if custom_prompt_text:
+        prompt += f"""
+
+# Additional Custom Instructions:
+{custom_prompt_text}"""
+
+    logger.info(
+        f"[get_translate_prompt] page {page_index}/{total_pages}, "
+        f"target_language={target_language}, style_refs={num_style_refs}, "
+        f"custom_prompt={bool(custom_prompt_text)}"
+    )
+    return prompt
+
+
+def get_pure_translation_prompt(
+    page_index: int,
+    total_pages: int,
+    target_language: str,
+    custom_prompt: str = "",
+) -> str:
+    """
+    Generate prompt for pure translation mode (no style change).
+
+    This is a convenience wrapper for get_translate_prompt with num_style_refs=0.
+
+    Args:
+        page_index: Current page number (1-indexed)
+        total_pages: Total number of pages
+        target_language: Target language for translation
+        custom_prompt: User-provided custom translation prompt (optional)
+
+    Returns:
+        Formatted prompt string
+    """
+    return get_translate_prompt(
+        page_index=page_index,
+        total_pages=total_pages,
+        target_language=target_language,
+        num_style_refs=0,
+        custom_prompt=custom_prompt,
+    )
+
+
+def get_translation_with_restyle_prompt(
+    page_index: int,
+    total_pages: int,
+    target_language: str,
+    num_style_refs: int = 1,
+    custom_prompt: str = "",
+) -> str:
+    """
+    Generate prompt for translation + restyle mode.
+
+    This is a convenience wrapper for get_translate_prompt with num_style_refs>=1.
+
+    Args:
+        page_index: Current page number (1-indexed)
+        total_pages: Total number of pages
+        target_language: Target language for translation
+        num_style_refs: Number of style reference images (default 1)
+        custom_prompt: User-provided custom translation prompt (optional)
+
+    Returns:
+        Formatted prompt string
+    """
+    return get_translate_prompt(
+        page_index=page_index,
+        total_pages=total_pages,
+        target_language=target_language,
+        num_style_refs=num_style_refs,
+        custom_prompt=custom_prompt,
+    )

@@ -1950,7 +1950,7 @@ export const SlidePreview: React.FC = () => {
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
-                {selectedContextImages.uploadedFiles.map((file, idx) => (
+                {selectedContextImages.uploadedFiles.map((_, idx) => (
                   <div key={idx} className="relative group">
                     <img
                       src={uploadedFileUrls.current[idx] || ''}

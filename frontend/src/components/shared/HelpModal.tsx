@@ -306,7 +306,7 @@ export const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
           {expandedFeature === idx && (
             <div className="px-4 pb-4 pt-0">
               <div className="pl-13 space-y-2">
-                {(t(`help.features.${featureKey}.details`, { returnObjects: true }) as string[]).map((detail: string, detailIdx: number) => (
+                {(t(`help.features.${featureKey}.details`, { returnObjects: true }) as unknown as string[]).map((detail: string, detailIdx: number) => (
                   <div key={detailIdx} className="flex items-start gap-2 text-sm text-gray-600 dark:text-foreground-tertiary">
                     <span className="text-banana-500 mt-1">•</span>
                     <span>{detail}</span>

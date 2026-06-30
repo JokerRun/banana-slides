@@ -21,7 +21,7 @@
 </p> 
 
 <b>A native AI PPT generation application based on nano banana pro🍌, supporting the generation of complete PPT presentations from ideas, outlines, or page descriptions.<br></b>
-<b> Automatically extract charts from attachments, upload arbitrary materials, and propose modifications verbally, moving towards true "Vibe PPT". </b>
+<b> Automatically extract charts from attachments, upload arbitrary materials, propose modifications verbally, and translate/restyle PPT/PDF files, moving towards true "Vibe PPT". </b>
 
 <b>🎯 Lower the barrier to PPT creation, enabling everyone to quickly create beautiful and professional presentations.</b>
 
@@ -102,7 +102,13 @@ No longer restricted by complex menu buttons; issue modification commands direct
 
 <img width="2000" height="1125" alt="image" src="https://github.com/user-attachments/assets/929ba24a-996c-4f6d-9ec6-818be6b08ea3" />
 
-### 4. Out-of-the-box Format Export
+### 4. PPT/PDF Translation and Restyle
+
+- **Source-file translation**: Upload PPT/PPTX/PDF files; the backend converts them into page images and translates each page through image-to-image generation.
+- **Target languages**: English, Chinese, Japanese, Korean, Spanish, French, German, Portuguese, Russian, Italian, and Arabic.
+- **Two modes**: Pure translation keeps the original layout and visual elements; Translation + Restyle also applies style reference images and can reuse the default DDI preset.
+
+### 5. Out-of-the-box Format Export
 
 - **Multi-format Support**: One-click export to standard **PPTX** or **PDF** files.
 - **Perfect Fit**: Default 16:9 aspect ratio; layout requires no manual adjustment, ready for direct presentation.
@@ -110,7 +116,7 @@ No longer restricted by complex menu buttons; issue modification commands direct
 <img width="1000" alt="image" src="https://github.com/user-attachments/assets/3e54bbba-88be-4f69-90a1-02e875c25420" />
 <img width="1748" height="538" alt="PPT and PDF export" src="https://github.com/user-attachments/assets/647eb9b1-d0b6-42cb-a898-378ebe06c984" />
 
-### 5. Fully Editable PPTX Export (Beta)
+### 6. Fully Editable PPTX Export (Beta)
 
 - **Export images as high-fidelity, clean-background PPT pages with freely editable images and text**
 - For related updates, see https://github.com/Anionex/banana-slides/issues/121
@@ -186,6 +192,7 @@ No longer restricted by complex menu buttons; issue modification commands direct
 | ✅ Completed | Vibe oral editing for selected areas on single slides |
 | ✅ Completed | Asset Module: Asset generation, uploading, etc. |
 | ✅ Completed | Support for uploading and parsing multiple file types |
+| ✅ Completed | Support PPT/PDF multilingual translation and Translation + Restyle |
 | ✅ Completed | Support Vibe oral adjustments for outlines and descriptions |
 | ✅ Completed | Initial support for exporting editable .pptx files |
 | 🔄 In Progress | Support for editable .pptx export with multi-layering and precise background removal |
@@ -194,7 +201,7 @@ No longer restricted by complex menu buttons; issue modification commands direct
 | 🚍 Partial | Optimize frontend loading speed |
 | 🧭 Planned | Online playback functionality |
 | 🧭 Planned | Simple animations and slide transition effects |
-| 🚍 Partially Supported | Multilingual support |
+| 🚍 Partially Supported | Multilingual UI and content generation |
 | 🏢 Business Feature | User system |
 
 ## 📦 Usage
@@ -603,6 +610,7 @@ banana-slides/
 │   │   ├── types/              # TypeScript type definitions
 │   │   ├── utils/              # Utility functions
 │   │   ├── constants/          # Constant definitions
+│   │   ├── config/             # Frontend presets, including translation languages/modes
 │   │   └── styles/             # Style files
 │   ├── public/                 # Static assets
 │   ├── package.json
@@ -631,6 +639,7 @@ banana-slides/
 │   │   ├── prompts.py          # AI prompt templates
 │   ├── controllers/            # API controllers
 │   │   ├── project_controller.py      # Project management
+│   │   ├── translate_controller.py    # PPT/PDF translation
 │   │   ├── page_controller.py         # Page management
 │   │   ├── material_controller.py     # Material management
 │   │   ├── template_controller.py     # Template management
