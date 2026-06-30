@@ -239,7 +239,10 @@ def get_page_description_prompt(
     language: str = None,
 ) -> str:
     """
-    生成单个页面描述的 prompt
+    生成单个页面描述的 prompt。
+
+    输出要求包含页面标题、页面文字、ASCII Diagram 版式建议和其他页面素材；
+    版式建议用于后续图片生成，不应作为幻灯片正文渲染。
 
     Args:
         project_context: 项目上下文对象，包含所有原始信息
@@ -280,6 +283,12 @@ def get_page_description_prompt(
 4. 确保内容可读性强，适合在演示时展示
 5. 不要包含任何额外的说明性文字或注释
 
+【硬性约束】请同时遵守：
+- must not modify user-provided content：不得改写、删减、替换或新增用户提供的事实、术语、数字、标题和要点
+- must not modify user-provided color scheme：不得改变用户提供的配色方案
+- must not modify user-provided base template constraints：不得改变用户提供的基础模板约束
+- 仅基于当前页内容、完整大纲和上下文分析最合适的版式
+
 输出格式示例：
 页面标题：原始社会：与自然共生
 {"副标题：人类祖先和自然的相处之道" if page_index == 1 else ""}
@@ -289,6 +298,15 @@ def get_page_description_prompt(
 - 依赖性强：生活完全依赖自然资源的直接供给
 - 适应而非改造：通过观察学习自然，发展生存技能
 - 影响特点：局部、短期、低强度，生态可自我恢复
+
+布局建议（Layout Recommendation - ASCII Diagram）：
++--------------------------------------------------+
+| title area                                       |
++---------------------------+----------------------+
+| key message area          | visual area          |
+| bullet list               | chart/image area     |
++---------------------------+----------------------+
+说明：用 ASCII Diagram 表达页面区域、层级和内容映射，可按内容选择标题区、主视觉区、关键结论区、要点列表、图表/图片区、对比区、流程区等结构。
 
 其他页面素材（如果文件中存在请积极添加，包括markdown图片链接、公式、表格等）
 
@@ -313,7 +331,10 @@ def get_image_generation_prompt(
     page_index: int = 1,
 ) -> str:
     """
-    生成图片生成 prompt
+    生成图片生成 prompt。
+
+    如果页面描述包含 ASCII Diagram 版式建议，该区块只作为 layout-only
+    instruction，不能渲染为页面文字或可见 ASCII 边框。
 
     Args:
         page_desc: 页面描述文本
@@ -362,6 +383,7 @@ def get_image_generation_prompt(
 # Inputs:
 - 参考图片 = 标准 PPT 模板 / 风格参考图（若提供）
 - [文本] = 当前页需要转化为 PPT 的原始页面内容
+- [布局建议 / Layout Recommendation - ASCII Diagram] = layout-only instruction, not slide text
 
 # Core Objective:
 基于 [文本] 的内容与业务逻辑，套用参考图片的 PPT 模板风格，
@@ -385,12 +407,15 @@ def get_image_generation_prompt(
 - 要求文字清晰锐利，画面为高分辨率，16:9比例。
 {template_style_guideline}
 - 严格基于 [文本] 中的原始文字内容进行排版设计，禁止凭空新增、替换、总结或重写未出现的文字信息。
+- 若 [文本] 包含"布局建议（Layout Recommendation - ASCII Diagram）"，该区块仅作为版式指令使用，must not be rendered as slide text。
+- Do not draw ASCII borders, plus signs, pipes, labels such as "title area" / "visual area" / "bullet list" / "chart/image area", or the layout recommendation heading as visible slide content.
+- 文本条目与视觉区块的 1:1 映射只适用于"页面标题"、"页面文字"和用户明确要求展示的内容，不适用于布局建议区块。
 - 可以对内容进行视觉化拆分、归类、层级化呈现，以及必要的版式适配（如将长句拆分为要点列表）。
 - 深度理解 [文本] 的业务主题、逻辑关系（并列 / 递进 / 包含 / 对比 / 因果），再决定版式。
 - 强制执行文本条目与视觉区块的 1:1 映射，严格基于实际文本条目数生成对应数量的几何区块或层级。
 - 若 [文本] 中包含明确主题或标题，将其作为页面标题；若无法识别明确标题，严禁自行捏造标题。
-- 标题规范：微软雅黑 Bold，32pt，DDI 板岩蓝 #3D4F5F，左对齐，贴近内容区左侧。
-- 色系限定：标题/页眉/结构线/主视觉使用 #3D4F5F；强调色/流程箭头/重点标签使用 #F9A825；辅助色仅使用 #2D72B2 / #E67E22 / #88A02C / #662D7C / #8B9A46；正文 #333333，次要文本 #666666，分割线 #E0E0E0，背景 #FFFFFF。
+- 标题规范：默认微软雅黑 Bold，32pt，左对齐，贴近内容区左侧；若用户提供标题样式或配色，以用户要求为准。
+- Preserve any user-provided color scheme exactly. Use the default DDI palette only when [文本]、额外要求和参考信息均未指定配色：标题/页眉/结构线/主视觉使用 #3D4F5F；强调色/流程箭头/重点标签使用 #F9A825；辅助色仅使用 #2D72B2 / #E67E22 / #88A02C / #662D7C / #8B9A46；正文 #333333，次要文本 #666666，分割线 #E0E0E0，背景 #FFFFFF。
 - 优先理解内容逻辑并匹配最优版式：流程用路线图，对比用左右/矩阵，层级用分层/冰山，核心主题用辐射/树状，概览用网格卡片，指标用 dashboard，循环用环形流转，问题到解决方案用桥接版式。
 - 允许图形：圆形节点、圆角矩形、房屋图标、粗体折线/S形箭头、带序号流程节点、矩阵表格、金字塔、文档图示；必须为纯扁平化矢量风格。
 - 主视觉区块控制在 3–5 个内并容纳所有原文内容；整体留白 8%–10%；文字约 40%，结构化图形约 60%；线条粗细一致，严格网格对齐。
@@ -425,9 +450,10 @@ def get_image_edit_prompt(
         格式化后的 prompt 字符串
     """
     if original_description:
-        # 删除"其他页面素材："之后的内容，避免被前面的图影响
         if "其他页面素材" in original_description:
             original_description = original_description.split("其他页面素材")[0].strip()
+        if "布局建议" in original_description:
+            original_description = original_description.split("布局建议")[0].strip()
 
         prompt = f"""\
 该PPT页面的原始页面描述为：
@@ -534,7 +560,10 @@ def get_description_split_prompt(
     project_context: "ProjectContext", outline: List[Dict], language: str = None
 ) -> str:
     """
-    从描述文本切分出每页描述的 prompt
+    从描述文本切分出每页描述的 prompt。
+
+    每页输出应保留用户正文、配色和基础模板约束，并单独生成 ASCII
+    Diagram 版式建议供图片生成步骤使用。
 
     Args:
         project_context: 项目上下文对象，包含所有原始信息
@@ -570,11 +599,19 @@ Each element should be a string containing the page description in the following
 - [要点2]
 ...
 
+布局建议（Layout Recommendation - ASCII Diagram）：
++--------------------------------------------------+
+| title area                                       |
++---------------------------+----------------------+
+| key message area          | visual area          |
+| bullet list               | chart/image area     |
++---------------------------+----------------------+
+
 其他页面素材（如果有排版、风格、素材等细节）
 
 Example output format:
 [
-    "页面标题：人工智能的诞生\\n页面文字：\\n- 1950 年，图灵提出"图灵测试"\\n- 奠定了AI的理论基础\\n\\n其他页面素材：\\n排版：标题居中，大字号\\n风格：科技感蓝色背景",
+    "页面标题：人工智能的诞生\\n页面文字：\\n- 1950 年，图灵提出"图灵测试"\\n- 奠定了AI的理论基础\\n\\n布局建议（Layout Recommendation - ASCII Diagram）：\\n+----------------------+----------------------+\\n| title area           | key message area     |\\n+----------------------+----------------------+\\n| visual area          | bullet list          |\\n| chart/image area     | bullet list          |\\n+----------------------+----------------------+\\n\\n其他页面素材：\\n排版：标题居中，大字号\\n风格：科技感蓝色背景",
     "页面标题：AI 的发展历程\\n页面文字：\\n- 1950年代：符号主义...",
     ...
 ]
@@ -585,12 +622,20 @@ Important rules:
 
 Fidelity rules (CRITICAL — do not paraphrase or invent):
 - "页面文字" must be copied VERBATIM from the original description text. Do NOT rewrite, polish, summarize, or change wording. Keep the source's exact phrasing, terminology, numbers, names, and quoted speech. Where the source uses "钩子句", output "钩子句"; do not rename it.
-- Design / layout / style / material / visual instructions (排版、风格、素材、版式、视觉元素、配色、Logo 尺寸) belong ONLY in the "其他页面素材" section. They must NEVER appear in "页面文字". Conversely, body copy must NEVER appear in "其他页面素材".
+- must not modify user-provided content: preserve user-provided facts, terms, numbers, titles, and bullet text; do not rewrite, delete, replace, or add body content.
+- must not modify user-provided color scheme: preserve any user-provided color scheme exactly.
+- must not modify user-provided base template constraints: preserve any user-provided base template constraints exactly.
+- Design / style / material / visual instructions (排版、风格、素材、视觉元素、配色、Logo 尺寸) belong ONLY in the "其他页面素材" section. They must NEVER appear in "页面文字". Conversely, body copy must NEVER appear in "其他页面素材".
+- Layout instructions must be expressed in the separate "布局建议（Layout Recommendation - ASCII Diagram）" section. Analyze the page content and context, then recommend a layout using ASCII Diagram boxes/regions such as title area, visual area, key message area, bullet list, and chart/image area. Do NOT change the preserved user content, color scheme, or base template constraints while creating this recommendation.
 - If a page references an image (e.g. "内容可见上传的图片" / "见图" / "见上传图片" / "详见设计图" / "见附图"), preserve that reference VERBATIM inside "页面文字" as one line in the form: "【需上传图片】<原句照抄>". Do NOT rewrite it into a fabricated description of what the image shows.
-- If a page in the outline has NO corresponding description in the original text, output only:
+- If a page in the outline has NO corresponding description in the original text, output only the unavailable-content marker plus a minimal title-only layout:
   页面标题：[页面标题]
   页面文字：
   （原文未提供）
+  布局建议（Layout Recommendation - ASCII Diagram）：
+  +--------------------------------------------------+
+  | title area                                       |
+  +--------------------------------------------------+
   Do NOT invent or hallucinate content based on the outline title. Do NOT describe images that the user never described.
 
 Now split the description text into individual page descriptions. Return only the JSON array, don't include any other text.
@@ -855,9 +900,13 @@ def get_restyle_prompt(
         if num_style_refs == 1:
             image_labels.append(f"IMAGE {img_num}: [底版.png] base template reference")
         else:
-            image_labels.append(f"IMAGE {img_num}: [底版.png] base template reference #{i}")
+            image_labels.append(
+                f"IMAGE {img_num}: [底版.png] base template reference #{i}"
+            )
     original_image_num = num_style_refs + 1
-    image_labels.append(f"IMAGE {original_image_num}: Original PPT slide (content source)")
+    image_labels.append(
+        f"IMAGE {original_image_num}: Original PPT slide (content source)"
+    )
 
     image_section = "\n".join(image_labels)
     template_ref_note = (
@@ -1168,7 +1217,9 @@ def get_text_attribute_extraction_prompt(content_hint: str = "") -> str:
     ]
 }}
 ```
-""".format(content_hint=content_hint)
+""".format(
+        content_hint=content_hint
+    )
 
     # logger.info(f"[get_text_attribute_extraction_prompt] Final prompt:\n{prompt}")
     return prompt
