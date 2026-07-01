@@ -342,9 +342,17 @@ def update_project(project_id):
     
     Request body:
     {
+        "project_name": "optional display name, null clears explicit rename",
         "idea_prompt": "...",
+        "outline_text": "...",
+        "description_text": "...",
+        "extra_requirements": "...",
         "pages_order": ["page-uuid-1", "page-uuid-2", ...]
     }
+
+    project_name is the History page display name only. It is stored separately
+    from generation inputs and page outline titles; blank names and names over
+    255 characters are rejected.
     """
     try:
         auth_error = require_auth_response()

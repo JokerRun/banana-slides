@@ -3,7 +3,9 @@ import type { Project, Page, DescriptionContent } from '@/types';
 import { downloadFile } from './index';
 
 /**
- * 获取项目标题
+ * 获取项目标题。
+ * 优先使用用户显式重命名的 project_name；文件型项目未重命名时使用源文件名；
+ * 普通项目保持旧行为，从第一页大纲标题 fallback。
  */
 export const getProjectTitle = (project: Project): string => {
   const projectName = project.project_name?.trim();

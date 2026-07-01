@@ -105,14 +105,14 @@ uv run python app.py
 
 ## API文档
 
-完整的API文档请参考项目根目录的 `API设计文档.md`。
+本节维护后端主要 API 摘要；接口行为以 controller 与测试为准。
 
 ### 主要端点
 
 #### 项目管理
 - `POST /api/projects` - 创建项目
 - `GET /api/projects/{project_id}` - 获取项目详情
-- `PUT /api/projects/{project_id}` - 更新项目
+- `PUT /api/projects/{project_id}` - 更新项目。`project_name` 是历史页显示名，和 `idea_prompt`、`outline_text`、`description_text`、第一页大纲标题分离；字符串会 trim，空字符串/纯空白和超过 255 字符返回 400，`null` 表示清除自定义名并恢复前端 fallback 标题。
 - `DELETE /api/projects/{project_id}` - 删除项目
 
 #### 大纲生成
@@ -209,6 +209,7 @@ result = remove_regions(image, bboxes, expand_pixels=5)
 
 #### Project（项目）
 - 项目基本信息
+- `project_name` 为用户在历史页显式重命名后的显示名；为空时前端按项目类型 fallback，不会修改生成输入或页面标题
 - 模板图片路径
 - `creation_type` 支持 `idea`、`outline`、`descriptions`、`restyle`、`translate`
 - 翻译项目会保存源文件路径、目标语言、翻译模式和可选风格参考图

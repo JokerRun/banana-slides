@@ -103,6 +103,11 @@ src/
 - 编辑单页（自然语言修改）
 - 导出为 PPTX/PDF
 
+### 5. 历史页 (/history)
+- 项目重命名写入后端 `project_name` 字段，只影响历史页显示名
+- `project_name` 为空时标题按工具函数 fallback：翻译/Restyle 等文件型项目优先源文件名，普通项目继续使用第一页大纲标题
+- 重命名不会修改 `idea_prompt`、`description_text` 或第一页 `outline_content.title`
+
 ## 开发注意事项
 
 ### 状态管理
