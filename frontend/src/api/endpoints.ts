@@ -117,7 +117,8 @@ export const deleteProject = async (projectId: string): Promise<ApiResponse> => 
 };
 
 /**
- * 更新项目
+ * 更新项目。
+ * History 页重命名应发送 project_name；不要把显示名写入 idea_prompt 或页面标题。
  */
 export const updateProject = async (
   projectId: string,

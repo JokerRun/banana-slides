@@ -2,13 +2,24 @@ import { getImageUrl } from '@/api/client';
 import type { Project, Page, DescriptionContent } from '@/types';
 import { downloadFile } from './index';
 
+/** Matches backend `projects.project_name` String(255). */
+export const PROJECT_NAME_MAX_LENGTH = 255;
+
 /**
- * 获取项目标题
+ * 获取项目标题。
+ * 优先使用用户显式重命名的 project_name；文件型项目未重命名时使用源文件名；
+ * 普通项目保持旧行为，从第一页大纲标题 fallback。
  */
 export const getProjectTitle = (project: Project): string => {
-  // restyle 项目优先使用 idea_prompt（即源文件名）
-  if (project.creation_type === 'restyle' && project.idea_prompt) {
-    return project.idea_prompt;
+  const projectName = project.project_name?.trim();
+  if (projectName) {
+    return projectName;
+  }
+
+  const sourceFilename = project.source_file_path?.split(/[\\/]/).pop()?.trim();
+  const fileFallback = project.idea_prompt?.trim() || sourceFilename;
+  if ((project.creation_type === 'restyle' || project.creation_type === 'translate') && fileFallback) {
+    return fileFallback;
   }
 
   // 从第一个页面的大纲标题获取项目名称
@@ -18,13 +29,14 @@ export const getProjectTitle = (project: Project): string => {
     );
     const firstPage = sortedPages[0];
 
-    if (firstPage?.outline_content?.title) {
-      return firstPage.outline_content.title;
+    const firstPageTitle = firstPage?.outline_content?.title?.trim();
+    if (firstPageTitle) {
+      return firstPageTitle;
     }
   }
 
   // 兜底：idea_prompt 或默认名
-  return project.idea_prompt || '未命名项目';
+  return project.idea_prompt?.trim() || '未命名项目';
 };
 
 /**
@@ -201,4 +213,3 @@ export const exportDescriptionsToMarkdown = (project: Project): void => {
   const filename = `页面描述_${project.id?.slice(0, 8) || 'export'}.md`;
   downloadFile(blob, filename);
 };
-

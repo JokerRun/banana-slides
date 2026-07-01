@@ -7,6 +7,7 @@
 - docker 挂载：`./data/debug:/app/debug`
 
 当前主要内容是 `restyle-context/`，用于追踪 restyle 首轮生成与后续多轮编辑。
+`export_restyle_debug_excel.py` 可把这些 artifact 和数据库记录汇总成 Excel；导出的 `project_name` 列优先使用历史页显式重命名的 `projects.project_name`，为空时回退到 `idea_prompt`。
 
 ## 当前范围
 

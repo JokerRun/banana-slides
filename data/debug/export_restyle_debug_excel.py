@@ -604,7 +604,7 @@ def build_project_rows(db_data: dict[str, Any]) -> list[dict[str, Any]]:
         current_version_count = sum(1 for page in pages if db_data['current_versions'].get(page['id']))
         rows.append({
             'project_id': project_id,
-            'project_name': project.get('idea_prompt'),
+            'project_name': project.get('project_name') or project.get('idea_prompt'),
             'creation_type': project.get('creation_type'),
             'project_status': project.get('status'),
             'restyle_prompt': project.get('restyle_prompt'),
@@ -635,7 +635,7 @@ def build_task_rows(db_data: dict[str, Any], task_meta: dict[str, dict[str, Any]
         rows.append({
             'task_id': task_id,
             'project_id': task.get('project_id') or meta.get('project_id'),
-            'project_name': project.get('idea_prompt'),
+            'project_name': project.get('project_name') or project.get('idea_prompt'),
             'task_type': task.get('task_type'),
             'task_status': task.get('status'),
             'flow_kind': meta.get('flow_kind'),
@@ -665,7 +665,7 @@ def build_page_rows(db_data: dict[str, Any], uploads_root: Path) -> list[dict[st
         original_host = host_path(page.get('original_slide_image_path'), uploads_root)
         rows.append({
             'project_id': page['project_id'],
-            'project_name': project.get('idea_prompt'),
+            'project_name': project.get('project_name') or project.get('idea_prompt'),
             'page_id': page['id'],
             'order_index': page.get('order_index'),
             'page_status': page.get('status'),
@@ -710,7 +710,7 @@ def build_version_rows(db_data: dict[str, Any], debug_entries: list[DebugEntry],
         host_image = host_path(version.get('image_path'), uploads_root)
         rows.append({
             'project_id': page.get('project_id'),
-            'project_name': project.get('idea_prompt'),
+            'project_name': project.get('project_name') or project.get('idea_prompt'),
             'project_status': project.get('status'),
             'page_id': page.get('id'),
             'order_index': page.get('order_index'),
@@ -752,7 +752,7 @@ def build_request_rows(db_data: dict[str, Any], debug_entries: list[DebugEntry])
         rows.append({
             'task_id': entry.task_id,
             'project_id': entry.project_id,
-            'project_name': project.get('idea_prompt'),
+            'project_name': project.get('project_name') or project.get('idea_prompt'),
             'page_id': entry.page_id,
             'order_index': entry.order_index,
             'version_number': entry.version_number,
