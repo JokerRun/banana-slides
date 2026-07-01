@@ -7,7 +7,7 @@
 - Single backend test：`uv run pytest backend/tests/unit/test_api_health.py`；按用例过滤可用 `uv run pytest backend/tests/unit/test_api_health.py -k health_check`。
 - Single frontend test：`cd frontend && npm run test:run -- src/tests/components/Button.test.tsx -t "renders"`；单个 E2E 用 `cd frontend && npm run test:e2e -- e2e/ui-full-flow.spec.ts`。
 - Verify：结束前优先跑最小相关 lint/test 范围；如果同时改了前后端，再跑 `npm run quick-check`。
-- Repo shape：根目录负责 Docker 和统一 scripts；`backend/` 是 Flask API，`frontend/` 是 React 18 + Vite，`docs/` 放 plans/specs，`.github/workflows/` 定义 CI。
+- Repo shape：根目录负责 Docker 和统一 scripts；`backend/` 是 Flask API，`frontend/` 是 React 18 + Vite，`docs/` 放 plans/specs（`docs/superpowers/`）、guides、需求材料与 Lavish 历史报告索引（`docs/lavish/README.md`，HTML 为归档上下文，实施前以代码为准），`.github/workflows/` 定义 CI。
 - Backend architecture：`backend/app.py` 是 app factory，负责接 CORS、cookie auth、SQLite WAL、Flask-Migrate 和各类 blueprints。
 - Backend layers：`controllers/` 暴露 `/api/*`；`services/` 放 AI、export、auth、task、material、restyle 逻辑；`models/` 是 SQLAlchemy models；`utils/` 放 response/auth 等共享 helpers。
 - Data/storage：SQLite DB 在 `backend/instance/database.db`；Alembic migrations 在 `backend/migrations`；上传和生成文件放 `uploads/`，通过 `/files/*` 提供访问。

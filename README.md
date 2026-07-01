@@ -595,6 +595,7 @@ banana-slides/
 │
 ├── assets/
 │   └── presets/                # 运行时风格预置包（DDI 底图与 prompt；见 assets/presets/README.md）
+├── docs/                       # 内部文档：superpowers 规格/计划、guides、需求材料；Lavish 归档见 docs/lavish/README.md
 ├── tests/                      # 测试文件目录
 ├── v0_demo/                    # 早期演示版本
 ├── output/                     # 输出文件目录
