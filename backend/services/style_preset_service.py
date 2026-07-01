@@ -7,13 +7,26 @@ from __future__ import annotations
 import hashlib
 import json
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 
 class StylePresetError(ValueError):
     """Raised when a style preset cannot be loaded or applied."""
+
+
+_PROMPT_KEYS = ("generate", "restyle", "translateRestyle")
+
+_manifest_cache: list["StylePreset"] | None = None
+_manifest_cache_mtime: float | None = None
+
+
+def clear_style_preset_cache() -> None:
+    """Clear in-process preset manifest cache (tests/dev)."""
+    global _manifest_cache, _manifest_cache_mtime
+    _manifest_cache = None
+    _manifest_cache_mtime = None
 
 
 @dataclass(frozen=True)
@@ -25,7 +38,8 @@ class StylePreset:
     base_image: str
     sha256: str
     prompts: dict[str, str]
-    directory: Path
+    prompt_texts: dict[str, str] = field(default_factory=dict)
+    directory: Path = field(default_factory=Path)
 
     @property
     def base_image_path(self) -> Path:
@@ -40,7 +54,11 @@ class StylePreset:
             "baseImage": self.base_image,
             "sha256": self.sha256,
             "imageUrl": f"/api/presets/{self.id}/image",
-            "prompts": self.prompts,
+            "prompts": {
+                key: self.prompt_texts.get(key, self.prompts.get(key, ""))
+                for key in _PROMPT_KEYS
+                if key in self.prompts or key in self.prompt_texts
+            },
         }
 
 
@@ -60,9 +78,22 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _load_prompt_texts(directory: Path, prompt_files: dict[str, str]) -> dict[str, str]:
+    loaded: dict[str, str] = {}
+    for key, filename in prompt_files.items():
+        path = directory / filename
+        if not path.is_file():
+            raise StylePresetError(
+                f"Style preset prompt file missing: {path}"
+            )
+        loaded[key] = path.read_text(encoding="utf-8").strip()
+    return loaded
+
+
 def _load_manifest(path: Path) -> StylePreset:
     data = json.loads(path.read_text(encoding="utf-8"))
     directory = path.parent
+    prompt_files = data.get("prompts", {})
     preset = StylePreset(
         id=data["id"],
         legacy_ids=data.get("legacyIds", []),
@@ -70,7 +101,8 @@ def _load_manifest(path: Path) -> StylePreset:
         name=data["name"],
         base_image=data["baseImage"],
         sha256=data["sha256"],
-        prompts=data.get("prompts", {}),
+        prompts=prompt_files,
+        prompt_texts=_load_prompt_texts(directory, prompt_files),
         directory=directory,
     )
     actual_sha = _sha256(preset.base_image_path)
@@ -82,11 +114,33 @@ def _load_manifest(path: Path) -> StylePreset:
     return preset
 
 
+def _presets_root_mtime() -> float:
+    root = _presets_root()
+    if not root.is_dir():
+        return 0.0
+    mtimes = [root.stat().st_mtime]
+    for path in root.rglob("*"):
+        if path.is_file():
+            mtimes.append(path.stat().st_mtime)
+    return max(mtimes)
+
+
+def _load_all_presets() -> list[StylePreset]:
+    return [
+        _load_manifest(manifest)
+        for manifest in sorted(_presets_root().glob("*/preset.json"))
+    ]
+
+
 def list_style_presets() -> list[StylePreset]:
-    presets = []
-    for manifest in sorted(_presets_root().glob("*/preset.json")):
-        presets.append(_load_manifest(manifest))
-    return presets
+    global _manifest_cache, _manifest_cache_mtime
+    mtime = _presets_root_mtime()
+    if _manifest_cache is not None and _manifest_cache_mtime == mtime:
+        return list(_manifest_cache)
+    presets = _load_all_presets()
+    _manifest_cache = presets
+    _manifest_cache_mtime = mtime
+    return list(presets)
 
 
 def get_style_preset(preset_id: str) -> StylePreset:
@@ -95,6 +149,33 @@ def get_style_preset(preset_id: str) -> StylePreset:
         if requested_id == preset.id or requested_id in preset.legacy_ids:
             return preset
     raise StylePresetError(f"Unsupported style_preset_id: {preset_id}")
+
+
+def resolve_generate_style_requirements(project) -> str | None:
+    """Merge extra_requirements, explicit template_style, or canonical generate prompt."""
+    combined = project.extra_requirements or ""
+    template_style = (getattr(project, "template_style", None) or "").strip()
+    if template_style:
+        combined += f"\n\nppt页面风格描述：\n\n{template_style}"
+    elif getattr(project, "style_preset_id", None):
+        try:
+            combined += "\n\n" + get_style_preset_prompt_text(
+                project.style_preset_id, "generate"
+            )
+        except StylePresetError:
+            pass
+    text = combined.strip()
+    return text or None
+
+
+def get_style_preset_prompt_text(preset_id: str, prompt_key: str) -> str:
+    preset = get_style_preset(preset_id)
+    text = preset.prompt_texts.get(prompt_key, "").strip()
+    if not text:
+        raise StylePresetError(
+            f"Style preset {preset.id} has no prompt text for key: {prompt_key}"
+        )
+    return text
 
 
 def apply_style_preset_to_project(

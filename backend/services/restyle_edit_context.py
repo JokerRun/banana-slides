@@ -49,14 +49,28 @@ def reconstruct_base_prompt_snapshot(
     total_pages: int,
     num_style_refs: int,
     custom_prompt: str,
+    style_preset_id: str | None = None,
 ) -> str:
     """Best-effort reconstruction when page snapshot is null."""
     from services.prompts import get_restyle_prompt
+    from services.style_preset_service import (
+        StylePresetError,
+        get_style_preset_prompt_text,
+    )
+
+    preset_base_body = None
+    if not (custom_prompt or "").strip() and style_preset_id:
+        try:
+            preset_base_body = get_style_preset_prompt_text(style_preset_id, "restyle")
+        except StylePresetError:
+            preset_base_body = None
+
     return get_restyle_prompt(
         page_index=page_index,
         total_pages=total_pages,
         num_style_refs=max(1, num_style_refs),
         custom_prompt=custom_prompt,
+        preset_base_body=preset_base_body,
     )
 
 
@@ -308,6 +322,7 @@ def build_restyle_edit_context(
     style_ref_paths: List[str],
     restyle_base_prompt_snapshot: Optional[str],
     restyle_prompt: str,
+    style_preset_id: Optional[str] = None,
     current_selected_path: Optional[str],
     edit_instruction: str,
     current_extra_ref_paths: Optional[List[str]] = None,
@@ -335,6 +350,7 @@ def build_restyle_edit_context(
             total_pages=total_pages,
             num_style_refs=len(style_ref_paths),
             custom_prompt=restyle_prompt,
+            style_preset_id=style_preset_id,
         )
         degraded = True
         snapshot_source = 'reconstructed'

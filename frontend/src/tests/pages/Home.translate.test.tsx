@@ -24,6 +24,24 @@ vi.mock('@/store/useProjectStore', () => ({
 vi.mock('@/api/endpoints', () => ({
   getAuthMe: vi.fn().mockResolvedValue({ data: { user: { id: 'user-1', display_name: 'Captain' } } }),
   logoutAuth: vi.fn().mockResolvedValue({ data: { ok: true } }),
+  listPresets: vi.fn().mockResolvedValue({
+    data: {
+      presets: [{
+        id: 'ddi-standard',
+        legacyIds: ['ddi'],
+        version: '2026-07-01',
+        name: 'DDI Standard',
+        baseImage: 'base.png',
+        sha256: 'f7f14464afd72793df3b68e5c06a91a32b4329c24d0886a7a557dd01bdcc112c',
+        imageUrl: '/api/presets/ddi-standard/image',
+        prompts: {
+          generate: 'DDI Generate Prompt',
+          restyle: '零重写内容原则',
+          translateRestyle: 'DDI Translate + Restyle',
+        },
+      }],
+    },
+  }),
   createRestyleProject: vi.fn(),
   createTranslateProject: vi.fn(),
   uploadReferenceFile: vi.fn(),

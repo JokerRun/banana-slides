@@ -906,6 +906,7 @@ def get_restyle_prompt(
     total_pages: int,
     num_style_refs: int = 1,
     custom_prompt: str = "",
+    preset_base_body: str | None = None,
 ) -> str:
     """
     Generate prompt for single-page DDI restyle.
@@ -970,6 +971,26 @@ Output: 16:9 landscape PPT slide, high resolution, crisp readable text."""
         logger.info(
             f"[get_restyle_prompt] page {page_index}/{total_pages}, "
             f"style_refs={num_style_refs}, custom_prompt=True"
+        )
+        return prompt
+
+    preset_body = (preset_base_body or "").strip()
+    if preset_body:
+        prompt = f"""\
+{image_section}
+
+Image role notes:
+- {template_ref_note}
+- IMAGE {original_image_num} is the original PPT slide. Extract content only.
+
+{preset_body}
+
+Page {page_index}/{total_pages}.
+
+Output: 16:9 landscape PPT slide, high resolution, crisp readable text."""
+        logger.info(
+            f"[get_restyle_prompt] page {page_index}/{total_pages}, "
+            f"style_refs={num_style_refs}, custom_prompt=False, preset_base=True"
         )
         return prompt
 
@@ -1397,6 +1418,7 @@ def get_translate_prompt(
     target_language: str,
     num_style_refs: int = 0,
     custom_prompt: str = "",
+    preset_base_body: str | None = None,
 ) -> str:
     """
     Generate prompt for PPT page translation via image-to-image generation.
@@ -1488,6 +1510,25 @@ def get_translate_prompt(
                 )
 
     image_section = "\n".join(image_labels)
+
+    preset_body = (preset_base_body or "").strip()
+    if num_style_refs > 0 and preset_body and not custom_prompt_text:
+        prompt = f"""{image_section}
+
+Target language for translation: {target_language}
+
+{preset_body}
+
+Page {page_index}/{total_pages}.
+
+# Output:
+输出翻译后的16:9高保真商业PPT页面，所有文本已翻译为{target_language}。"""
+        logger.info(
+            f"[get_translate_prompt] page {page_index}/{total_pages}, "
+            f"target_language={target_language}, style_refs={num_style_refs}, "
+            f"custom_prompt=False, preset_base=True"
+        )
+        return prompt
 
     # Build final prompt
     prompt = f"""{image_section}

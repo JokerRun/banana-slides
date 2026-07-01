@@ -13,6 +13,7 @@ import { PRESET_STYLES } from '@/config/presetStyles';
 import { RESTYLE_PRESETS, getRestylePresetById } from '@/config/restylePresets';
 import { TRANSLATE_PRESETS, TARGET_LANGUAGES, getTargetLanguageByCode, getTranslatePresetById } from '@/config/translatePresets';
 import { GENERATE_DDI_PROMPT, GENERATE_PRESETS } from '@/config/generatePresets';
+import { useRuntimePresets } from '@/hooks/useRuntimePresets';
 
 type CreationType = 'idea' | 'outline' | 'description' | 'restyle' | 'translate';
 
@@ -563,23 +564,68 @@ export const Home: React.FC = () => {
     },
   };
 
+  const { presets: runtimePresets } = useRuntimePresets();
+
+  const restylePresetOptions = useMemo(() => {
+    if (runtimePresets.length > 0) {
+      return runtimePresets.map((preset) => {
+        const fallback = getRestylePresetById(preset.id);
+        return {
+          id: preset.id,
+          name: preset.name,
+          description: fallback?.description ?? preset.name,
+          imageUrl: preset.imageUrl,
+          prompt: preset.prompts.restyle,
+        };
+      });
+    }
+    return RESTYLE_PRESETS.map((preset) => ({
+      id: preset.id,
+      name: preset.name,
+      description: preset.description,
+      imageUrl: preset.imageUrl,
+      prompt: preset.prompt,
+    }));
+  }, [runtimePresets]);
+
+  const generatePresetOptions = useMemo(() => {
+    if (runtimePresets.length > 0) {
+      return runtimePresets.map((preset) => {
+        const fallback = GENERATE_PRESETS.find((item) => item.id === preset.id);
+        return {
+          id: preset.id,
+          name: preset.name,
+          imageUrl: preset.imageUrl,
+          prompt: preset.prompts.generate,
+        };
+      });
+    }
+    return GENERATE_PRESETS.map((preset) => ({
+      id: preset.id,
+      name: preset.name,
+      imageUrl: preset.imageUrl,
+      prompt: preset.prompt,
+    }));
+  }, [runtimePresets]);
+
   const selectedRestylePreset = useMemo(() => {
     if (!selectedRestylePresetId) {
       return undefined;
     }
-    return getRestylePresetById(selectedRestylePresetId);
-  }, [selectedRestylePresetId]);
+    return restylePresetOptions.find((preset) => preset.id === selectedRestylePresetId)
+      ?? getRestylePresetById(selectedRestylePresetId);
+  }, [selectedRestylePresetId, restylePresetOptions]);
 
   const applyGeneratePreset = useCallback((presetId: string) => {
     setSelectedGeneratePresetId(presetId);
-    const preset = GENERATE_PRESETS.find(item => item.id === presetId);
+    const preset = generatePresetOptions.find(item => item.id === presetId);
     if (!preset) {
       setGenerateStyleRefs([]);
       return;
     }
     setGenerateStyleRefs([]);
     setTemplateStyle(preset.prompt);
-  }, []);
+  }, [generatePresetOptions]);
 
   const applyRestylePreset = useCallback((presetId: string, silent = false) => {
     setSelectedRestylePresetId(presetId);
@@ -587,7 +633,8 @@ export const Home: React.FC = () => {
       return;
     }
 
-    const preset = getRestylePresetById(presetId);
+    const preset = restylePresetOptions.find((item) => item.id === presetId)
+      ?? getRestylePresetById(presetId);
     if (!preset) {
       return;
     }
@@ -598,26 +645,34 @@ export const Home: React.FC = () => {
     if (!silent) {
       show({ message: t('home.messages.restylePresetApplied'), type: 'success' });
     }
-  }, [show, t]);
+  }, [restylePresetOptions, show, t]);
 
   const applyDefaultTranslateRestylePreset = useCallback(() => {
-    const preset = RESTYLE_PRESETS[0];
+    const preset = restylePresetOptions[0];
     if (!preset) {
       return;
     }
 
-    setTranslatePrompt(prev => prev.trim() ? prev : preset.prompt);
-  }, []);
+    const translateBody = runtimePresets[0]?.prompts.translateRestyle ?? preset.prompt;
+    setTranslatePrompt(prev => prev.trim() ? prev : translateBody);
+  }, [restylePresetOptions, runtimePresets]);
 
-  // 默认静默应用 DDI 预制模板（填充 prompt + 参考图），与生成模式默认 DDI 行为一致
+  const runtimeDefaultsApplied = useRef(false);
   useEffect(() => {
-    const defaultId = RESTYLE_PRESETS[0]?.id;
+    if (runtimeDefaultsApplied.current || restylePresetOptions.length === 0) {
+      return;
+    }
+    runtimeDefaultsApplied.current = true;
+    const defaultId = restylePresetOptions[0]?.id;
     if (defaultId) {
       applyRestylePreset(defaultId, true);
     }
-    // 仅在 mount 时应用一次默认模板，避免依赖 show/t 引用变化导致重复触发
-
-  }, []);
+    const defaultGenerate = generatePresetOptions.find((item) => item.id === 'ddi-standard')
+      ?? generatePresetOptions[0];
+    if (defaultGenerate?.prompt) {
+      setTemplateStyle(defaultGenerate.prompt);
+    }
+  }, [applyRestylePreset, generatePresetOptions, restylePresetOptions]);
 
   // === Restyle submit handler ===
   const handleRestyleSubmit = async () => {
@@ -1127,7 +1182,7 @@ export const Home: React.FC = () => {
                   className="w-full rounded-lg border-2 border-gray-200 dark:border-border-primary bg-white dark:bg-background-tertiary px-3 py-2 text-sm text-gray-800 dark:text-white focus:border-banana-400 dark:focus:border-banana"
                 >
                   <option value="">{i18n.language?.startsWith('zh') ? '不使用预制模板（手动配置）' : 'No preset (manual setup)'}</option>
-                  {RESTYLE_PRESETS.map((preset) => (
+                  {restylePresetOptions.map((preset) => (
                     <option key={preset.id} value={preset.id}>
                       {preset.name}
                     </option>
@@ -1296,7 +1351,7 @@ export const Home: React.FC = () => {
                         setSelectedTranslatePresetId(preset.id);
                         if (preset.id === 'pure-translation') {
                           setTranslateMode('pure');
-                          setTranslatePrompt(prev => prev === RESTYLE_PRESETS[0]?.prompt ? '' : prev);
+                          setTranslatePrompt(prev => prev === restylePresetOptions[0]?.prompt ? '' : prev);
                         } else {
                           setTranslateMode('restyle');
                           if (translateStyleRefs.length === 0) {
@@ -1334,7 +1389,7 @@ export const Home: React.FC = () => {
                     {translateMode === 'restyle' && translateStyleRefs.length === 0 && (
                       <div className="w-40 h-24 rounded-lg border-2 border-banana-400 overflow-hidden bg-slate-100 shadow-sm">
                         <img
-                          src={RESTYLE_PRESETS[0].imageUrl}
+                          src={restylePresetOptions[0]?.imageUrl ?? RESTYLE_PRESETS[0].imageUrl}
                           alt="DDI standard template"
                           className="w-full h-full object-cover"
                         />
@@ -1473,7 +1528,7 @@ export const Home: React.FC = () => {
               }}
               className="w-full md:w-1/2 rounded-lg border-2 border-gray-200 dark:border-border-primary bg-white dark:bg-background-tertiary px-4 py-3 text-sm md:text-base font-semibold text-gray-900 dark:text-white focus:border-banana-400 dark:focus:border-banana outline-none"
             >
-              {GENERATE_PRESETS.map((preset) => (
+              {generatePresetOptions.map((preset) => (
                 <option key={preset.id} value={preset.id}>{preset.name}</option>
               ))}
               <option value="custom">{i18n.language?.startsWith('zh') ? '自定义模板' : 'Custom template'}</option>
@@ -1494,7 +1549,7 @@ export const Home: React.FC = () => {
               {selectedGeneratePresetId === 'ddi-standard' && generateStyleRefs.length === 0 && (
                 <div className="w-40 h-24 rounded-lg border-2 border-banana-400 overflow-hidden bg-slate-100 shadow-sm">
                   <img
-                    src={GENERATE_PRESETS[0].imageUrl}
+                    src={generatePresetOptions.find((item) => item.id === 'ddi-standard')?.imageUrl ?? GENERATE_PRESETS[0].imageUrl}
                     alt="DDI standard template"
                     className="w-full h-full object-cover"
                   />

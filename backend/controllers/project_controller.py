@@ -946,10 +946,9 @@ def generate_images(project_id):
         ai_service = get_ai_service()
 
         # 合并额外要求和风格描述
-        combined_requirements = project.extra_requirements or ""
-        if project.template_style:
-            style_requirement = f"\n\nppt页面风格描述：\n\n{project.template_style}"
-            combined_requirements = combined_requirements + style_requirement
+        from services.style_preset_service import resolve_generate_style_requirements
+
+        combined_requirements = resolve_generate_style_requirements(project)
 
         # Get app instance for background task
         app = current_app._get_current_object()
@@ -983,7 +982,7 @@ def generate_images(project_id):
                 current_app.config["DEFAULT_ASPECT_RATIO"],
                 current_app.config["DEFAULT_RESOLUTION"],
                 app,
-                combined_requirements if combined_requirements.strip() else None,
+                combined_requirements if combined_requirements and combined_requirements.strip() else None,
                 language,
                 selected_page_ids if selected_page_ids else None,
             )

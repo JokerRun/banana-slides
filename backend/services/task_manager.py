@@ -919,6 +919,7 @@ def edit_page_image_task(
                             style_ref_paths=style_ref_abs_paths,
                             restyle_base_prompt_snapshot=page.restyle_base_prompt_snapshot,
                             restyle_prompt=project.restyle_prompt or "",
+                            style_preset_id=project.style_preset_id,
                             current_selected_path=current_abs,
                             edit_instruction=edit_instruction,
                             current_extra_ref_paths=normalized_extras,
@@ -1633,11 +1634,26 @@ def restyle_images_task(
                         original_image.load()  # Force decode into memory
 
                         # Build prompt with explicit style reference count for IMAGE labeling
+                        preset_base_body = None
+                        if not restyle_prompt and project.style_preset_id:
+                            from services.style_preset_service import (
+                                StylePresetError,
+                                get_style_preset_prompt_text,
+                            )
+
+                            try:
+                                preset_base_body = get_style_preset_prompt_text(
+                                    project.style_preset_id, "restyle"
+                                )
+                            except StylePresetError:
+                                preset_base_body = None
+
                         prompt = get_restyle_prompt(
                             page_index=page_index,
                             total_pages=total_pages,
                             num_style_refs=len(style_ref_images),
                             custom_prompt=restyle_prompt,
+                            preset_base_body=preset_base_body,
                         )
 
                         context_event = {
@@ -2109,12 +2125,31 @@ def translate_images_task(
                         original_image.load()  # Force decode into memory
 
                         # Build prompt
+                        preset_base_body = None
+                        if (
+                            not translate_prompt
+                            and style_ref_images
+                            and project.style_preset_id
+                        ):
+                            from services.style_preset_service import (
+                                StylePresetError,
+                                get_style_preset_prompt_text,
+                            )
+
+                            try:
+                                preset_base_body = get_style_preset_prompt_text(
+                                    project.style_preset_id, "translateRestyle"
+                                )
+                            except StylePresetError:
+                                preset_base_body = None
+
                         prompt = get_translate_prompt(
                             page_index=page_index,
                             total_pages=total_pages,
                             target_language=target_language,
                             num_style_refs=len(style_ref_images),
                             custom_prompt=translate_prompt,
+                            preset_base_body=preset_base_body,
                         )
 
                         # Build ref_images: original slide first, then style refs (if restyle mode)
