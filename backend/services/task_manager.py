@@ -2127,10 +2127,21 @@ def translate_images_task(
                             resolve_preset_prompt_body_for_flow,
                         )
 
+                        if (
+                            translate_mode == "restyle"
+                            and style_ref_paths
+                            and not style_ref_images
+                        ):
+                            logger.warning(
+                                "Translate restyle: style ref paths on project but "
+                                "none loaded from disk (paths=%s)",
+                                style_ref_paths,
+                            )
+
                         preset_base_body, effective_translate_prompt = (
                             resolve_preset_prompt_body_for_flow(
                                 project.style_preset_id
-                                if style_ref_images
+                                if translate_mode == "restyle"
                                 else None,
                                 "translateRestyle",
                                 translate_prompt or "",

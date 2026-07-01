@@ -281,7 +281,7 @@ class TestRestylePrompt:
         prompt = get_restyle_prompt(page_index=2, total_pages=5)
 
         assert "零重写内容原则" in prompt
-        assert "禁止修改、新增、删除" in prompt
+        assert "绝对禁止：修改、新增、删除" in prompt
 
     def test_custom_prompt_overrides_default_body(self):
         """Custom prompt should be injected when provided"""

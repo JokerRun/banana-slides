@@ -427,10 +427,16 @@ def generate_page_image(project_id, page_id):
         if use_template:
             ref_image_path = file_service.get_template_path(project_id)
         
-        # 检查是否有模板图片或风格描述
-        # 如果都没有，则返回错误
-        if not ref_image_path and not project.template_style:
-            return bad_request("No template image or style description found for project")
+        style_ref_paths = project.get_style_ref_image_paths()
+        if project.creation_type == "restyle":
+            if not style_ref_paths:
+                return bad_request("Restyle 项目必须有风格参考图。")
+        elif (
+            not style_ref_paths
+            and not ref_image_path
+            and not project.template_style
+        ):
+            return bad_request("请先上传风格参考图或添加风格描述。")
         
         # Generate prompt
         page_data = page.get_outline_content() or {}

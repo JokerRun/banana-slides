@@ -975,8 +975,12 @@ Output: 16:9 landscape PPT slide, high resolution, crisp readable text."""
         return prompt
 
     preset_body = (preset_base_body or "").strip()
-    if preset_body:
-        prompt = f"""\
+    if not preset_body:
+        from services.style_preset_service import get_style_preset_prompt_text
+
+        preset_body = get_style_preset_prompt_text("ddi-standard", "restyle")
+
+    prompt = f"""\
 {image_section}
 
 Image role notes:
@@ -988,41 +992,9 @@ Image role notes:
 Page {page_index}/{total_pages}.
 
 Output: 16:9 landscape PPT slide, high resolution, crisp readable text."""
-        logger.info(
-            f"[get_restyle_prompt] page {page_index}/{total_pages}, "
-            f"style_refs={num_style_refs}, custom_prompt=False, preset_base=True"
-        )
-        return prompt
-
-    prompt = f"""\
-{image_section}
-
-Image role notes:
-- {template_ref_note}
-- IMAGE {original_image_num} is the original PPT slide. Extract content only.
-
-# Role: 资深商业咨询级 PPT 排版与视觉架构师
-
-# Core Objective:
-将 IMAGE {original_image_num} 套用参考图的 PPT 模板版式，在严格保留原始页面内容信息与业务逻辑的前提下，重新设计页面的信息架构、视觉层级、空间关系与排版方式，输出具有麦肯锡 / BCG 咨询报告风格的专业商务 PPT 页面。
-
-Page {page_index}/{total_pages}.
-
-# Execution Rules:
-1. 模板迁移与背景净化：将参考图的版式框架严格应用到原始页面上；彻底移除原始页面中的背景、页眉、页脚、页码、装饰线条、低质量图形、无意义色块、旧版式视觉干扰元素；仅保留原始文本内容、数据信息、业务逻辑。
-2. 零重写内容原则：严格保留 IMAGE {original_image_num} 的全部文字内容与逻辑层级；禁止修改、新增、删除、总结或重写任何文本；仅允许调整布局位置、对齐方式、字号层级和视觉排版。
-3. 内容逻辑理解与结构重组：原图只是排版草稿，禁止复刻遮挡块、涂抹痕迹、多余占位符或错位元素；先清点实际文本条目数，基于文本条目生成对应数量的几何区块或层级；完全依据文本间的并列、递进、包含、对比、因果关系重构版式。
-4. 标题规范：仅当原图存在标题时应用；若无标题，严禁新增。标题使用微软雅黑 Bold，32pt，DDI 板岩蓝 #3D4F5F，左对齐贴近内容区左侧。
-5. 色系规范：禁止继承原图旧颜色。标题/页眉/结构线/主视觉使用 #3D4F5F；强调色/流程箭头/重点标签使用 #F9A825；辅助色仅可使用 #2D72B2 / #E67E22 / #88A02C / #662D7C / #8B9A46；正文 #333333，次要文本 #666666，分割线 #E0E0E0，背景 #FFFFFF。
-6. 动态版式选择：时序/流程用线性流程或路线图；两方对比用左右对比；多维对比用矩阵；优先级/层级用分层架构或冰山图；核心主题+分支用辐射或树状；板块概览用网格卡片；漏斗/转化用漏斗图；指标/KPI 用 dashboard；交集关系用维恩图；循环用环形流转；问题到解决方案用桥接过渡；单一叙事用极简要点或图文注解；三项并列用三栏或图标网格。
-7. 视觉元素与密度：允许圆形节点、圆角矩形、房屋图标、粗体折线/S形箭头、带序号流程节点、矩阵表格、金字塔、文档图示、等轴测路径图；必须纯扁平化矢量风格。主区块尽量控制在 3–5 个内并容纳全部原文；留白 8%–10%；文字约 40%，结构化图形约 60%；线条一致，严格网格对齐；禁止文字与图形重叠。
-
-# Output Format:
-输出优化后的 16:9 高保真商业 PPT 页面。所有视觉块必须清晰、规整，具有明确边界逻辑。"""
-
     logger.info(
         f"[get_restyle_prompt] page {page_index}/{total_pages}, "
-        f"style_refs={num_style_refs}, custom_prompt=False, ddi_requirements=True"
+        f"style_refs={num_style_refs}, custom_prompt=False, preset_base=True"
     )
     return prompt
 
