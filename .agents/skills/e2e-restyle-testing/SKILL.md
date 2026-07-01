@@ -134,7 +134,7 @@ Why：hidden `<input type="file">` 经常不直接暴露在 accessibility snapsh
 - 不是“`@ref` 永远不行”
 - 而是“只在 `@ref` 明确指向真实 `<input>` 节点时才可信；这个页面里 hidden input 场景下不该赌它”
 
-3. 选择 `DDI Restyle` preset
+3. 选择 `DDI Restyle` preset（UI 使用后端 `/api/presets` 元数据；创建项目时提交 `style_preset_id`，无需从 `frontend/public` 重复上传底图）
 
 ```bash
 agent-browser select @<combobox-ref> "DDI Restyle"

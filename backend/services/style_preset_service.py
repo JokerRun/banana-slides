@@ -1,5 +1,9 @@
 """
 Canonical runtime style preset loading and application.
+
+Presets are defined under ``assets/presets/<preset-id>/`` (``preset.json``, base image,
+``prompt-*.md``). This module validates SHA-256, caches manifests, serves prompt text to
+``prompts.py`` / task flows, and copies base images when controllers apply ``style_preset_id``.
 """
 
 from __future__ import annotations

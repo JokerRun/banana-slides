@@ -106,7 +106,7 @@ No longer restricted by complex menu buttons; issue modification commands direct
 
 - **Source-file translation**: Upload PPT/PPTX/PDF files; the backend converts them into page images and translates each page through image-to-image generation.
 - **Target languages**: English, Chinese, Japanese, Korean, Spanish, French, German, Portuguese, Russian, Italian, and Arabic.
-- **Two modes**: Pure translation keeps the original layout and visual elements; Translation + Restyle also applies style reference images and can reuse the default DDI preset.
+- **Two modes**: Pure translation keeps the original layout and visual elements; Translation + Restyle applies style references via uploaded images or `style_preset_id` (e.g. `ddi-standard`), using the backend canonical DDI base image and prompts from `/api/presets`.
 
 ### 5. Out-of-the-box Format Export
 
@@ -610,7 +610,7 @@ banana-slides/
 │   │   ├── types/              # TypeScript type definitions
 │   │   ├── utils/              # Utility functions
 │   │   ├── constants/          # Constant definitions
-│   │   ├── config/             # Frontend presets, including translation languages/modes
+│   │   ├── config/             # UI preset labels/fallback; runtime DDI copy from GET /api/presets
 │   │   └── styles/             # Style files
 │   ├── public/                 # Static assets
 │   ├── package.json
@@ -637,8 +637,11 @@ banana-slides/
 │   │   ├── export_service.py   # PPTX/PDF export service
 │   │   ├── task_manager.py     # Asynchronous task management
 │   │   ├── prompts.py          # AI prompt templates
+│   │   ├── style_preset_service.py    # Runtime presets (assets/presets/)
 │   ├── controllers/            # API controllers
 │   │   ├── project_controller.py      # Project management
+│   │   ├── restyle_controller.py      # PPT/PDF restyle
+│   │   ├── preset_controller.py       # GET /api/presets
 │   │   ├── translate_controller.py    # PPT/PDF translation
 │   │   ├── page_controller.py         # Page management
 │   │   ├── material_controller.py     # Material management
@@ -655,6 +658,8 @@ banana-slides/
 │   ├── Dockerfile
 │   └── README.md
 │
+├── assets/
+│   └── presets/                # Runtime style preset bundles (see assets/presets/README.md)
 ├── tests/                      # Test files directory
 ├── v0_demo/                    # Early demo versions
 ├── output/                     # Output files directory

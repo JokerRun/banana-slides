@@ -11,7 +11,8 @@
 - Backend architecture：`backend/app.py` 是 app factory，负责接 CORS、cookie auth、SQLite WAL、Flask-Migrate 和各类 blueprints。
 - Backend layers：`controllers/` 暴露 `/api/*`；`services/` 放 AI、export、auth、task、material、restyle 逻辑；`models/` 是 SQLAlchemy models；`utils/` 放 response/auth 等共享 helpers。
 - Data/storage：SQLite DB 在 `backend/instance/database.db`；Alembic migrations 在 `backend/migrations`；上传和生成文件放 `uploads/`，通过 `/files/*` 提供访问。
-- Key backend APIs：项目和页面生成主流程在 `/api/projects`；认证在 `/api/auth`；设置在 `/api/settings`；素材在 `/api/materials`；参考文件在 `/api/reference-files`；任务轮询在 `/api/tasks`。
+- Key backend APIs：项目和页面生成主流程在 `/api/projects`；认证在 `/api/auth`；设置在 `/api/settings`；素材在 `/api/materials`；参考文件在 `/api/reference-files`；任务轮询在 `/api/tasks`；产品风格预置元数据与底图在 `/api/presets`（canonical 包在 `assets/presets/`，由 `backend/services/style_preset_service.py` 加载）。
+- Style presets：Restyle、翻译+风格、以及带 `style_preset_id` 的生成流程由后端复制 canonical 底图并记录 `style_preset_id` / `version` / `sha256`；前端通过 `listPresets` / `useRuntimePresets` 拉取元数据，提交 `style_preset_id` 而非重复上传 public 静态图；遗留 id `ddi`、`ddi-restyle-v2` 映射为 `ddi-standard`。
 - Project display names：历史页显式重命名使用 `projects.project_name` / `PUT /api/projects/{id}` 的 `project_name`；不要把显示名写入 `idea_prompt`、`description_text` 或第一页 `outline_content.title`。
 - Async model：长耗时 AI 任务通过 `backend/services/task_manager.py` 里的 `ThreadPoolExecutor` 执行；frontend 轮询 task endpoints 并同步 Zustand store。
 - Frontend architecture：路由页面在 `frontend/src/pages`；复用 UI 在 `components/`；API 封装在 `api/`；全局状态在 `store/`；hooks/types/utils 各自独立目录。

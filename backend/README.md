@@ -27,12 +27,15 @@ backend/
 │   ├── ai_service.py        # AI相关服务
 │   ├── file_service.py      # 文件管理服务
 │   ├── export_service.py    # 导出服务
-│   ├── prompts.py           # AI提示词模板
+│   ├── prompts.py           # AI提示词模板（通用逻辑；DDI 等产品预置正文见 style_preset_service）
+│   ├── style_preset_service.py  # 运行时预置包加载、hash 校验、项目应用
 │   └── task_manager.py      # 异步任务管理
 ├── controllers/              # 控制器层
 │   ├── __init__.py
 │   ├── project_controller.py
+│   ├── restyle_controller.py
 │   ├── translate_controller.py
+│   ├── preset_controller.py
 │   ├── page_controller.py
 │   ├── template_controller.py
 │   ├── export_controller.py
@@ -123,12 +126,22 @@ uv run python app.py
 - `POST /api/projects/{project_id}/pages/{page_id}/generate/description` - 单页生成
 
 #### 图片生成
-- `POST /api/projects/{project_id}/generate/images` - 批量生成图片（异步）
+- `POST /api/projects/{project_id}/generate/images` - 批量生成图片（异步）；表单可选 `style_preset_id`（如 `ddi-standard` 或遗留 `ddi`），与 `template_style` / `extra_requirements` 配合使用
 - `POST /api/projects/{project_id}/pages/{page_id}/generate/image` - 单页生成
 - `POST /api/projects/{project_id}/pages/{page_id}/edit/image` - 编辑图片
+- `POST /api/projects/{project_id}/style-refs` - 上传风格参考图；可选 `style_preset_id` 由后端复制 canonical 底图并写入 `style_preset_*` 元数据
+
+#### PPT/PDF 风格转换（Restyle）
+- `POST /api/projects/restyle` - 创建 restyle 项目：`source_file` 必填；`style_refs` 与 `style_preset_id` 至少其一（预置 id 如 `ddi-standard`，遗留 `ddi` / `ddi-restyle-v2` 会规范为 `ddi-standard`）；可选 `restyle_prompt`
+- `POST /api/projects/{project_id}/restyle/generate` - 批量 restyle（异步）
+- `POST /api/projects/{project_id}/pages/{page_id}/restyle/generate` - 单页 restyle
+
+#### 运行时风格预置
+- `GET /api/presets` - 列出 canonical 预置（id、version、sha256、各流程 prompt 正文、`imageUrl`）
+- `GET /api/presets/{preset_id}/image` - 预置底图 PNG（源文件在仓库 `assets/presets/<id>/`）
 
 #### PPT/PDF 翻译
-- `POST /api/projects/translate` - 创建翻译项目，上传 `source_file`（PPT/PPTX/PDF）、`target_language`、`translate_mode`（`pure` 或 `restyle`），`restyle` 模式可上传最多 5 张 `style_refs`
+- `POST /api/projects/translate` - 创建翻译项目，上传 `source_file`（PPT/PPTX/PDF）、`target_language`、`translate_mode`（`pure` 或 `restyle`）；`restyle` 模式可上传最多 5 张 `style_refs` 或传 `style_preset_id`（`pure` 模式不可传 `style_preset_id`）
 - `POST /api/projects/{project_id}/translate/generate` - 批量翻译页面（异步），可传 `page_ids`
 - `POST /api/projects/{project_id}/pages/{page_id}/translate/generate` - 单页翻译（异步）
 
@@ -212,6 +225,7 @@ result = remove_regions(image, bboxes, expand_pixels=5)
 - `project_name` 为用户在历史页显式重命名后的显示名；为空时前端按项目类型 fallback，不会修改生成输入或页面标题
 - 模板图片路径
 - `creation_type` 支持 `idea`、`outline`、`descriptions`、`restyle`、`translate`
+- Restyle/翻译+风格：`source_file_path`、`style_ref_image_paths`（JSON）、`restyle_prompt`；应用预置时还有 `style_preset_id`、`style_preset_version`、`style_preset_sha256`
 - 翻译项目会保存源文件路径、目标语言、翻译模式和可选风格参考图
 - 项目状态
 - 关联的页面和任务
@@ -265,16 +279,9 @@ class AIService:
 
 #### 自定义提示词模板
 
-修改 `services/ai_service.py` 中的提示词生成逻辑：
+通用 prompt 组装在 `services/prompts.py`。产品级 DDI 等预置的正文与底图以 `assets/presets/<preset-id>/` 为准，由 `services/style_preset_service.py` 加载并在 restyle / translate+restyle / generate 流程中注入；修改预置内容请改对应 `prompt-*.md` 与 `preset.json` 中的 `sha256`，不要依赖 `frontend/public` 或 `.agents/references` 作为运行时源。
 
-```python
-def generate_image_prompt(self, ...):
-    prompt = dedent(f"""
-        # 自定义提示词模板
-        ...
-    """)
-    return prompt
-```
+扩展新的预置：在 `assets/presets/` 下新增目录与 `preset.json`，重启后 `GET /api/presets` 会自动发现（按目录 mtime 缓存）。
 
 #### 添加新的导出格式
 

@@ -254,7 +254,7 @@ def upload_style_refs(project_id):
 
     Multipart form data:
     - style_refs: File[] (optional)
-    - style_preset_id: "ddi" (optional)
+    - style_preset_id: str (optional; e.g. ddi-standard; legacy ddi accepted)
     - replace: "true" to replace existing project style references
     """
     try:

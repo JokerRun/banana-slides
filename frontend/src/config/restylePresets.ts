@@ -1,3 +1,4 @@
+/** Local labels/fallback when GET /api/presets is unavailable; authoritative copy lives in assets/presets/. */
 export interface RestylePreset {
   id: string;
   legacyIds: string[];

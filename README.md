@@ -107,7 +107,7 @@
 ### 4. PPT/PDF 翻译与风格转换
 - **源文件翻译**：上传 PPT/PPTX/PDF 后，系统会先转换为逐页图片，再通过 image-to-image 生成翻译页。
 - **多语言目标**：支持 English、中文、日本語、한국어、Español、Français、Deutsch、Português、Русский、Italiano、العربية。
-- **两种模式**：纯翻译模式尽量锁定原布局和视觉元素；翻译+风格转换模式会同时应用风格参考图，默认可复用 DDI 预设。
+- **两种模式**：纯翻译模式尽量锁定原布局和视觉元素；翻译+风格转换模式会同时应用风格参考图，可通过 `style_preset_id`（如 `ddi-standard`）使用后端 canonical DDI 预置底图与 prompt，无需重复上传静态参考图。
 
 ### 5. 开箱即用的格式导出
 - **多格式支持**：一键导出标准 **PPTX** 或 **PDF** 文件。
@@ -544,9 +544,9 @@ banana-slides/
 │   │   ├── types/              # TypeScript类型定义
 │   │   ├── utils/              # 工具函数
 │   │   ├── constants/          # 常量定义
-│   │   ├── config/             # 前端预设配置（含翻译语言/模式）
+│   │   ├── config/             # UI 预置标签与离线 fallback；运行时 DDI 以 GET /api/presets 为准
 │   │   └── styles/             # 样式文件
-│   ├── public/                 # 静态资源
+│   ├── public/                 # 静态资源（restyle-presets/ 为遗留目录，非运行时源）
 │   ├── package.json
 │   ├── vite.config.ts
 │   ├── tailwind.config.js      # Tailwind CSS配置
@@ -571,8 +571,11 @@ banana-slides/
 │   │   ├── export_service.py   # PPTX/PDF导出服务
 │   │   ├── task_manager.py     # 异步任务管理
 │   │   ├── prompts.py          # AI提示词模板
+│   │   ├── style_preset_service.py    # 运行时预置包（assets/presets/）
 │   ├── controllers/            # API控制器
 │   │   ├── project_controller.py      # 项目管理
+│   │   ├── restyle_controller.py      # PPT/PDF 风格转换
+│   │   ├── preset_controller.py       # GET /api/presets
 │   │   ├── translate_controller.py    # PPT/PDF 翻译
 │   │   ├── page_controller.py         # 页面管理
 │   │   ├── material_controller.py     # 素材管理
@@ -589,6 +592,8 @@ banana-slides/
 │   ├── Dockerfile
 │   └── README.md
 │
+├── assets/
+│   └── presets/                # 运行时风格预置包（DDI 底图与 prompt；见 assets/presets/README.md）
 ├── tests/                      # 测试文件目录
 ├── v0_demo/                    # 早期演示版本
 ├── output/                     # 输出文件目录
