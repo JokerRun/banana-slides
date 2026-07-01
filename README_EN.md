@@ -661,7 +661,11 @@ banana-slides/
 │
 ├── assets/
 │   └── presets/                # Runtime style preset bundles (see assets/presets/README.md)
-├── docs/                       # Internal docs: superpowers specs/plans, guides, requirements; Lavish archives at docs/lavish/README.md
+├── docs/                       # Internal documentation
+│   ├── superpowers/            # Specs and implementation plans (authoritative)
+│   ├── guides/                 # How-to and debugging guides
+│   ├── requirements/           # Requirements and prototype materials
+│   └── lavish/                 # Archived Lavish HTML reports (index: docs/lavish/README.md; verify in code before acting)
 ├── tests/                      # Test files directory
 ├── v0_demo/                    # Early demo versions
 ├── output/                     # Output files directory
