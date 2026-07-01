@@ -1,5 +1,8 @@
 """
-AI Service Prompts - 集中管理所有 AI 服务的 prompt 模板
+AI Service Prompts - 集中管理所有 AI 服务的 prompt 模板。
+
+产品级 DDI 等风格预置的正文与底图以 ``assets/presets/<preset-id>/`` 为准，由
+``services.style_preset_service`` 加载；本模块负责通用组装与注入 ``preset_base_body``。
 """
 
 import json

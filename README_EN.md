@@ -612,7 +612,7 @@ banana-slides/
 │   │   ├── constants/          # Constant definitions
 │   │   ├── config/             # UI preset labels/fallback; runtime DDI copy from GET /api/presets
 │   │   └── styles/             # Style files
-│   ├── public/                 # Static assets
+│   ├── public/                 # Static assets (restyle-presets/ is legacy; not a runtime source)
 │   ├── package.json
 │   ├── vite.config.ts
 │   ├── tailwind.config.js      # Tailwind CSS configuration
@@ -636,7 +636,7 @@ banana-slides/
 │   │   ├── file_parser_service.py # File parsing service
 │   │   ├── export_service.py   # PPTX/PDF export service
 │   │   ├── task_manager.py     # Asynchronous task management
-│   │   ├── prompts.py          # AI prompt templates
+│   │   ├── prompts.py          # AI prompt templates (generic; DDI bodies via style_preset_service)
 │   │   ├── style_preset_service.py    # Runtime presets (assets/presets/)
 │   ├── controllers/            # API controllers
 │   │   ├── project_controller.py      # Project management

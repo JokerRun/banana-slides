@@ -794,14 +794,16 @@ nl -ba backend/services/task_manager.py | sed -n '1289,1532p'
 
 ## 4. Request 发起时的 Prompt Template
 
-首轮 prompt 的拼接发生在 `get_restyle_prompt(...)`。
+首轮 prompt 的拼接发生在 `get_restyle_prompt(...)`（签名含可选 `preset_base_body`；未传 custom prompt 时默认正文来自 `style_preset_service` / `assets/presets/ddi/prompt-restyle.md`）。
 
 它有两种模式：
 
-- 没有 custom restyle prompt：走默认的 “apply style from IMAGE 2 to IMAGE 1” instruction
-- 有 custom restyle prompt：把用户文本塞进 `Use the following restyle instructions strictly:` 下面
+- 没有 custom restyle prompt：将 canonical 预置正文（或传入的 `preset_base_body`）嵌入 IMAGE 角色说明之后
+- 有 custom restyle prompt：把用户文本塞进 `Use the following restyle instructions strictly:` 下面（与预置 `prompt-restyle.md` 全文一致时，task 层可走预置路径）
 
 无论哪种模式，prompt 都会强行加一个 hard constraint：所有文本内容必须一字不差。
+
+> **文档与源码**：下方引用的 `prompts.py` 行号/片段可能早于 DDI 预置统一；以仓库内 `get_restyle_prompt` 实现与 `assets/presets/ddi/prompt-restyle.md` 为准。
 
 ```bash
 nl -ba backend/services/prompts.py | sed -n '781,856p'

@@ -171,7 +171,7 @@ POST /api/projects/restyle
   - restyle_prompt: str (可选；原 brand_guidelines 场景由 restyle_prompt / 预置 prompt 覆盖)
   Response: { project_id, pages: [{id, original_slide_image_url}...] }
 
-（后续演进）canonical 预置：`GET /api/presets`，底图与 prompt 源 `assets/presets/<id>/`。
+**已实现**：canonical 预置经 `GET /api/presets` 与 `GET /api/presets/<id>/image` 暴露；底图与 prompt 源为 `assets/presets/<id>/`（见 `assets/presets/README.md`）。
 
 # 批量风格转换 (异步任务)
 POST /api/projects/{id}/restyle/generate

@@ -570,7 +570,7 @@ banana-slides/
 │   │   ├── file_parser_service.py # 文件解析服务
 │   │   ├── export_service.py   # PPTX/PDF导出服务
 │   │   ├── task_manager.py     # 异步任务管理
-│   │   ├── prompts.py          # AI提示词模板
+│   │   ├── prompts.py          # AI提示词模板（通用逻辑；DDI 预置正文见 style_preset_service）
 │   │   ├── style_preset_service.py    # 运行时预置包（assets/presets/）
 │   ├── controllers/            # API控制器
 │   │   ├── project_controller.py      # 项目管理
