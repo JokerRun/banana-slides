@@ -316,6 +316,10 @@ def upload_style_refs(project_id):
             )
 
         project.set_style_ref_image_paths(saved_paths)
+        if replace_existing and not style_preset_id:
+            project.style_preset_id = None
+            project.style_preset_version = None
+            project.style_preset_sha256 = None
         project.updated_at = datetime.utcnow()
         db.session.commit()
 

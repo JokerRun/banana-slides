@@ -81,6 +81,41 @@ def test_legacy_ddi_style_preset_copies_canonical_base_and_records_metadata(clie
     assert project["style_preset_sha256"] == expected_sha
 
 
+def test_upload_style_refs_replace_custom_only_clears_preset_metadata(client):
+    create_response = client.post(
+        "/api/projects",
+        json={"creation_type": "idea", "idea_prompt": "DDI deck"},
+    )
+    project_id = assert_success_response(create_response, 201)["data"]["project_id"]
+
+    bind_response = client.post(
+        f"/api/projects/{project_id}/style-refs",
+        data={"style_preset_id": "ddi-standard"},
+        content_type="multipart/form-data",
+    )
+    assert_success_response(bind_response)
+
+    project_response = client.get(f"/api/projects/{project_id}")
+    assert assert_success_response(project_response)["data"]["style_preset_id"] == "ddi-standard"
+
+    replace_response = client.post(
+        f"/api/projects/{project_id}/style-refs",
+        data={
+            "replace": "true",
+            "style_refs": [(io.BytesIO(_png_bytes("green")), "custom.png")],
+        },
+        content_type="multipart/form-data",
+    )
+    assert_success_response(replace_response)
+
+    project_response = client.get(f"/api/projects/{project_id}")
+    project = assert_success_response(project_response)["data"]
+    assert project["style_preset_id"] is None
+    assert project["style_preset_version"] is None
+    assert project["style_preset_sha256"] is None
+    assert len(project["style_ref_image_paths"]) == 1
+
+
 def test_upload_style_refs_rejects_preset_plus_too_many_uploads(client):
     create_response = client.post(
         "/api/projects",

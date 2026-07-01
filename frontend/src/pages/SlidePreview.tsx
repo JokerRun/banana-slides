@@ -1053,7 +1053,7 @@ export const SlidePreview: React.FC = () => {
   const handleStyleReferenceSave = async () => {
     if (!projectId) return;
 
-    const stylePresetId = selectedStylePresetId === 'ddi-standard' ? 'ddi' : undefined;
+    const stylePresetId = styleRefFiles.length === 0 ? selectedStylePresetId : undefined;
     if (!stylePresetId && styleRefFiles.length === 0) {
       show({ message: t('slidePreview.loadTemplateFailed'), type: 'error' });
       return;
