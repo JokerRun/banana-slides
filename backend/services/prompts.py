@@ -1312,7 +1312,8 @@ def get_translate_prompt(
     image_section = "\n".join(image_labels)
 
     preset_body = (preset_base_body or "").strip()
-    if num_style_refs > 0 and preset_body and not custom_prompt_text:
+    use_canonical_preset_body = bool(preset_body) and not custom_prompt_text
+    if use_canonical_preset_body:
         prompt = f"""{image_section}
 
 Target language for translation: {target_language}

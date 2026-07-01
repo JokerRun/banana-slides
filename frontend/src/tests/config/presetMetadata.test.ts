@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { clearRuntimePresetCache, getRuntimePresetById, loadRuntimePresets } from '@/config/presetMetadata'
+import { TRANSLATION_WITH_RESTYLE_PROMPT } from '@/config/translatePresets'
 import { listPresets } from '@/api/endpoints'
 
 vi.mock('@/api/endpoints', () => ({
@@ -49,5 +50,7 @@ describe('preset metadata runtime loader', () => {
 
     expect(presets.length).toBeGreaterThan(0)
     expect(presets[0]?.imageUrl).toBe('/api/presets/ddi-standard/image')
+    expect(presets[0]?.prompts.translateRestyle).toBe(TRANSLATION_WITH_RESTYLE_PROMPT)
+    expect(presets[0]?.prompts.translateRestyle).not.toBe(presets[0]?.prompts.restyle)
   })
 })

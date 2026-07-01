@@ -315,3 +315,24 @@ class TestRestylePrompt:
         assert "IMAGE 2: [底版.png] base template reference #2" in prompt
         assert "IMAGE 3: [底版.png] base template reference #3" in prompt
         assert "IMAGE 4: Original PPT slide (content source)" in prompt
+
+
+class TestTranslatePrompt:
+    """get_translate_prompt canonical preset body behavior"""
+
+    def test_preset_base_body_used_when_style_refs_zero(self):
+        from services.prompts import get_translate_prompt
+        from services.style_preset_service import get_style_preset_prompt_text
+
+        canonical = get_style_preset_prompt_text("ddi-standard", "translateRestyle")
+        prompt = get_translate_prompt(
+            page_index=1,
+            total_pages=2,
+            target_language="English",
+            num_style_refs=0,
+            custom_prompt="",
+            preset_base_body=canonical,
+        )
+        assert canonical in prompt
+        assert "专业PPT翻译与视觉重构专家" in prompt
+        assert "# Role: 专业PPT翻译与排版保真专家" not in prompt

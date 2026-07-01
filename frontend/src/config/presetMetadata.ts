@@ -1,6 +1,7 @@
 import { listPresets, type StylePresetMetadata } from '@/api/endpoints';
 import { GENERATE_PRESETS } from '@/config/generatePresets';
 import { RESTYLE_PRESETS } from '@/config/restylePresets';
+import { TRANSLATION_WITH_RESTYLE_PROMPT } from '@/config/translatePresets';
 
 export type RuntimePresetMetadata = StylePresetMetadata & {
   prompts: {
@@ -30,7 +31,7 @@ const fallbackDdi = (): RuntimePresetMetadata | undefined => {
     prompts: {
       generate: generate.prompt,
       restyle: restyle.prompt,
-      translateRestyle: restyle.prompt,
+      translateRestyle: TRANSLATION_WITH_RESTYLE_PROMPT,
     },
   };
 };
