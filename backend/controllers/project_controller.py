@@ -360,8 +360,16 @@ def update_project(project_id):
         if not project:
             return not_found('Project')
         
-        data = request.get_json()
+        data = request.get_json() or {}
         
+        # Update user-visible project name if provided. This is intentionally
+        # separate from idea_prompt/page titles, which are generation inputs.
+        if 'project_name' in data:
+            project_name = (data['project_name'] or '').strip()
+            if not project_name:
+                return bad_request("project_name cannot be empty")
+            project.project_name = project_name
+
         # Update idea_prompt if provided
         if 'idea_prompt' in data:
             project.idea_prompt = data['idea_prompt']

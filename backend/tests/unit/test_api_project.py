@@ -98,6 +98,32 @@ class TestProjectUpdate:
         data = response.get_json()
         assert data['success'] is True
 
+    def test_update_project_name(self, client, sample_project):
+        """测试更新用户显式项目名称"""
+        if not sample_project:
+            pytest.skip("项目创建失败")
+
+        project_id = sample_project['project_id']
+        response = client.put(f'/api/projects/{project_id}', json={
+            'project_name': '  新历史页名称  '
+        })
+
+        data = assert_success_response(response)
+        assert data['data']['project_name'] == '新历史页名称'
+        assert data['data']['idea_prompt'] == '测试PPT生成'
+
+    def test_update_project_name_rejects_blank(self, client, sample_project):
+        """测试空项目名称不允许保存"""
+        if not sample_project:
+            pytest.skip("项目创建失败")
+
+        project_id = sample_project['project_id']
+        response = client.put(f'/api/projects/{project_id}', json={
+            'project_name': '   '
+        })
+
+        assert response.status_code == 400
+
 
 class TestProjectDelete:
     """项目删除测试"""
@@ -121,4 +147,3 @@ class TestProjectDelete:
         response = client.delete('/api/projects/non-existent-id')
         
         assert response.status_code == 404
-

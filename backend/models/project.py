@@ -19,6 +19,7 @@ class Project(db.Model):
     owner_id = db.Column(
         db.String(36), db.ForeignKey("users.id"), nullable=False, index=True
     )
+    project_name = db.Column(db.String(255), nullable=True)
     idea_prompt = db.Column(db.Text, nullable=True)
     outline_text = db.Column(
         db.Text, nullable=True
@@ -117,6 +118,7 @@ class Project(db.Model):
 
         data = {
             "project_id": self.id,
+            "project_name": self.project_name,
             "idea_prompt": self.idea_prompt,
             "outline_text": self.outline_text,
             "description_text": self.description_text,

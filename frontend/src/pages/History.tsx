@@ -302,13 +302,13 @@ export const History: React.FC = () => {
 
     try {
       // 调用API更新项目名称
-      await api.updateProject(projectId, { idea_prompt: editingTitle.trim() });
+      await api.updateProject(projectId, { project_name: editingTitle.trim() });
 
       // 更新本地状态
       setProjects(prev => prev.map(p => {
         const id = p.id || p.project_id;
         if (id === projectId) {
-          return { ...p, idea_prompt: editingTitle.trim() };
+          return { ...p, project_name: editingTitle.trim() };
         }
         return p;
       }));
@@ -487,4 +487,3 @@ export const History: React.FC = () => {
     </div>
   );
 };
-
