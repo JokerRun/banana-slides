@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Home, Trash2, Sun, Moon } from 'lucide-react';
@@ -86,6 +86,7 @@ export const History: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState<string>('');
+  const savingProjectIdsRef = useRef<Set<string>>(new Set());
   const { show, ToastContainer } = useToast();
   const { confirm, ConfirmDialog } = useConfirm();
 
@@ -297,6 +298,10 @@ export const History: React.FC = () => {
   }, []);
 
   const handleSaveEdit = useCallback(async (projectId: string) => {
+    if (savingProjectIdsRef.current.has(projectId)) {
+      return;
+    }
+
     const trimmed = editingTitle.trim();
     if (!trimmed) {
       show({ message: t('history.titleEmpty'), type: 'error' });
@@ -310,6 +315,13 @@ export const History: React.FC = () => {
       return;
     }
 
+    const currentProject = projects.find(p => (p.id || p.project_id) === projectId);
+    if (currentProject && trimmed === getProjectTitle(currentProject).trim()) {
+      handleCancelEdit();
+      return;
+    }
+
+    savingProjectIdsRef.current.add(projectId);
     try {
       // 调用API更新项目名称
       await api.updateProject(projectId, { project_name: trimmed });
@@ -332,9 +344,11 @@ export const History: React.FC = () => {
         message: t('history.titleUpdateFailed') + ': ' + (err.message || t('common.unknownError')),
         type: 'error'
       });
+    } finally {
+      savingProjectIdsRef.current.delete(projectId);
     }
    
-  }, [editingTitle, show, t]);
+  }, [editingTitle, handleCancelEdit, projects, show, t]);
 
   const handleTitleKeyDown = useCallback((e: React.KeyboardEvent, projectId: string) => {
     if (e.key === 'Enter') {
