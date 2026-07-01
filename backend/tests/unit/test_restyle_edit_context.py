@@ -365,6 +365,18 @@ class TestBuildImageEditContext:
         assert ctx.snapshot_source == 'fallback'
         assert '页面标题：A' in ctx.legacy_prompt
 
+    def test_fallback_legacy_prompt_does_not_duplicate_edit_instruction(self):
+        instruction = 'make title larger'
+        ctx = build_image_edit_context(
+            baseline_prompt_snapshot=None,
+            baseline_ref_paths=[],
+            current_selected_path='/fake/current.png',
+            edit_instruction=instruction,
+            original_description='页面标题：A',
+        )
+        assert ctx.legacy_prompt.count(instruction) == 1
+        assert 'Edit instruction:' not in ctx.legacy_prompt
+
 
 class TestReconstructBasePromptSnapshot:
     """Tests for snapshot reconstruction"""

@@ -576,7 +576,10 @@ def build_image_edit_context(
         edit_instruction=edit_instruction,
         selected_extras=selected_extras,
     )
-    legacy_prompt = _build_legacy_prompt(baseline_block, edit_instruction)
+    if snapshot_source == "fallback":
+        legacy_prompt = baseline_block
+    else:
+        legacy_prompt = _build_legacy_prompt(baseline_block, edit_instruction)
     legacy_images = _build_legacy_ref_images(
         original_slide_path=None,
         selected_style_refs=selected_baseline_refs,

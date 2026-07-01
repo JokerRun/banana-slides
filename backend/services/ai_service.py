@@ -966,6 +966,16 @@ class AIService:
                         img = Image.open(path)
                         img.load()
                         new_parts.append(img)
+                    elif isinstance(path, str) and (
+                        path.startswith("http://") or path.startswith("https://")
+                    ):
+                        downloaded = self.download_image_from_url(path)
+                        if downloaded:
+                            new_parts.append(downloaded)
+                        else:
+                            logger.warning(
+                                f"Failed to download conversation image, skipping: {path}"
+                            )
                     else:
                         logger.warning(f"Image not found, skipping: {path}")
                 elif "text" in part:
@@ -983,6 +993,16 @@ class AIService:
                 img = Image.open(path)
                 img.load()
                 images.append(img)
+            elif isinstance(path, str) and (
+                path.startswith("http://") or path.startswith("https://")
+            ):
+                downloaded = self.download_image_from_url(path)
+                if downloaded:
+                    images.append(downloaded)
+                else:
+                    logger.warning(
+                        f"Failed to download legacy ref image, skipping: {path}"
+                    )
             else:
                 logger.warning(f"Legacy ref image not found, skipping: {path}")
         return images

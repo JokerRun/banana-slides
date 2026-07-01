@@ -216,6 +216,10 @@ def _normalize_ref_paths(ref_paths: List[str], file_service) -> List[str]:
             continue
         if os.path.exists(ref):
             normalized.append(ref)
+        elif isinstance(ref, str) and (
+            ref.startswith("http://") or ref.startswith("https://")
+        ):
+            normalized.append(ref)
         elif isinstance(ref, str) and ref.startswith("/files/") and upload_folder:
             relative = ref[len("/files/") :].lstrip("/")
             local = os.path.abspath(os.path.join(upload_folder, relative))
