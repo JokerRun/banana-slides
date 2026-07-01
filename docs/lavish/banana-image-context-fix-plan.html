@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Banana Slides 图片上下文修复方案</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --banana-yellow:#FFD700; --banana-light:#FFE44D; --banana-dark:#FFC700; --banana-pale:#FFF9E6;
+      --bg:#FFFFFF; --bg2:#F7F7F4; --card:#FFFFFF; --text:#1A1A1A; --muted:#666; --border:#E8E2C8;
+      --danger:#FF4D4F; --warn:#FAAD14; --ok:#52C41A; --info:#1890FF;
+    }
+    html { scroll-behavior:smooth; }
+    body { margin:0; background:linear-gradient(180deg,var(--banana-pale),#fff 22%,var(--bg2)); color:var(--text); font-family:"PingFang SC","Microsoft YaHei",system-ui,-apple-system,sans-serif; }
+    .page { max-width:1280px; margin:0 auto; padding:28px; }
+    .hero { border:1px solid var(--border); background:linear-gradient(135deg,#fff 0%,#fff9df 52%,#fff 100%); border-radius:28px; padding:34px; box-shadow:0 20px 60px rgba(60,45,0,.10); position:relative; overflow:hidden; min-width:0; }
+    .hero h1 { font-size:clamp(1.9rem, 4.2vw, 3.6rem); line-height:1.05; overflow-wrap:anywhere; max-width:100%; }
+    .hero:after { content:""; position:absolute; right:-40px; top:-40px; width:150px; height:150px; border-radius:999px; background:rgba(255,215,0,.18); filter:blur(8px); pointer-events:none; }
+    .badge { display:inline-flex; align-items:center; gap:8px; background:#111; color:#fff; border-radius:999px; padding:7px 12px; font-size:13px; font-weight:700; }
+    .tag { display:inline-flex; border:1px solid var(--border); background:#fff; border-radius:999px; padding:5px 10px; font-size:12px; color:#444; white-space:normal; min-width:0; max-width:100%; overflow-wrap:anywhere; word-break:break-word; }
+    .section { margin-top:26px; border:1px solid var(--border); background:rgba(255,255,255,.86); border-radius:24px; padding:24px; box-shadow:0 10px 30px rgba(60,45,0,.06); }
+    .grid-2 { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:18px; }
+    .grid-3 { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+    .card { background:#fff; border:1px solid var(--border); border-radius:18px; padding:18px; min-width:0; }
+    .card.danger { border-color:#ffc8c9; background:linear-gradient(180deg,#fff,#fff6f6); }
+    .card.ok { border-color:#c9edbe; background:linear-gradient(180deg,#fff,#f7fff5); }
+    .card.warn { border-color:#ffe3a3; background:linear-gradient(180deg,#fff,#fffaf0); }
+    .h2 { font-size:26px; font-weight:900; letter-spacing:-.03em; margin:0 0 8px; }
+    .h3 { font-size:18px; font-weight:850; margin:0 0 10px; }
+    .muted { color:var(--muted); }
+    .small { font-size:13px; }
+    .mono { font-family:"SFMono-Regular","Menlo","Consolas",monospace; overflow-wrap:anywhere; word-break:break-word; }
+    .pill-danger { color:#9b1116; background:#fff0f0; border:1px solid #ffc8c9; border-radius:999px; padding:4px 9px; font-weight:700; font-size:12px; }
+    .pill-ok { color:#236b14; background:#f0ffed; border:1px solid #c9edbe; border-radius:999px; padding:4px 9px; font-weight:700; font-size:12px; }
+    .pill-warn { color:#8a5b00; background:#fff8e7; border:1px solid #ffe3a3; border-radius:999px; padding:4px 9px; font-weight:700; font-size:12px; }
+    .flow-caption { font-size:13px; color:#555; margin-top:10px; }
+    .decision { border-left:6px solid var(--banana-yellow); background:#fffdf1; }
+    .code-host { border:1px solid #24292f22; border-radius:16px; overflow:hidden; background:#0d1117; min-width:0; }
+    .prompt-box { border:1px solid var(--border); border-radius:16px; background:#fff; padding:16px; min-width:0; }
+    .prompt-title { display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:10px; }
+    .quote { white-space:pre-wrap; overflow-wrap:anywhere; background:#f8f8f3; border:1px solid #eee3bd; border-radius:14px; padding:14px; font-size:13px; line-height:1.65; }
+    .list { padding-left:18px; line-height:1.8; }
+    .callout { border:1px dashed #d6b400; background:#fffbe5; border-radius:16px; padding:16px; }
+    .table { width:100%; border-collapse:separate; border-spacing:0; overflow:hidden; border:1px solid var(--border); border-radius:16px; }
+    .table th,.table td { padding:13px 14px; border-bottom:1px solid var(--border); vertical-align:top; text-align:left; }
+    .table th { background:#fff8d5; font-size:13px; }
+    .table tr:last-child td { border-bottom:0; }
+    .sticky-nav { position:sticky; top:0; z-index:20; backdrop-filter:blur(12px); background:rgba(255,255,255,.78); border-bottom:1px solid var(--border); }
+    .nav-inner { max-width:1280px; margin:0 auto; padding:10px 28px; display:flex; gap:8px; flex-wrap:wrap; }
+    .nav-inner a { color:#333; text-decoration:none; font-size:13px; font-weight:700; padding:7px 10px; border-radius:999px; }
+    .nav-inner a:hover { background:var(--banana-pale); }
+    @media (max-width: 900px) { .grid-2,.grid-3 { grid-template-columns:1fr; } .page { padding:16px; } .hero { padding:22px; } .hero:after { right:-150px; top:-150px; } }
+  </style>
+</head>
+<body>
+  <div class="sticky-nav"><div class="nav-inner">
+    <a href="#summary">结论</a><a href="#before">Before</a><a href="#after">After</a><a href="#prompt">Prompt 原文</a><a href="#pseudo">伪代码</a><a href="#plan">实施计划</a><a href="#risks">风险</a>
+  </div></div>
+  <main class="page">
+    <section class="hero" id="summary">
+      <div class="badge">Banana Slides · From Description 图片上下文修复方案</div>
+      <h1 class="font-black tracking-tight mt-5 mb-4">问题不是“图片没传”，而是“图片语义位置被切断”。</h1>
+      <p class="text-lg text-zinc-700 max-w-4xl leading-8">我建议不要只删除 <span class="mono">remove_markdown_images()</span>。如果要做，就一步到位：保留二进制参考图，同时把 markdown 图片转换为稳定、结构化、provider-friendly 的 <span class="mono">IMAGE_REF</span> 语义标记和 manifest，让模型同时知道“看哪张图”以及“这张图该服务哪段内容”。</p>
+      <div class="flex flex-wrap gap-2 mt-5">
+        <span class="tag">根因：<span class="mono">backend/services/ai_service.py:426-428</span></span>
+        <span class="tag">当前：binary refs ✅ / prompt context ❌</span>
+        <span class="tag">推荐：structured image refs + binary refs</span>
+      </div>
+    </section>
+
+    <section class="section decision">
+      <h2 class="h2">推荐方案：一步到位 Hybrid，不走“先删调用试试看”</h2>
+      <div class="grid-3 mt-4">
+        <div class="card ok"><div class="h3">1. 保留视觉输入</div><p class="muted">继续通过 <span class="mono">additional_ref_images</span> 传图片二进制，确保 provider 真能“看到”图。</p></div>
+        <div class="card ok"><div class="h3">2. 保留语义绑定</div><p class="muted">把 <span class="mono">![alt](/files/x)</span> 转成 <span class="mono">[IMAGE_REF:image_1]</span>，留在页面文案位置。</p></div>
+        <div class="card ok"><div class="h3">3. 显式给模型 manifest</div><p class="muted">在 prompt 中追加“图片引用清单”：id、caption、source、使用规则、放置意图。</p></div>
+      </div>
+    </section>
+
+    <section class="section" id="before">
+      <h2 class="h2">Before：当前链路在哪里丢上下文</h2>
+      <div class="mermaid">
+flowchart TD
+  U["User description\n第一页：公司介绍\n我们的Logo：![公司Logo](/files/logo.png)"] --> F["frontend useImagePaste\n插入 markdown image"]
+  F --> T["task_manager.py\nextract_image_urls_from_markdown(desc_text)"]
+  T --> B["Binary path ✅\nadditional_ref_images=[/files/logo.png]"]
+  T --> P["Prompt path"]
+  P --> R["ai_service.py\nremove_markdown_images(page_desc)"]
+  R --> L["Prompt becomes:\n我们的Logo：公司Logo"]
+  B --> M["Image Provider"]
+  L --> M
+  M --> O["Model sees image bytes,\nbut placement/relationship is ambiguous"]
+  classDef danger fill:#fff0f0,stroke:#ff4d4f,color:#7a1111;
+  classDef ok fill:#f0ffed,stroke:#52c41a,color:#235b16;
+  class R,L,O danger;
+  class B ok;
+      </div>
+      <p class="flow-caption">关键点：图片作为 reference image 传入是对的，但 prompt 中的 markdown 关系被移除，导致 “这张图应放在这段文案旁边/作为 Logo/作为截图/作为图表证据” 这些语义消失。</p>
+    </section>
+
+    <section class="section" id="after">
+      <h2 class="h2">After：一步到位的双通道语义方案</h2>
+      <div class="mermaid">
+flowchart TD
+  U["User description\n我们的Logo：![公司Logo](/files/logo.png)"] --> N["normalize_image_references(page_desc)"]
+  N --> D["normalized_desc\n我们的Logo：[IMAGE_REF:image_1]"]
+  N --> X["image_refs manifest\nimage_1: alt=公司Logo, url=/files/logo.png"]
+  X --> B["Binary path ✅\nadditional_ref_images=[/files/logo.png]"]
+  D --> P["Prompt path ✅\nkeeps image marker inline"]
+  X --> P2["Prompt manifest ✅\nexplicit usage rules"]
+  B --> M["Image Provider"]
+  P --> M
+  P2 --> M
+  M --> O["Model sees image bytes +\nknows semantic placement"]
+  classDef ok fill:#f0ffed,stroke:#52c41a,color:#235b16;
+  class N,D,X,B,P,P2,O ok;
+      </div>
+      <div class="grid-2 mt-5">
+        <div class="card"><div class="h3">为什么不用原始 markdown 直接透传？</div><ul class="list muted"><li>不同 provider 对 markdown URL 的理解不稳定。</li><li><span class="mono">/files/...</span> 对外部模型未必可访问。</li><li>结构化 marker 可避免模型把 URL 当作可访问资源，而是把它当作已附加 reference image 的索引。</li></ul></div>
+        <div class="card"><div class="h3">为什么仍保留 binary refs？</div><ul class="list muted"><li>模型真正看图仍依赖 binary/reference image。</li><li>manifest 只负责“这张图是什么、和哪段内容绑定、怎么用”。</li><li>两个通道职责清晰，不互相替代。</li></ul></div>
+      </div>
+    </section>
+
+    <section class="section" id="prompt">
+      <h2 class="h2">Prompt 原文：Before vs After</h2>
+      <div class="grid-2">
+        <div class="prompt-box danger">
+          <div class="prompt-title"><strong>Before：最终生成图 prompt 中的页面描述</strong><span class="pill-danger">语义丢失</span></div>
+          <div class="quote mono">页面标题：公司介绍
+页面文字：
+- 我们的Logo：公司Logo
+- 成立于2020年
+
+其他页面素材：
+配色：黑金商务
+布局建议：左文右图
+
+# 隐含输入：additional_ref_images=[logo.png]
+# 问题：prompt 没有告诉模型 logo.png 对应“我们的Logo”这一行，也没有告诉它应按用户描述放置。</div>
+        </div>
+        <div class="prompt-box ok">
+          <div class="prompt-title"><strong>After：最终生成图 prompt 中的页面描述</strong><span class="pill-ok">语义绑定保留</span></div>
+          <div class="quote mono">页面标题：公司介绍
+页面文字：
+- 我们的Logo：[IMAGE_REF:image_1]
+- 成立于2020年
+
+图片引用清单：
+- image_1
+  caption: 公司Logo
+  source: /files/logo.png
+  attached_as_reference_image: true
+  usage: 将此参考图作为“我们的Logo”对应的视觉元素；保持原图主体，不要重绘成无关图标；根据页面布局建议放置在 Logo/品牌视觉区域。
+
+其他页面素材：
+配色：黑金商务
+布局建议：左文右图
+
+# 隐含输入：additional_ref_images=[logo.png]
+# 结果：模型同时拥有图像内容和语义位置。</div>
+        </div>
+      </div>
+      <div class="callout mt-5"><strong>关键变化：</strong>不是让模型通过 URL 取图，而是让 prompt 中的 <span class="mono">IMAGE_REF:image_1</span> 指向已经附加的第 1 张 reference image。</div>
+    </section>
+
+    <section class="section" id="pseudo">
+      <h2 class="h2">伪代码与代码变更面</h2>
+      <div class="grid-2">
+        <div><h3 class="h3">现状代码证据</h3><div id="current-code" class="code-host"></div></div>
+        <div><h3 class="h3">建议改法：结构化 image refs</h3><div id="proposed-code" class="code-host"></div></div>
+      </div>
+      <div class="mt-5"><h3 class="h3">核心 diff 方向</h3><div id="diff-code" class="code-host"></div></div>
+    </section>
+
+    <section class="section" id="plan">
+      <h2 class="h2">实施计划：小步提交，但方案一次到位</h2>
+      <table class="table">
+        <thead><tr><th>Step</th><th>改动</th><th>验收</th><th>风险</th></tr></thead>
+        <tbody>
+          <tr><td><strong>1</strong></td><td>新增 <span class="mono">parse_markdown_image_refs()</span> / <span class="mono">normalize_image_references()</span></td><td>单测覆盖 alt、空 alt、多个图片、/files 与 http URL</td><td>低</td></tr>
+          <tr><td><strong>2</strong></td><td><span class="mono">generate_image_prompt()</span> 接收 normalized desc + image refs manifest</td><td>prompt 中出现 <span class="mono">[IMAGE_REF:image_1]</span> 和 “图片引用清单”</td><td>低</td></tr>
+          <tr><td><strong>3</strong></td><td>task_manager 继续把 URL 放入 <span class="mono">additional_ref_images</span></td><td>binary ref 数量不回退</td><td>低</td></tr>
+          <tr><td><strong>4</strong></td><td>更新 prompt 文案：模型不得忽略 IMAGE_REF，需按上下文放置</td><td>prompt contract 单测</td><td>中：需要 prompt wording 稳定</td></tr>
+          <tr><td><strong>5</strong></td><td>回归 From Description 单页/批量生成路径</td><td>至少 targeted unit tests + 手动样例 prompt dump</td><td>中</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section" id="risks">
+      <h2 class="h2">风险与我建议的决策</h2>
+      <div class="grid-3">
+        <div class="card warn"><div class="h3">Provider 是否理解 marker？</div><p class="muted">marker 是 prompt 语义，不要求 provider 访问 URL；风险低于原始 markdown URL。</p></div>
+        <div class="card warn"><div class="h3">是否会重复画图？</div><p class="muted">Prompt 要明确：“使用附加参考图，不要重绘成无关素材；必要时保持主体”。</p></div>
+        <div class="card ok"><div class="h3">推荐决策</div><p class="muted">直接实施 Hybrid。不要只删 <span class="mono">remove_markdown_images</span>；那是半修复，provider 行为不够可控。</p></div>
+      </div>
+      <div class="callout mt-5"><strong>建议下一步：</strong>把 P1.2 scout 结果 promote 成 ship 任务：实现 “structured image refs + binary refs” 修复，并加 prompt contract tests。</div>
+    </section>
+  </main>
+
+<script>
+  mermaid.initialize({ startOnLoad:true, theme:'base', themeVariables:{ primaryColor:'#FFF9E6', primaryBorderColor:'#FFD700', lineColor:'#6b5b00', textColor:'#1A1A1A', fontFamily:'PingFang SC, Microsoft YaHei, sans-serif' } });
+</script>
+<script type="module">
+  import { File, FileDiff } from "https://esm.sh/@pierre/diffs@1.2.10?bundle";
+  const options = { theme: { light: "github-light", dark: "github-dark" }, themeType: "dark", overflow: "wrap" };
+  const current = { name:"backend/services/ai_service.py · current", contents:`def generate_image_prompt(..., page_desc: str, ...):
+    outline_text = self.generate_outline_text(outline)
+
+    # 在传给文生图模型之前，移除 Markdown 图片链接
+    # 图片本身已经通过 additional_ref_images 传递，只保留文字描述
+    cleaned_page_desc = self.remove_markdown_images(page_desc)
+
+    prompt = get_image_generation_prompt(
+        page_desc=cleaned_page_desc,
+        outline_text=outline_text,
+        has_material_images=has_material_images,
+        ...
+    )
+    return prompt
+`};
+  const proposed = { name:"backend/services/ai_service.py · proposed", contents:`@dataclass
+class ImageRef:
+    id: str
+    alt: str
+    url: str
+    source_index: int
+
+def normalize_image_references(page_desc: str) -> tuple[str, list[ImageRef]]:
+    refs = []
+    def repl(match):
+        alt, url = match.group(1).strip(), match.group(2).strip()
+        if not is_supported_image_url(url):
+            return match.group(0)
+        ref = ImageRef(
+            id=f"image_{len(refs)+1}",
+            alt=alt or "user provided image",
+            url=url,
+            source_index=len(refs)+1,
+        )
+        refs.append(ref)
+        return f"[IMAGE_REF:{ref.id} alt=\"{ref.alt}\"]"
+    normalized = MARKDOWN_IMAGE_RE.sub(repl, page_desc)
+    return normalized, refs
+
+def generate_image_prompt(..., page_desc: str, ...):
+    normalized_desc, image_refs = normalize_image_references(page_desc)
+    image_manifest = format_image_reference_manifest(image_refs)
+
+    prompt = get_image_generation_prompt(
+        page_desc=normalized_desc,
+        image_reference_manifest=image_manifest,
+        outline_text=outline_text,
+        has_material_images=bool(image_refs),
+        ...
+    )
+    return prompt
+`};
+  new File(options).render({ containerWrapper: document.querySelector('#current-code'), file: current });
+  new File(options).render({ containerWrapper: document.querySelector('#proposed-code'), file: proposed });
+  new FileDiff({ ...options, diffStyle:"split" }).render({
+    containerWrapper: document.querySelector('#diff-code'),
+    oldFile: current,
+    newFile: proposed
+  });
+</script>
+</body>
+</html>

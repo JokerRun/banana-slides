@@ -96,6 +96,12 @@ npm run dev
 # 前端运行在 http://localhost:3000
 ```
 
+## Documentation
+
+- **Active design docs:** `docs/superpowers/specs/` and `docs/superpowers/plans/`
+- **Guides:** `docs/guides/`
+- **Archived Lavish HTML reports:** `docs/lavish/` (see `docs/lavish/README.md`). Treat them as historical context; confirm behavior in code and `AGENTS.md` before implementing from a report.
+
 ## Code Style
 
 - Follow the existing code style in the project

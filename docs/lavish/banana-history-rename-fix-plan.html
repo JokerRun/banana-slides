@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="banana">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Banana Slides 历史项目重命名修复方案</title>
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --banana: #ffc000;
+      --banana-2: #ffd84d;
+      --ink: #172033;
+      --muted: #64748b;
+      --bg: #fffaf0;
+      --card: #ffffff;
+      --line: #e5e7eb;
+      --green: #16a34a;
+      --red: #dc2626;
+      --blue: #2563eb;
+      --amber: #d97706;
+      --code: #0f172a;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 0%, rgba(255, 192, 0, .28), transparent 34rem),
+        linear-gradient(135deg, #fffbeb 0%, #ffffff 44%, #f8fafc 100%);
+      line-height: 1.55;
+    }
+    .page { max-width: 1180px; margin: 0 auto; padding: 40px 22px 64px; }
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.3fr) minmax(280px, .7fr);
+      gap: 20px;
+      align-items: stretch;
+      margin-bottom: 22px;
+    }
+    .hero-card, .card {
+      background: rgba(255, 255, 255, .88);
+      border: 1px solid rgba(226, 232, 240, .9);
+      box-shadow: 0 20px 55px rgba(15, 23, 42, .08);
+      border-radius: 24px;
+      padding: 24px;
+      min-width: 0;
+    }
+    .eyebrow { display: inline-flex; gap: 8px; align-items: center; font-weight: 800; color: #92400e; background: #fef3c7; border: 1px solid #fde68a; padding: 6px 10px; border-radius: 999px; font-size: 13px; }
+    h1 { font-size: clamp(30px, 5vw, 54px); line-height: 1.04; margin: 18px 0 14px; letter-spacing: -.04em; }
+    h2 { font-size: 24px; margin: 0 0 14px; letter-spacing: -.02em; }
+    h3 { font-size: 17px; margin: 0 0 10px; }
+    p { margin: 0 0 12px; }
+    .lead { font-size: 18px; color: #334155; max-width: 78ch; }
+    .verdict {
+      background: #111827;
+      color: white;
+      border-radius: 22px;
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      min-height: 100%;
+    }
+    .verdict b { color: var(--banana-2); }
+    .big { font-size: 42px; font-weight: 900; letter-spacing: -.04em; }
+    .grid { display: grid; gap: 18px; margin: 18px 0; }
+    .grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .stat { border-radius: 18px; padding: 16px; background: #f8fafc; border: 1px solid var(--line); min-width: 0; }
+    .stat .label { color: var(--muted); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+    .stat .value { font-size: 18px; font-weight: 900; margin-top: 6px; overflow-wrap: anywhere; }
+    .ok { color: var(--green); }
+    .bad { color: var(--red); }
+    .warn { color: var(--amber); }
+    .blue { color: var(--blue); }
+    .tag { display: inline-flex; align-items: center; padding: 4px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; border: 1px solid transparent; white-space: nowrap; }
+    .tag.red { color: #991b1b; background: #fee2e2; border-color: #fecaca; }
+    .tag.green { color: #166534; background: #dcfce7; border-color: #bbf7d0; }
+    .tag.blue { color: #1e40af; background: #dbeafe; border-color: #bfdbfe; }
+    .tag.amber { color: #92400e; background: #fef3c7; border-color: #fde68a; }
+    table { width: 100%; border-collapse: collapse; background: white; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); }
+    th, td { text-align: left; padding: 13px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { background: #f8fafc; color: #475569; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+    td { font-size: 14px; }
+    tr:last-child td { border-bottom: 0; }
+    code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    code { background: #f1f5f9; padding: 2px 5px; border-radius: 6px; font-size: .92em; }
+    .flow { background: #ffffff; border: 1px solid var(--line); border-radius: 18px; padding: 14px; overflow: hidden; }
+    .mermaid { overflow: hidden; }
+    .pseudo { background: var(--code); color: #dbeafe; border-radius: 18px; padding: 16px; overflow: auto; font-size: 13px; border: 1px solid #1e293b; }
+    .pseudo .c { color: #94a3b8; }
+    .pseudo .g { color: #86efac; }
+    .pseudo .y { color: #fde68a; }
+    .pseudo .r { color: #fca5a5; }
+    .timeline { display: grid; gap: 12px; }
+    .step { display: grid; grid-template-columns: 36px minmax(0,1fr); gap: 12px; align-items: start; }
+    .dot { width: 32px; height: 32px; border-radius: 50%; background: var(--banana); display:flex; align-items:center; justify-content:center; font-weight: 900; box-shadow: 0 6px 16px rgba(255,192,0,.35); }
+    .callout { border-left: 5px solid var(--banana); background: #fffbeb; padding: 14px 16px; border-radius: 14px; }
+    .diff-host { border-radius: 16px; overflow: hidden; border: 1px solid #334155; background: #0f172a; margin-top: 10px; }
+    .small { color: var(--muted); font-size: 13px; }
+    .footer { color: var(--muted); text-align: center; margin-top: 30px; font-size: 13px; }
+    @media (max-width: 860px) {
+      .hero, .grid.two, .grid.three { grid-template-columns: 1fr; }
+      .page { padding: 24px 14px 48px; }
+      th, td { padding: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <div class="hero-card">
+        <span class="eyebrow">🍌 Banana Slides · Rename Bug RCA</span>
+        <h1>历史项目重命名失败，不是 API 没写入，是“标题读取源”和“写入字段”不一致</h1>
+        <p class="lead">当前历史页保存重命名时写入 <code>Project.idea_prompt</code>；但卡片标题对非 restyle 项目优先读取第一页 <code>Page.outline_content.title</code>。所以生成 PPT / 翻译 PPT 改名后会被旧的第一页标题覆盖；restyle 特判优先读 <code>idea_prompt</code>，因此看起来正常。</p>
+      </div>
+      <div class="verdict">
+        <div>
+          <div class="tag amber">Recommended Fix</div>
+          <p class="big">新增显式项目名字段</p>
+          <p>不要继续复用 <b>idea_prompt</b>。项目显示名应该是独立 metadata：<b>Project.project_name</b>。</p>
+        </div>
+        <p class="small">影响范围：Project model + migration + PUT API + frontend title utility + history rename tests。</p>
+      </div>
+    </section>
+
+    <section class="grid three">
+      <div class="stat"><div class="label">用户现象</div><div class="value bad">生成 PPT / 翻译 PPT 重命名不生效</div></div>
+      <div class="stat"><div class="label">为什么 restyle 正常</div><div class="value ok"><code>creation_type === 'restyle'</code> 特判读 <code>idea_prompt</code></div></div>
+      <div class="stat"><div class="label">核心风险</div><div class="value warn"><code>idea_prompt</code> 被当作项目名，语义已经过载</div></div>
+    </section>
+
+    <section class="card">
+      <h2>1. 当前数据结构：Project 没有“项目显示名”</h2>
+      <table>
+        <thead><tr><th>字段</th><th>当前语义</th><th>被重命名功能如何使用</th><th>问题</th></tr></thead>
+        <tbody>
+          <tr><td><code>Project.idea_prompt</code></td><td>idea 类型原始用户 prompt；restyle/translate 类型源文件名</td><td>历史页把新名称写进这里</td><td><span class="tag red">语义过载</span> 不是所有类型都会拿它当标题显示</td></tr>
+          <tr><td><code>Project.description_text</code></td><td>From Description 的原始页面描述</td><td>不参与重命名</td><td>不能改，否则会破坏生成输入</td></tr>
+          <tr><td><code>Page.outline_content.title</code></td><td>页面标题 / Slide 标题</td><td>非 restyle 历史卡片优先显示它</td><td><span class="tag red">覆盖重命名结果</span>，且不应该把项目改名写到第一页标题</td></tr>
+          <tr><td><code>Project.project_name</code></td><td>不存在</td><td>应该成为重命名的唯一写入目标</td><td><span class="tag green">建议新增</span></td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>2. 失败链路：写入成功，但下一次渲染读错字段</h2>
+      <div class="flow">
+        <pre class="mermaid">
+flowchart LR
+  A["History card edit"] --> B["PUT /api/projects/:id\n{ idea_prompt: newTitle }"]
+  B --> C["DB Project.idea_prompt updated"]
+  C --> D["setProjects updates idea_prompt"]
+  D --> E["ProjectCard renders getProjectTitle(project)"]
+  E --> F{"creation_type === restyle?"}
+  F -- yes --> G["return project.idea_prompt\n✅ renamed title"]
+  F -- no --> H["return first page outline title\n❌ old title wins"]
+        </pre>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>3. 代码证据</h2>
+      <div class="grid two">
+        <div>
+          <h3>历史页保存：只写 <code>idea_prompt</code></h3>
+          <p class="small">证据：<code>frontend/src/pages/History.tsx:297-312</code></p>
+          <div id="code-history" class="diff-host"></div>
+        </div>
+        <div>
+          <h3>标题读取：非 restyle 优先读第一页标题</h3>
+          <p class="small">证据：<code>frontend/src/utils/projectUtils.ts:8-27</code></p>
+          <div id="code-utils" class="diff-host"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>4. 推荐方案：新增 <code>Project.project_name</code>，重命名只改它</h2>
+      <div class="callout"><b>原则：</b>项目名是项目 metadata；第一页标题是幻灯片内容；idea/description/source file 是生成输入。三者不要互相覆盖。</div>
+      <div class="grid two">
+        <div>
+          <h3>Before</h3>
+          <pre class="pseudo"><span class="c">// Rename writes generation input</span>
+PUT /api/projects/:id
+{
+  <span class="r">idea_prompt</span>: "客户想看的新项目名"
+}
+
+<span class="c">// Render ignores it for non-restyle</span>
+if project.creation_type === "restyle":
+  return project.idea_prompt
+else:
+  return project.pages[0].outline_content.title</pre>
+        </div>
+        <div>
+          <h3>After</h3>
+          <pre class="pseudo"><span class="c">// Rename writes display metadata only</span>
+PUT /api/projects/:id
+{
+  <span class="g">project_name</span>: "客户想看的新项目名"
+}
+
+<span class="c">// Render always respects explicit project name first</span>
+if project.project_name?.trim():
+  return project.project_name
+else:
+  return deriveDefaultTitle(project)</pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>5. 目标数据结构</h2>
+      <pre class="pseudo"><span class="c"># backend/models/project.py</span>
+class Project(db.Model):
+    id: str
+    owner_id: str
+    <span class="g">project_name: Optional[str]  # 用户重命名后的显示名；nullable；不参与 AI 生成</span>
+    idea_prompt: Optional[str]
+    outline_text: Optional[str]
+    description_text: Optional[str]
+    creation_type: "idea" | "outline" | "descriptions" | "restyle" | "translate"
+    source_file_path: Optional[str]
+    pages: list[Page]
+
+<span class="c"># frontend/src/types/index.ts</span>
+interface Project {
+  project_id: string
+  <span class="g">project_name?: string | null</span>
+  idea_prompt: string
+  creation_type?: string
+  pages: Page[]
+}</pre>
+      <p class="small">兼容策略：老项目 <code>project_name = null</code>，继续走现有 fallback，不需要批量回填。</p>
+    </section>
+
+    <section class="card">
+      <h2>6. 修复伪代码</h2>
+      <div class="timeline">
+        <div class="step"><div class="dot">1</div><div><h3>Migration：加 nullable 字段</h3><pre class="pseudo">op.add_column("projects", sa.Column("project_name", sa.Text(), nullable=True))</pre></div></div>
+        <div class="step"><div class="dot">2</div><div><h3>Model 序列化</h3><pre class="pseudo">data = {
+  "project_id": self.id,
+  <span class="g">"project_name": self.project_name,</span>
+  "idea_prompt": self.idea_prompt,
+  ...
+}</pre></div></div>
+        <div class="step"><div class="dot">3</div><div><h3>PUT API 支持 <code>project_name</code></h3><pre class="pseudo">if "project_name" in data:
+    name = data["project_name"].strip()
+    if not name:
+        return bad_request("project_name cannot be empty")
+    project.project_name = name
+
+<span class="c"># 保留 idea_prompt 更新给原有编辑场景使用，不用它做重命名</span></pre></div></div>
+        <div class="step"><div class="dot">4</div><div><h3>Frontend 标题工具统一优先级</h3><pre class="pseudo">function getProjectTitle(project):
+  if trim(project.project_name):
+    return project.project_name
+
+  if project.creation_type in ["restyle", "translate"] and project.idea_prompt:
+    return project.idea_prompt       <span class="c">// source filename fallback</span>
+
+  if firstPageTitle(project):
+    return firstPageTitle(project)   <span class="c">// old behavior fallback</span>
+
+  return project.idea_prompt || "未命名项目"</pre></div></div>
+        <div class="step"><div class="dot">5</div><div><h3>History rename 改写 <code>project_name</code></h3><pre class="pseudo">await api.updateProject(projectId, { project_name: editingTitle.trim() })
+
+setProjects(prev => prev.map(p =>
+  sameProject(p, projectId)
+    ? { ...p, project_name: editingTitle.trim() }
+    : p
+))</pre></div></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>7. 测试建议</h2>
+      <table>
+        <thead><tr><th>用例</th><th>准备数据</th><th>断言</th></tr></thead>
+        <tbody>
+          <tr><td>生成 PPT 项目重命名</td><td><code>creation_type='descriptions'</code>，第一页 title = “第一页标题”</td><td>PUT <code>project_name='新名称'</code> 后，History 显示“新名称”，第一页标题不变</td></tr>
+          <tr><td>翻译 PPT 项目重命名</td><td><code>creation_type='translate'</code>，<code>idea_prompt='source-file'</code>，第一页 title = “Slide 1”</td><td>显示 project_name；清空/不存在时 fallback 到 source filename</td></tr>
+          <tr><td>Restyle 兼容</td><td><code>creation_type='restyle'</code>，<code>idea_prompt='deck-a'</code></td><td>未重命名前仍显示 deck-a；重命名后显示 project_name</td></tr>
+          <tr><td>API 校验</td><td><code>project_name='   '</code></td><td>返回 400；不写入空标题</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>8. 不推荐的快速修法</h2>
+      <table>
+        <thead><tr><th>方案</th><th>为什么看似简单</th><th>为什么不推荐</th></tr></thead>
+        <tbody>
+          <tr><td>让 <code>getProjectTitle()</code> 对所有类型都优先读 <code>idea_prompt</code></td><td>只改前端一处</td><td>会改变现有 idea/description 项目的默认命名行为；继续污染 idea_prompt 语义</td></tr>
+          <tr><td>重命名时同步改第一页 <code>outline_content.title</code></td><td>立即让卡片显示新名称</td><td>会修改 PPT 内容本身；用户只是改项目名，不是改第一页标题</td></tr>
+          <tr><td>只针对 translate/descriptions 做 if/else</td><td>改动小</td><td>继续堆类型特判，下一种 workflow 还会再破</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card">
+      <h2>9. 建议实施顺序</h2>
+      <div class="grid three">
+        <div class="stat"><div class="label">Step 1</div><div class="value">加 migration/model/API</div><p class="small">风险低，nullable 字段，不破坏旧数据。</p></div>
+        <div class="stat"><div class="label">Step 2</div><div class="value">改 frontend title + rename</div><p class="small">所有类型统一走 <code>project_name</code>。</p></div>
+        <div class="stat"><div class="label">Step 3</div><div class="value">补最小测试</div><p class="small">重点覆盖 descriptions / translate / restyle 三类。</p></div>
+      </div>
+    </section>
+
+    <p class="footer">设计来源：沿用 Banana Slides 的 banana yellow、白卡片、圆角和轻阴影视觉语言；本页用于方案 review，不改业务代码。</p>
+  </main>
+
+  <script type="module">
+    mermaid.initialize({ startOnLoad: true, theme: 'base', themeVariables: {
+      primaryColor: '#fff7cc', primaryBorderColor: '#facc15', primaryTextColor: '#172033',
+      lineColor: '#64748b', secondaryColor: '#f8fafc', tertiaryColor: '#ffffff'
+    }});
+
+    import { File } from "https://esm.sh/@pierre/diffs@1.2.10?bundle";
+    const options = { theme: { light: "github-light", dark: "github-dark" }, themeType: "dark", overflow: "wrap" };
+    new File(options).render({
+      containerWrapper: document.querySelector("#code-history"),
+      file: {
+        name: "frontend/src/pages/History.tsx:297-312",
+        contents: `const handleSaveEdit = useCallback(async (projectId: string) => {
+  if (!editingTitle.trim()) {
+    show({ message: t('history.titleEmpty'), type: 'error' });
+    return;
+  }
+
+  try {
+    // 调用API更新项目名称
+    await api.updateProject(projectId, { idea_prompt: editingTitle.trim() });
+
+    // 更新本地状态
+    setProjects(prev => prev.map(p => {
+      const id = p.id || p.project_id;
+      if (id === projectId) {
+        return { ...p, idea_prompt: editingTitle.trim() };
+      }`
+      }
+    });
+
+    new File(options).render({
+      containerWrapper: document.querySelector("#code-utils"),
+      file: {
+        name: "frontend/src/utils/projectUtils.ts:8-27",
+        contents: `export const getProjectTitle = (project: Project): string => {
+  // restyle 项目优先使用 idea_prompt（即源文件名）
+  if (project.creation_type === 'restyle' && project.idea_prompt) {
+    return project.idea_prompt;
+  }
+
+  // 从第一个页面的大纲标题获取项目名称
+  if (project.pages && project.pages.length > 0) {
+    const sortedPages = [...project.pages].sort((a, b) =>
+      (a.order_index || 0) - (b.order_index || 0)
+    );
+    const firstPage = sortedPages[0];
+
+    if (firstPage?.outline_content?.title) {
+      return firstPage.outline_content.title;
+    }
+  }
+
+  // 兜底：idea_prompt 或默认名
+  return project.idea_prompt || '未命名项目';
+};`
+      }
+    });
+  </script>
+</body>
+</html>

@@ -2,6 +2,11 @@
 
 Status: Ready for implementation planning
 
+**See also:** Broader prompt assembly and edit-context history is archived in
+`docs/lavish/` (`banana-prompt-deep-dive-revised.html`, index at
+`docs/lavish/README.md`). Those HTML reports may be stale; this spec and current
+code take precedence.
+
 ## 1. Context
 
 In `restyle` workflow, first-pass generation has stable style anchors (`original slide`, `style refs`, `restyle prompt`).
