@@ -629,14 +629,15 @@ banana-slides/
 │   │   ├── material.py         # Material model (Reference materials)
 │   │   ├── user_template.py    # UserTemplate model (User templates)
 │   │   ├── reference_file.py   # ReferenceFile model (Reference files)
-│   │   ├── page_image_version.py # PageImageVersion model (Page versions)
+│   │   ├── page_image_version.py # PageImageVersion (prompt_snapshot / ref_manifest)
 │   ├── services/               # Service layer
 │   │   ├── ai_service.py       # AI generation service (Gemini integration)
 │   │   ├── file_service.py     # File management service
 │   │   ├── file_parser_service.py # File parsing service
 │   │   ├── export_service.py   # PPTX/PDF export service
 │   │   ├── task_manager.py     # Asynchronous task management
-│   │   ├── prompts.py          # AI prompt templates (generic; DDI bodies via style_preset_service)
+│   │   ├── prompts.py          # AI prompts (neutral default generate; preset bodies via style_preset_service)
+│   │   ├── restyle_edit_context.py # Restyle and generic image-edit conversation context
 │   │   ├── style_preset_service.py    # Runtime presets (assets/presets/)
 │   ├── controllers/            # API controllers
 │   │   ├── project_controller.py      # Project management

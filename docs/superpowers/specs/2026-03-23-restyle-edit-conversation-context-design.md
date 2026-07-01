@@ -152,7 +152,7 @@ In page edit flow:
 5. call image provider with provider-agnostic conversation payload (Gemini adapter uses native `contents[]`; unsupported adapters use legacy path),
 6. save output with existing versioning pipeline.
 
-Non-restyle path remains unchanged.
+Non-restyle edits use the same conversation + legacy-fallback provider path via `build_image_edit_context`, anchoring on the current version's `prompt_snapshot` and `ref_manifest` (degrade to legacy edit prompt when metadata is missing). See `task_manager.edit_page_image_task` and migration `024_add_generation_metadata_to_page_image_versions`.
 
 ## 9.3 Provider Capability And Retry Semantics
 

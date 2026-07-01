@@ -27,7 +27,7 @@
 
 - 上传 PPT/PDF 的解析细节
 - 建立 restyle project 的完整取证
-- 非 restyle 项目的普通生成流程
+- 非 restyle 项目的普通生成/编辑的专用 debug 目录（idea/outline/descriptions 编辑已写入 `page_image_versions.prompt_snapshot` / `ref_manifest`，但无与 `restyle-context/` 对等的 JSON artifact 树）
 
 ## 为什么现在先用 debug
 
@@ -57,7 +57,7 @@ project
 
 ## 主目录说明
 
-- [restyle-context/README.md](file:///Users/rico/gits/ddi-side-projects/banana-slides/data/debug/restyle-context/README.md)
+- [restyle-context/README.md](restyle-context/README.md)
 
 这个子目录 README 会具体解释：
 

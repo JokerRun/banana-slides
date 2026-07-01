@@ -332,6 +332,7 @@ Schema gotchas：
 - version number: `page_image_versions.version_number` vs `saved_version.json -> event.version_number`
 - source version: `saved_version.json -> trace.source_version_number` 应该对应 edit 前的 current version
 - snapshot persisted: DB `restyle_base_prompt_snapshot IS NOT NULL` and debug `snapshot_persisted / snapshot_source`
+- version metadata: 当前 `page_image_versions` 行应有 `prompt_snapshot` 与 `ref_manifest`（JSON）；首轮/编辑保存后可用于下一轮编辑上下文
 - file exists: debug 里 `/app/uploads/...` 要映射回宿主机 `data/uploads/...`
 
 ## Reliable Learnings
