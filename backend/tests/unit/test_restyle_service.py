@@ -15,6 +15,7 @@ from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import sys
+
 backend_path = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(backend_path))
 
@@ -39,22 +40,26 @@ class TestConvertToImages:
     def test_routes_pdf_to_pdf_handler(self):
         """PDF 文件应走 _pdf_to_images 路径"""
         service = RestyleService()
-        with patch.object(service, '_pdf_to_images', return_value=['/tmp/slide_001.png']) as mock:
+        with patch.object(
+            service, "_pdf_to_images", return_value=["/tmp/slide_001.png"]
+        ) as mock:
             result = service.convert_to_images("/tmp/test.pdf", "/tmp/out", dpi=150)
             mock.assert_called_once_with("/tmp/test.pdf", "/tmp/out", 150)
-            assert result == ['/tmp/slide_001.png']
+            assert result == ["/tmp/slide_001.png"]
 
     def test_routes_pptx_to_pptx_handler(self):
         """PPTX 文件应走 _pptx_to_images 路径"""
         service = RestyleService()
-        with patch.object(service, '_pptx_to_images', return_value=['/tmp/slide_001.png']) as mock:
+        with patch.object(
+            service, "_pptx_to_images", return_value=["/tmp/slide_001.png"]
+        ) as mock:
             result = service.convert_to_images("/tmp/test.pptx", "/tmp/out")
             mock.assert_called_once()
 
     def test_routes_ppt_to_pptx_handler(self):
         """PPT 文件也应走 _pptx_to_images 路径"""
         service = RestyleService()
-        with patch.object(service, '_pptx_to_images', return_value=[]) as mock:
+        with patch.object(service, "_pptx_to_images", return_value=[]) as mock:
             service.convert_to_images("/tmp/test.ppt", "/tmp/out")
             mock.assert_called_once()
 
@@ -63,7 +68,7 @@ class TestConvertToImages:
         service = RestyleService()
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = os.path.join(tmpdir, "subdir", "output")
-            with patch.object(service, '_pdf_to_images', return_value=[]):
+            with patch.object(service, "_pdf_to_images", return_value=[]):
                 service.convert_to_images("/tmp/test.pdf", output_dir)
             assert os.path.isdir(output_dir)
 
@@ -98,7 +103,7 @@ class TestPdfToImages:
             assert len(result) == 2
             for path in result:
                 assert os.path.exists(path)
-                assert path.endswith('.png')
+                assert path.endswith(".png")
 
     def test_pdf_to_images_naming(self):
         """输出文件命名应为 slide_001.png, slide_002.png ..."""
@@ -150,6 +155,7 @@ class TestPdfToImages:
             service._pdf_to_images(pdf_path, out_144, dpi=144)
 
             from PIL import Image
+
             img72 = Image.open(os.path.join(out_72, "slide_001.png"))
             img144 = Image.open(os.path.join(out_144, "slide_001.png"))
 
@@ -163,7 +169,11 @@ class TestPptxToImages:
     def test_libreoffice_not_found(self):
         """LibreOffice 未安装时应抛出 RuntimeError"""
         service = RestyleService()
-        with patch.object(RestyleService, '_find_libreoffice', side_effect=RuntimeError("LibreOffice not found")):
+        with patch.object(
+            RestyleService,
+            "_find_libreoffice",
+            side_effect=RuntimeError("LibreOffice not found"),
+        ):
             with pytest.raises(RuntimeError, match="LibreOffice not found"):
                 service._pptx_to_images("/tmp/test.pptx", "/tmp/out")
 
@@ -174,8 +184,8 @@ class TestPptxToImages:
         mock_result.returncode = 1
         mock_result.stderr = "conversion error"
 
-        with patch.object(RestyleService, '_find_libreoffice', return_value='soffice'):
-            with patch('subprocess.run', return_value=mock_result):
+        with patch.object(RestyleService, "_find_libreoffice", return_value="soffice"):
+            with patch("subprocess.run", return_value=mock_result):
                 with pytest.raises(RuntimeError, match="LibreOffice conversion failed"):
                     service._pptx_to_images("/tmp/test.pptx", "/tmp/out")
 
@@ -189,15 +199,19 @@ class TestFindLibreoffice:
         mock_result.returncode = 0
         mock_result.stdout = "LibreOffice 7.6"
 
-        with patch('subprocess.run', return_value=mock_result):
+        with patch("subprocess.run", return_value=mock_result):
             result = RestyleService._find_libreoffice()
-            assert result in ['libreoffice', 'soffice', '/usr/bin/libreoffice',
-                              '/usr/bin/soffice',
-                              '/Applications/LibreOffice.app/Contents/MacOS/soffice']
+            assert result in [
+                "libreoffice",
+                "soffice",
+                "/usr/bin/libreoffice",
+                "/usr/bin/soffice",
+                "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+            ]
 
     def test_find_libreoffice_not_found(self):
         """所有候选路径都找不到时应抛出 RuntimeError"""
-        with patch('subprocess.run', side_effect=FileNotFoundError):
+        with patch("subprocess.run", side_effect=FileNotFoundError):
             with pytest.raises(RuntimeError, match="LibreOffice not found"):
                 RestyleService._find_libreoffice()
 
@@ -208,6 +222,7 @@ class TestRestylePrompt:
     def test_basic_prompt(self):
         """Basic prompt should use DDI product prompt with IMAGE labels"""
         from services.prompts import get_restyle_prompt
+
         prompt = get_restyle_prompt(page_index=1, total_pages=5)
 
         assert "IMAGE 1: [底版.png] base template reference" in prompt
@@ -220,6 +235,7 @@ class TestRestylePrompt:
     def test_prompt_migrates_source_content_to_base_template(self):
         """Prompt should map source slide content onto the base template"""
         from services.prompts import get_restyle_prompt
+
         prompt = get_restyle_prompt(page_index=2, total_pages=5)
 
         assert "Brand guidelines" not in prompt
@@ -245,6 +261,7 @@ class TestRestylePrompt:
     def test_first_page_uses_product_prompt_without_legacy_cover_hint(self):
         """Product prompt should not add legacy cover-page styling hints"""
         from services.prompts import get_restyle_prompt
+
         prompt = get_restyle_prompt(page_index=1, total_pages=5)
 
         assert "COVER" not in prompt
@@ -252,6 +269,7 @@ class TestRestylePrompt:
     def test_last_page_uses_product_prompt_without_legacy_ending_hint(self):
         """Product prompt should not add legacy ending-page styling hints"""
         from services.prompts import get_restyle_prompt
+
         prompt = get_restyle_prompt(page_index=5, total_pages=5)
 
         assert "ENDING" not in prompt
@@ -259,6 +277,7 @@ class TestRestylePrompt:
     def test_middle_page_no_special_hint(self):
         """Middle page should have no special hint"""
         from services.prompts import get_restyle_prompt
+
         prompt = get_restyle_prompt(page_index=3, total_pages=5)
 
         assert "COVER" not in prompt
@@ -267,6 +286,7 @@ class TestRestylePrompt:
     def test_multiple_style_refs(self):
         """Multiple base template references should get numbered labels"""
         from services.prompts import get_restyle_prompt
+
         prompt = get_restyle_prompt(page_index=2, total_pages=5, num_style_refs=3)
 
         assert "IMAGE 1: [底版.png] base template reference #1" in prompt
@@ -278,6 +298,7 @@ class TestRestylePrompt:
     def test_text_preservation_instruction(self):
         """Verify source content preservation is clearly instructed"""
         from services.prompts import get_restyle_prompt
+
         prompt = get_restyle_prompt(page_index=2, total_pages=5)
 
         assert "零重写内容原则" in prompt
@@ -289,10 +310,7 @@ class TestRestylePrompt:
 
         custom = "必须使用底版.png作为唯一底板，标题位置固定"
         prompt = get_restyle_prompt(
-            page_index=2,
-            total_pages=5,
-            num_style_refs=2,
-            custom_prompt=custom
+            page_index=2, total_pages=5, num_style_refs=2, custom_prompt=custom
         )
 
         assert custom in prompt
@@ -308,7 +326,7 @@ class TestRestylePrompt:
             page_index=1,
             total_pages=3,
             num_style_refs=3,
-            custom_prompt="custom instructions"
+            custom_prompt="custom instructions",
         )
 
         assert "IMAGE 1: [底版.png] base template reference #1" in prompt

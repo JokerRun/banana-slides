@@ -996,7 +996,11 @@ def generate_images(project_id):
                 current_app.config["DEFAULT_ASPECT_RATIO"],
                 current_app.config["DEFAULT_RESOLUTION"],
                 app,
-                combined_requirements if combined_requirements and combined_requirements.strip() else None,
+                (
+                    combined_requirements
+                    if combined_requirements and combined_requirements.strip()
+                    else None
+                ),
                 language,
                 selected_page_ids if selected_page_ids else None,
             )

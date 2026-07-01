@@ -12,7 +12,10 @@ from werkzeug.utils import secure_filename
 
 from models import db, Project, Page, Task
 from services.restyle_service import RestyleService
-from services.style_preset_service import StylePresetError, apply_style_preset_to_project
+from services.style_preset_service import (
+    StylePresetError,
+    apply_style_preset_to_project,
+)
 from services.ai_service_manager import get_ai_service
 from services.task_manager import task_manager, translate_images_task
 from utils import (

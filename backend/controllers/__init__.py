@@ -1,4 +1,5 @@
 """Controllers package"""
+
 from .project_controller import project_bp
 from .page_controller import page_bp
 from .template_controller import template_bp, user_template_bp
@@ -12,16 +13,16 @@ from .task_controller import task_bp
 from .preset_controller import preset_bp
 
 __all__ = [
-    'project_bp',
-    'page_bp',
-    'template_bp',
-    'user_template_bp',
-    'export_bp',
-    'file_bp',
-    'material_bp',
-    'settings_bp',
-    'restyle_bp',
-    'auth_bp',
-    'task_bp',
-    'preset_bp',
+    "project_bp",
+    "page_bp",
+    "template_bp",
+    "user_template_bp",
+    "export_bp",
+    "file_bp",
+    "material_bp",
+    "settings_bp",
+    "restyle_bp",
+    "auth_bp",
+    "task_bp",
+    "preset_bp",
 ]

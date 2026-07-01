@@ -16,11 +16,13 @@ logger = logging.getLogger(__name__)
 
 class MissingStructuralImagesError(ValueError):
     """Both original slide and current selected version are unavailable."""
+
     pass
 
 
 class ContextImageLimitExceeded(ValueError):
     """Assembled image set exceeds total cap after pruning."""
+
     pass
 
 
@@ -30,13 +32,14 @@ class ContextImageLimitExceeded(ValueError):
 @dataclass
 class RestyleEditContext:
     """Provider-agnostic restyle edit context payload."""
-    conversation_contents: list          # Multi-turn content for conversation providers
-    legacy_prompt: str                   # Flattened prompt for fallback providers
-    legacy_ref_images: list              # Flattened image path list for fallback
-    degraded_context: bool               # True if any baseline component missing
-    baseline_images_count: int           # Images from baseline bucket
-    current_images_count: int            # Images from current round bucket
-    snapshot_source: str = 'persisted'   # persisted | reconstructed
+
+    conversation_contents: list  # Multi-turn content for conversation providers
+    legacy_prompt: str  # Flattened prompt for fallback providers
+    legacy_ref_images: list  # Flattened image path list for fallback
+    degraded_context: bool  # True if any baseline component missing
+    baseline_images_count: int  # Images from baseline bucket
+    current_images_count: int  # Images from current round bucket
+    snapshot_source: str = "persisted"  # persisted | reconstructed
     turns_summary: list = field(default_factory=list)
     image_manifest: list = field(default_factory=list)
 
@@ -145,7 +148,14 @@ def _select_images(
         selected_extras=selected_extras,
     )
 
-    return anchors, selected_style_refs, selected_extras, baseline_count, current_count, image_manifest
+    return (
+        anchors,
+        selected_style_refs,
+        selected_extras,
+        baseline_count,
+        current_count,
+        image_manifest,
+    )
 
 
 def _build_image_manifest(
@@ -161,46 +171,58 @@ def _build_image_manifest(
     manifest: List[dict] = []
 
     if original_slide_path:
-        manifest.append({
-            'kind': 'original_slide',
-            'bucket': 'baseline',
-            'path': original_slide_path,
-            'selected': True,
-            'selection_reason': 'anchor',
-        })
+        manifest.append(
+            {
+                "kind": "original_slide",
+                "bucket": "baseline",
+                "path": original_slide_path,
+                "selected": True,
+                "selection_reason": "anchor",
+            }
+        )
 
     for idx, path in enumerate(style_ref_paths):
-        manifest.append({
-            'kind': 'style_ref',
-            'bucket': 'baseline',
-            'path': path,
-            'selected': path in selected_style_refs,
-            'selection_reason': (
-                'reserved_style_ref'
-                if path in selected_style_refs and idx == 0
-                else 'kept_style_ref'
-                if path in selected_style_refs
-                else 'pruned_budget'
-            ),
-        })
+        manifest.append(
+            {
+                "kind": "style_ref",
+                "bucket": "baseline",
+                "path": path,
+                "selected": path in selected_style_refs,
+                "selection_reason": (
+                    "reserved_style_ref"
+                    if path in selected_style_refs and idx == 0
+                    else (
+                        "kept_style_ref"
+                        if path in selected_style_refs
+                        else "pruned_budget"
+                    )
+                ),
+            }
+        )
 
     if current_selected_path:
-        manifest.append({
-            'kind': 'current_selected',
-            'bucket': 'current',
-            'path': current_selected_path,
-            'selected': True,
-            'selection_reason': 'anchor',
-        })
+        manifest.append(
+            {
+                "kind": "current_selected",
+                "bucket": "current",
+                "path": current_selected_path,
+                "selected": True,
+                "selection_reason": "anchor",
+            }
+        )
 
     for path in current_extra_ref_paths:
-        manifest.append({
-            'kind': 'current_extra_ref',
-            'bucket': 'current',
-            'path': path,
-            'selected': path in selected_extras,
-            'selection_reason': 'current_extra_ref' if path in selected_extras else 'pruned_budget',
-        })
+        manifest.append(
+            {
+                "kind": "current_extra_ref",
+                "bucket": "current",
+                "path": path,
+                "selected": path in selected_extras,
+                "selection_reason": (
+                    "current_extra_ref" if path in selected_extras else "pruned_budget"
+                ),
+            }
+        )
 
     return manifest
 
@@ -211,17 +233,19 @@ def _build_turns_summary(contents: List[dict]) -> List[dict]:
     for index, turn in enumerate(contents, 1):
         text_len = 0
         image_count = 0
-        for part in turn.get('parts', []):
-            if 'text' in part:
-                text_len += len(part['text'])
-            if 'image_path' in part:
+        for part in turn.get("parts", []):
+            if "text" in part:
+                text_len += len(part["text"])
+            if "image_path" in part:
                 image_count += 1
-        summary.append({
-            'index': index,
-            'role': turn.get('role'),
-            'text_len': text_len,
-            'image_count': image_count,
-        })
+        summary.append(
+            {
+                "index": index,
+                "role": turn.get("role"),
+                "text_len": text_len,
+                "image_count": image_count,
+            }
+        )
     return summary
 
 
@@ -248,36 +272,40 @@ def _build_conversation_contents(
     turns: list = []
 
     # Turn 1 (user, text): baseline instruction block
-    turns.append({
-        'role': 'user',
-        'parts': [{'text': baseline_text}],
-    })
+    turns.append(
+        {
+            "role": "user",
+            "parts": [{"text": baseline_text}],
+        }
+    )
 
     # Turn 2 (user, images): baseline images, matching first-pass prompt order:
     # style/base template refs first, then original slide content.
     turn2_parts: list = []
     for ref in selected_style_refs:
-        turn2_parts.append({'image_path': ref})
+        turn2_parts.append({"image_path": ref})
     if original_slide_path:
-        turn2_parts.append({'image_path': original_slide_path})
+        turn2_parts.append({"image_path": original_slide_path})
     if turn2_parts:
-        turns.append({'role': 'user', 'parts': turn2_parts})
+        turns.append({"role": "user", "parts": turn2_parts})
 
     # Turn 3 (user, image): current selected slide version.
     # This is user-supplied context, not a prior SDK model response. Using a
     # synthetic model turn with Gemini 3 image models triggers thought-signature
     # validation, because only real model outputs carry those signatures.
     if current_selected_path:
-        turns.append({
-            'role': 'user',
-            'parts': [{'image_path': current_selected_path}],
-        })
+        turns.append(
+            {
+                "role": "user",
+                "parts": [{"image_path": current_selected_path}],
+            }
+        )
 
     # Turn 4 (user, text + optional images): current delta instruction
-    turn4_parts: list = [{'text': edit_instruction}]
+    turn4_parts: list = [{"text": edit_instruction}]
     for extra in selected_extras:
-        turn4_parts.append({'image_path': extra})
-    turns.append({'role': 'user', 'parts': turn4_parts})
+        turn4_parts.append({"image_path": extra})
+    turns.append({"role": "user", "parts": turn4_parts})
 
     return turns
 
@@ -338,7 +366,7 @@ def build_restyle_edit_context(
     """
     extras = current_extra_ref_paths or []
     degraded = False
-    snapshot_source = 'persisted'
+    snapshot_source = "persisted"
 
     # Snapshot resolution
     snapshot = restyle_base_prompt_snapshot
@@ -351,9 +379,11 @@ def build_restyle_edit_context(
             style_preset_id=style_preset_id,
         )
         degraded = True
-        snapshot_source = 'reconstructed'
-        logger.info("restyle_edit_context: snapshot missing, using reconstruction",
-                     extra={'degraded_context': True})
+        snapshot_source = "reconstructed"
+        logger.info(
+            "restyle_edit_context: snapshot missing, using reconstruction",
+            extra={"degraded_context": True},
+        )
 
     # Degrade if structural images partially missing
     if not original_slide_path or not current_selected_path:
@@ -364,15 +394,20 @@ def build_restyle_edit_context(
         degraded = True
 
     # Image selection + pruning
-    anchors, selected_style_refs, selected_extras, baseline_count, current_count, image_manifest = (
-        _select_images(
-            original_slide_path=original_slide_path,
-            style_ref_paths=style_ref_paths,
-            current_selected_path=current_selected_path,
-            current_extra_ref_paths=extras,
-            prunable_cap=prunable_cap,
-            total_cap=total_cap,
-        )
+    (
+        anchors,
+        selected_style_refs,
+        selected_extras,
+        baseline_count,
+        current_count,
+        image_manifest,
+    ) = _select_images(
+        original_slide_path=original_slide_path,
+        style_ref_paths=style_ref_paths,
+        current_selected_path=current_selected_path,
+        current_extra_ref_paths=extras,
+        prunable_cap=prunable_cap,
+        total_cap=total_cap,
     )
 
     # Assemble baseline text block
@@ -419,13 +454,13 @@ def build_restyle_edit_context(
 
 # Patterns indicating provider-format/schema rejection (retryable via legacy fallback)
 _RETRYABLE_PATTERNS = re.compile(
-    r'(?:^|\b)(?:400|422|contents|parts|inline_data|schema|invalid_argument)(?:\b|$)',
+    r"(?:^|\b)(?:400|422|contents|parts|inline_data|schema|invalid_argument)(?:\b|$)",
     re.IGNORECASE,
 )
 
 # Patterns indicating non-retryable infrastructure errors
 _NON_RETRYABLE_PATTERNS = re.compile(
-    r'(?:^|\b)(?:500|503|timed?\s*out|timeout|internal\s+server|service\s+unavailable)(?:\b|$)',
+    r"(?:^|\b)(?:500|503|timed?\s*out|timeout|internal\s+server|service\s+unavailable)(?:\b|$)",
     re.IGNORECASE,
 )
 

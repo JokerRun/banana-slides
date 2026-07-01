@@ -17,9 +17,15 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column("projects", sa.Column("style_preset_id", sa.String(100), nullable=True))
-    op.add_column("projects", sa.Column("style_preset_version", sa.String(50), nullable=True))
-    op.add_column("projects", sa.Column("style_preset_sha256", sa.String(64), nullable=True))
+    op.add_column(
+        "projects", sa.Column("style_preset_id", sa.String(100), nullable=True)
+    )
+    op.add_column(
+        "projects", sa.Column("style_preset_version", sa.String(50), nullable=True)
+    )
+    op.add_column(
+        "projects", sa.Column("style_preset_sha256", sa.String(64), nullable=True)
+    )
 
 
 def downgrade():

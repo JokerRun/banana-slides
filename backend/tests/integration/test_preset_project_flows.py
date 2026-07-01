@@ -18,7 +18,9 @@ def _png_bytes(color: str = "blue") -> bytes:
     return buf.getvalue()
 
 
-def test_create_restyle_project_accepts_ddi_preset_without_uploaded_style_refs(client, tmp_path):
+def test_create_restyle_project_accepts_ddi_preset_without_uploaded_style_refs(
+    client, tmp_path
+):
     original = tmp_path / "slide.png"
     original.write_bytes(_png_bytes("white"))
 
@@ -45,7 +47,9 @@ def test_create_restyle_project_accepts_ddi_preset_without_uploaded_style_refs(c
     ]
 
 
-def test_create_translate_restyle_project_accepts_ddi_preset_without_uploaded_style_refs(client, tmp_path):
+def test_create_translate_restyle_project_accepts_ddi_preset_without_uploaded_style_refs(
+    client, tmp_path
+):
     original = tmp_path / "slide.png"
     original.write_bytes(_png_bytes("white"))
 
@@ -120,4 +124,6 @@ def test_create_restyle_project_still_accepts_custom_style_refs(client, tmp_path
     project = assert_success_response(client.get(f"/api/projects/{project_id}"))["data"]
 
     assert project["style_preset_id"] is None
-    assert project["style_ref_image_paths"] == [f"{project_id}/style_refs/style_ref_1.png"]
+    assert project["style_ref_image_paths"] == [
+        f"{project_id}/style_refs/style_ref_1.png"
+    ]

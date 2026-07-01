@@ -25,7 +25,9 @@ def _clear_preset_cache():
     clear_style_preset_cache()
 
 
-def test_list_style_presets_uses_cache_without_rescanning_manifest(tmp_path, monkeypatch):
+def test_list_style_presets_uses_cache_without_rescanning_manifest(
+    tmp_path, monkeypatch
+):
     monkeypatch.setattr(
         "services.style_preset_service._presets_root",
         lambda: tmp_path,

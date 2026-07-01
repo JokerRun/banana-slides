@@ -2140,9 +2140,11 @@ def translate_images_task(
 
                         preset_base_body, effective_translate_prompt = (
                             resolve_preset_prompt_body_for_flow(
-                                project.style_preset_id
-                                if translate_mode == "restyle"
-                                else None,
+                                (
+                                    project.style_preset_id
+                                    if translate_mode == "restyle"
+                                    else None
+                                ),
                                 "translateRestyle",
                                 translate_prompt or "",
                             )

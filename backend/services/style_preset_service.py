@@ -87,9 +87,7 @@ def _load_prompt_texts(directory: Path, prompt_files: dict[str, str]) -> dict[st
     for key, filename in prompt_files.items():
         path = directory / filename
         if not path.is_file():
-            raise StylePresetError(
-                f"Style preset prompt file missing: {path}"
-            )
+            raise StylePresetError(f"Style preset prompt file missing: {path}")
         loaded[key] = path.read_text(encoding="utf-8").strip()
     return loaded
 
@@ -221,7 +219,11 @@ def apply_style_preset_to_project(
     shutil.copyfile(preset.base_image_path, target)
     rel_path = target.relative_to(file_service.upload_folder).as_posix()
 
-    paths = existing_paths if existing_paths is not None else project.get_style_ref_image_paths()
+    paths = (
+        existing_paths
+        if existing_paths is not None
+        else project.get_style_ref_image_paths()
+    )
     if rel_path not in paths:
         paths.append(rel_path)
 

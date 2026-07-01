@@ -96,7 +96,10 @@ def test_upload_style_refs_replace_custom_only_clears_preset_metadata(client):
     assert_success_response(bind_response)
 
     project_response = client.get(f"/api/projects/{project_id}")
-    assert assert_success_response(project_response)["data"]["style_preset_id"] == "ddi-standard"
+    assert (
+        assert_success_response(project_response)["data"]["style_preset_id"]
+        == "ddi-standard"
+    )
 
     replace_response = client.post(
         f"/api/projects/{project_id}/style-refs",
@@ -123,10 +126,7 @@ def test_upload_style_refs_rejects_preset_plus_too_many_uploads(client):
     )
     project_id = assert_success_response(create_response, 201)["data"]["project_id"]
 
-    refs = [
-        (io.BytesIO(_png_bytes("red")), f"ref{i}.png")
-        for i in range(5)
-    ]
+    refs = [(io.BytesIO(_png_bytes("red")), f"ref{i}.png") for i in range(5)]
     upload_response = client.post(
         f"/api/projects/{project_id}/style-refs",
         data={
