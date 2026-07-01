@@ -590,15 +590,12 @@ export const Home: React.FC = () => {
 
   const generatePresetOptions = useMemo(() => {
     if (runtimePresets.length > 0) {
-      return runtimePresets.map((preset) => {
-        const fallback = GENERATE_PRESETS.find((item) => item.id === preset.id);
-        return {
-          id: preset.id,
-          name: preset.name,
-          imageUrl: preset.imageUrl,
-          prompt: preset.prompts.generate,
-        };
-      });
+      return runtimePresets.map((preset) => ({
+        id: preset.id,
+        name: preset.name,
+        imageUrl: preset.imageUrl,
+        prompt: preset.prompts.generate,
+      }));
     }
     return GENERATE_PRESETS.map((preset) => ({
       id: preset.id,
