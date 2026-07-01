@@ -2,6 +2,21 @@ import { apiClient } from './client';
 import type { Project, Task, ApiResponse, CreateProjectRequest, Page } from '@/types';
 import type { AuthMeResponse } from '@/types/auth';
 
+export interface StylePresetMetadata {
+  id: string;
+  legacyIds: string[];
+  version: string;
+  name: string;
+  baseImage: string;
+  sha256: string;
+  imageUrl: string;
+  prompts: {
+    generate: string;
+    restyle: string;
+    translateRestyle: string;
+  };
+}
+
 // ===== 认证相关 API =====
 
 /**
@@ -17,6 +32,11 @@ export const getAuthMe = async (): Promise<ApiResponse<AuthMeResponse>> => {
  */
 export const logoutAuth = async (): Promise<ApiResponse<{ ok: boolean }>> => {
   const response = await apiClient.post<ApiResponse<{ ok: boolean }>>('/api/auth/logout');
+  return response.data;
+};
+
+export const listPresets = async (): Promise<ApiResponse<{ presets: StylePresetMetadata[] }>> => {
+  const response = await apiClient.get<ApiResponse<{ presets: StylePresetMetadata[] }>>('/api/presets');
   return response.data;
 };
 
@@ -850,6 +870,7 @@ export interface CreateTranslateProjectOptions {
   targetLanguage: string;
   translateMode: 'pure' | 'restyle';
   styleRefs?: File[];
+  stylePresetId?: string;
   translatePrompt?: string;
 }
 
@@ -875,6 +896,9 @@ export const createTranslateProject = async (
 
   if (options.styleRefs && options.styleRefs.length > 0) {
     options.styleRefs.forEach(ref => formData.append('style_refs', ref));
+  }
+  if (options.stylePresetId) {
+    formData.append('style_preset_id', options.stylePresetId);
   }
   if (options.translatePrompt) {
     formData.append('translate_prompt', options.translatePrompt);
@@ -926,6 +950,7 @@ export const translateSinglePage = async (
  */
 export interface CreateRestyleProjectOptions {
   restylePrompt?: string;
+  stylePresetId?: string;
 }
 
 export const createRestyleProject = async (
@@ -942,6 +967,9 @@ export const createRestyleProject = async (
   const formData = new FormData();
   formData.append('source_file', sourceFile);
   styleRefs.forEach(ref => formData.append('style_refs', ref));
+  if (options?.stylePresetId) {
+    formData.append('style_preset_id', options.stylePresetId);
+  }
   if (options?.restylePrompt) {
     formData.append('restyle_prompt', options.restylePrompt);
   }

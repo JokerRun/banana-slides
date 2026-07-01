@@ -5,7 +5,6 @@ Project Controller - handles project-related endpoints
 import json
 import logging
 import traceback
-import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -22,6 +21,10 @@ from services.task_manager import (
     generate_descriptions_task,
     generate_images_task,
     restyle_images_task,
+)
+from services.style_preset_service import (
+    StylePresetError,
+    apply_style_preset_to_project,
 )
 from utils import (
     success_response,
@@ -284,21 +287,15 @@ def upload_style_refs(project_id):
         saved_paths = [] if replace_existing else project.get_style_ref_image_paths()
 
         if style_preset_id:
-            if style_preset_id != "ddi":
-                return bad_request("Unsupported style_preset_id")
-            preset_source = (
-                Path(current_app.root_path).parent
-                / "assets"
-                / "style-presets"
-                / "ddi-base.png"
-            )
-            if not preset_source.exists():
-                return error_response("SERVER_ERROR", "DDI style preset not found", 500)
-            preset_target = style_ref_dir / "style_ref_preset_ddi.png"
-            shutil.copyfile(preset_source, preset_target)
-            rel_path = preset_target.relative_to(file_service.upload_folder).as_posix()
-            if rel_path not in saved_paths:
-                saved_paths.append(rel_path)
+            try:
+                apply_style_preset_to_project(
+                    project=project,
+                    file_service=file_service,
+                    style_preset_id=style_preset_id,
+                    existing_paths=saved_paths,
+                )
+            except StylePresetError as exc:
+                return bad_request(str(exc))
 
         for i, ref in enumerate(style_refs):
             if not ref.filename or not _allowed_style_ref_file(ref.filename):

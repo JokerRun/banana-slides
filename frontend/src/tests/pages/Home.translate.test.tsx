@@ -3,7 +3,6 @@ import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { Home } from '@/pages/Home'
 import { createTranslateProject } from '@/api/endpoints'
-import { RESTYLE_PRESETS } from '@/config/restylePresets'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -47,10 +46,6 @@ describe('Home translate workflow', () => {
         total_pages: 0,
       },
     })
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      blob: async () => new Blob(['preset-image'], { type: 'image/png' }),
-    } as Response)
     URL.createObjectURL = vi.fn(() => 'blob:style-ref')
   })
 
@@ -73,7 +68,7 @@ describe('Home translate workflow', () => {
 
     fireEvent.click(screen.getByText('翻译+风格转换'))
 
-    await screen.findByAltText('style ref 1')
+    await screen.findByAltText('DDI standard template')
 
     const submitButton = screen.getByRole('button', { name: /开始翻译/ })
     expect(submitButton).toBeEnabled()
@@ -82,11 +77,12 @@ describe('Home translate workflow', () => {
 
     await waitFor(() => {
       expect(createTranslateProject).toHaveBeenCalledWith(
-        expect.any(File),
+        expect.anything(),
         expect.objectContaining({
           translateMode: 'restyle',
-          styleRefs: [expect.any(File)],
-          translatePrompt: RESTYLE_PRESETS[0].prompt,
+          styleRefs: [],
+          stylePresetId: 'ddi-standard',
+          translatePrompt: expect.stringContaining('零重写内容原则'),
         })
       )
     })

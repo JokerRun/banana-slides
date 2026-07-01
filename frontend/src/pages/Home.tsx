@@ -11,7 +11,7 @@ import { useImagePaste } from '@/hooks/useImagePaste';
 import { useT } from '@/hooks/useT';
 import { PRESET_STYLES } from '@/config/presetStyles';
 import { RESTYLE_PRESETS, getRestylePresetById } from '@/config/restylePresets';
-import { TRANSLATE_PRESETS, TARGET_LANGUAGES, getTargetLanguageByCode } from '@/config/translatePresets';
+import { TRANSLATE_PRESETS, TARGET_LANGUAGES, getTargetLanguageByCode, getTranslatePresetById } from '@/config/translatePresets';
 import { GENERATE_DDI_PROMPT, GENERATE_PRESETS } from '@/config/generatePresets';
 
 type CreationType = 'idea' | 'outline' | 'description' | 'restyle' | 'translate';
@@ -570,15 +570,6 @@ export const Home: React.FC = () => {
     return getRestylePresetById(selectedRestylePresetId);
   }, [selectedRestylePresetId]);
 
-  const getPresetStyleRefFile = useCallback(async (imageUrl: string, fileName: string) => {
-    const response = await fetch(imageUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch preset image: ${response.status}`);
-    }
-    const blob = await response.blob();
-    return new File([blob], fileName, { type: blob.type || 'image/png' });
-  }, []);
-
   const applyGeneratePreset = useCallback((presetId: string) => {
     setSelectedGeneratePresetId(presetId);
     const preset = GENERATE_PRESETS.find(item => item.id === presetId);
@@ -590,7 +581,7 @@ export const Home: React.FC = () => {
     setTemplateStyle(preset.prompt);
   }, []);
 
-  const applyRestylePreset = useCallback(async (presetId: string, silent = false) => {
+  const applyRestylePreset = useCallback((presetId: string, silent = false) => {
     setSelectedRestylePresetId(presetId);
     if (!presetId) {
       return;
@@ -602,48 +593,27 @@ export const Home: React.FC = () => {
     }
 
     setIsApplyingRestylePreset(true);
-    try {
-      const presetStyleRef = await getPresetStyleRefFile(
-        preset.styleRefImageUrl,
-        preset.styleRefFileName
-      );
-      setRestyleStyleRefs([presetStyleRef]);
-      setRestylePrompt(preset.prompt);
-      if (!silent) {
-        show({ message: t('home.messages.restylePresetApplied'), type: 'success' });
-      }
-    } catch (error) {
-      console.error('应用 restyle 预制模板失败:', error);
-      show({ message: t('home.messages.restylePresetApplyFailed'), type: 'error' });
-    } finally {
-      setIsApplyingRestylePreset(false);
+    setRestylePrompt(preset.prompt);
+    setIsApplyingRestylePreset(false);
+    if (!silent) {
+      show({ message: t('home.messages.restylePresetApplied'), type: 'success' });
     }
-  }, [getPresetStyleRefFile, show, t]);
+  }, [show, t]);
 
-  const applyDefaultTranslateRestylePreset = useCallback(async () => {
+  const applyDefaultTranslateRestylePreset = useCallback(() => {
     const preset = RESTYLE_PRESETS[0];
     if (!preset) {
       return;
     }
 
-    try {
-      const presetStyleRef = await getPresetStyleRefFile(
-        preset.styleRefImageUrl,
-        preset.styleRefFileName
-      );
-      setTranslateStyleRefs([presetStyleRef]);
-      setTranslatePrompt(prev => prev.trim() ? prev : preset.prompt);
-    } catch (error) {
-      console.error('应用 translate restyle 默认模板失败:', error);
-      show({ message: t('home.messages.restylePresetApplyFailed'), type: 'error' });
-    }
-  }, [getPresetStyleRefFile, show, t]);
+    setTranslatePrompt(prev => prev.trim() ? prev : preset.prompt);
+  }, []);
 
   // 默认静默应用 DDI 预制模板（填充 prompt + 参考图），与生成模式默认 DDI 行为一致
   useEffect(() => {
     const defaultId = RESTYLE_PRESETS[0]?.id;
     if (defaultId) {
-      void applyRestylePreset(defaultId, true);
+      applyRestylePreset(defaultId, true);
     }
     // 仅在 mount 时应用一次默认模板，避免依赖 show/t 引用变化导致重复触发
 
@@ -655,8 +625,8 @@ export const Home: React.FC = () => {
       show({ message: '请上传 PPT/PDF 源文件', type: 'error' });
       return;
     }
-    if (restyleStyleRefs.length === 0) {
-      show({ message: '请至少上传一张风格参考图', type: 'error' });
+    if (!selectedRestylePresetId && restyleStyleRefs.length === 0) {
+      show({ message: '请选择预制模板或上传至少一张风格参考图', type: 'error' });
       return;
     }
 
@@ -665,7 +635,10 @@ export const Home: React.FC = () => {
       const response = await createRestyleProject(
         restyleSourceFile,
         restyleStyleRefs,
-        { restylePrompt: restylePrompt.trim() || undefined }
+        {
+          restylePrompt: restylePrompt.trim() || undefined,
+          stylePresetId: selectedRestylePresetId || undefined,
+        }
       );
 
       if (!response.data?.project_id) {
@@ -695,8 +668,12 @@ export const Home: React.FC = () => {
       show({ message: '请上传 PPT/PDF 源文件', type: 'error' });
       return;
     }
-    if (translateMode === 'restyle' && translateStyleRefs.length === 0) {
-      show({ message: '翻译+风格转换模式需要至少上传一张风格参考图', type: 'error' });
+    const selectedTranslatePreset = getTranslatePresetById(selectedTranslatePresetId);
+    const translateStylePresetId = translateMode === 'restyle'
+      ? selectedTranslatePreset?.stylePresetId
+      : undefined;
+    if (translateMode === 'restyle' && !translateStylePresetId && translateStyleRefs.length === 0) {
+      show({ message: '翻译+风格转换模式需要选择预制模板或上传风格参考图', type: 'error' });
       return;
     }
     const selectedTargetLanguage = getTargetLanguageByCode(translateTargetLanguage);
@@ -713,6 +690,7 @@ export const Home: React.FC = () => {
           targetLanguage: selectedTargetLanguage.nativeName || selectedTargetLanguage.name,
           translateMode: translateMode,
           styleRefs: translateMode === 'restyle' ? translateStyleRefs : undefined,
+          stylePresetId: translateStylePresetId,
           translatePrompt: translatePrompt.trim() || undefined,
         }
       );
@@ -1143,7 +1121,7 @@ export const Home: React.FC = () => {
                 <select
                   value={selectedRestylePresetId}
                   onChange={(e) => {
-                    void applyRestylePreset(e.target.value);
+                    applyRestylePreset(e.target.value);
                   }}
                   disabled={isApplyingRestylePreset || isRestyleSubmitting}
                   className="w-full rounded-lg border-2 border-gray-200 dark:border-border-primary bg-white dark:bg-background-tertiary px-3 py-2 text-sm text-gray-800 dark:text-white focus:border-banana-400 dark:focus:border-banana"
@@ -1168,6 +1146,15 @@ export const Home: React.FC = () => {
                   🎨 {t('home.actions.uploadStyleRef')}
                 </label>
                 <div className="flex flex-wrap gap-3">
+                  {selectedRestylePreset && restyleStyleRefs.length === 0 && (
+                    <div className="w-40 h-24 rounded-lg border-2 border-banana-400 overflow-hidden bg-slate-100 shadow-sm">
+                      <img
+                        src={selectedRestylePreset.imageUrl}
+                        alt="DDI standard template"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
                   {restyleStyleRefs.map((ref, i) => (
                     <div key={i} className="relative w-24 h-16 rounded-lg overflow-hidden border-2 border-banana-300 dark:border-banana/50 group">
                       <img
@@ -1224,7 +1211,7 @@ export const Home: React.FC = () => {
               <Button
                 onClick={handleRestyleSubmit}
                 loading={isRestyleSubmitting}
-                disabled={!restyleSourceFile || restyleStyleRefs.length === 0}
+                disabled={!restyleSourceFile || (!selectedRestylePresetId && restyleStyleRefs.length === 0)}
                 className="w-full py-3 text-base font-semibold"
               >
                 <RefreshCw size={18} className="mr-2" />
@@ -1313,7 +1300,7 @@ export const Home: React.FC = () => {
                         } else {
                           setTranslateMode('restyle');
                           if (translateStyleRefs.length === 0) {
-                            void applyDefaultTranslateRestylePreset();
+                            applyDefaultTranslateRestylePreset();
                           }
                         }
                       }}
@@ -1344,6 +1331,15 @@ export const Home: React.FC = () => {
                     🎨 {i18n.language?.startsWith('zh') ? '风格参考图（可选）' : 'Style Reference Images (Optional)'}
                   </label>
                   <div className="flex flex-wrap gap-3">
+                    {translateMode === 'restyle' && translateStyleRefs.length === 0 && (
+                      <div className="w-40 h-24 rounded-lg border-2 border-banana-400 overflow-hidden bg-slate-100 shadow-sm">
+                        <img
+                          src={RESTYLE_PRESETS[0].imageUrl}
+                          alt="DDI standard template"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
                     {translateStyleRefs.map((ref, i) => (
                       <div key={i} className="relative w-24 h-16 rounded-lg overflow-hidden border-2 border-banana-300 dark:border-banana/50 group">
                         <img
@@ -1401,7 +1397,7 @@ export const Home: React.FC = () => {
               <Button
                 onClick={handleTranslateSubmit}
                 loading={isTranslateSubmitting}
-                disabled={!translateSourceFile || (translateMode === 'restyle' && translateStyleRefs.length === 0)}
+                disabled={!translateSourceFile}
                 className="w-full py-3 text-base font-semibold"
               >
                 <Globe size={18} className="mr-2" />
@@ -1498,7 +1494,7 @@ export const Home: React.FC = () => {
               {selectedGeneratePresetId === 'ddi-standard' && generateStyleRefs.length === 0 && (
                 <div className="w-40 h-24 rounded-lg border-2 border-banana-400 overflow-hidden bg-slate-100 shadow-sm">
                   <img
-                    src={GENERATE_PRESETS[0].styleRefImageUrl}
+                    src={GENERATE_PRESETS[0].imageUrl}
                     alt="DDI standard template"
                     className="w-full h-full object-cover"
                   />

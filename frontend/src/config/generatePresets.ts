@@ -113,8 +113,9 @@ export const GENERATE_PRESETS = [
   {
     id: 'ddi-standard',
     name: 'DDI 标准模板',
-    styleRefImageUrl: '/restyle-presets/ddi-base-v2.png',
+    imageUrl: '/api/presets/ddi-standard/image',
+    sha256: 'f7f14464afd72793df3b68e5c06a91a32b4329c24d0886a7a557dd01bdcc112c',
+    version: '2026-07-01',
     prompt: GENERATE_DDI_PROMPT,
   },
 ];
-

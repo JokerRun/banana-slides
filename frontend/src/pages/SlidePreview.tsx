@@ -2063,7 +2063,7 @@ export const SlidePreview: React.FC = () => {
                 {selectedStylePresetId === 'ddi-standard' && styleRefFiles.length === 0 && (
                   <div className="w-40 h-24 rounded-lg border-2 border-banana-400 overflow-hidden bg-slate-100 shadow-sm">
                     <img
-                      src={GENERATE_PRESETS[0].styleRefImageUrl}
+                      src={GENERATE_PRESETS[0].imageUrl}
                       alt="DDI standard template"
                       className="w-full h-full object-cover"
                     />

@@ -3,6 +3,7 @@ export interface TranslatePreset {
   name: string;
   description: string;
   prompt: string;
+  stylePresetId?: string;
 }
 
 export interface TargetLanguage {
@@ -99,6 +100,7 @@ export const TRANSLATE_PRESETS: TranslatePreset[] = [
     name: '翻译+风格转换',
     description: '翻译文本内容，同时应用风格参考图的设计规范，重新设计视觉呈现。',
     prompt: TRANSLATION_WITH_RESTYLE_PROMPT,
+    stylePresetId: 'ddi-standard',
   },
 ];
 

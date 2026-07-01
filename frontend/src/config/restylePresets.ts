@@ -1,10 +1,12 @@
 export interface RestylePreset {
   id: string;
+  legacyIds: string[];
   name: string;
   description: string;
   prompt: string;
-  styleRefImageUrl: string;
-  styleRefFileName: string;
+  imageUrl: string;
+  sha256: string;
+  version: string;
 }
 
 export const DDI_RESTYLE_PROMPT = `# Role: 资深商业咨询级 PPT 排版与视觉架构师
@@ -89,15 +91,17 @@ ORIGINAL_SLIDE 套用 STYLE_REFERENCE 的 PPT 模板版式，在严格保留 ORI
 
 export const RESTYLE_PRESETS: RestylePreset[] = [
   {
-    id: 'ddi-restyle-v2',
+    id: 'ddi-standard',
+    legacyIds: ['ddi', 'ddi-standard', 'ddi-restyle-v2'],
     name: 'DDI Restyle',
     description: '使用 DDI 底版和需求文档 restyle prompt 的标准化风格转换模板。',
-    styleRefImageUrl: '/restyle-presets/ddi-base-v2.png',
-    styleRefFileName: 'ddi-base-v2.png',
+    imageUrl: '/api/presets/ddi-standard/image',
+    sha256: 'f7f14464afd72793df3b68e5c06a91a32b4329c24d0886a7a557dd01bdcc112c',
+    version: '2026-07-01',
     prompt: DDI_RESTYLE_PROMPT,
   },
 ];
 
 export const getRestylePresetById = (id: string): RestylePreset | undefined => {
-  return RESTYLE_PRESETS.find((preset) => preset.id === id);
+  return RESTYLE_PRESETS.find((preset) => preset.id === id || preset.legacyIds.includes(id));
 };

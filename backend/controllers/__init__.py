@@ -9,6 +9,7 @@ from .settings_controller import settings_bp
 from .restyle_controller import restyle_bp
 from .auth_controller import auth_bp
 from .task_controller import task_bp
+from .preset_controller import preset_bp
 
 __all__ = [
     'project_bp',
@@ -22,4 +23,5 @@ __all__ = [
     'restyle_bp',
     'auth_bp',
     'task_bp',
+    'preset_bp',
 ]

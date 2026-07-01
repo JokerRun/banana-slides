@@ -38,6 +38,7 @@ from controllers import (
     restyle_bp,
     auth_bp,
     task_bp,
+    preset_bp,
 )
 
 
@@ -146,6 +147,7 @@ def create_app():
     app.register_blueprint(translate_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(task_bp)
+    app.register_blueprint(preset_bp)
 
     # Health check endpoint
     @app.route("/health")
