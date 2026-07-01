@@ -365,10 +365,15 @@ def update_project(project_id):
         # Update user-visible project name if provided. This is intentionally
         # separate from idea_prompt/page titles, which are generation inputs.
         if 'project_name' in data:
-            project_name = (data['project_name'] or '').strip()
-            if not project_name:
-                return bad_request("project_name cannot be empty")
-            project.project_name = project_name
+            if data['project_name'] is None:
+                project.project_name = None
+            else:
+                project_name = str(data['project_name']).strip()
+                if not project_name:
+                    return bad_request("project_name cannot be empty")
+                if len(project_name) > 255:
+                    return bad_request("project_name is too long")
+                project.project_name = project_name
 
         # Update idea_prompt if provided
         if 'idea_prompt' in data:

@@ -124,6 +124,35 @@ class TestProjectUpdate:
 
         assert response.status_code == 400
 
+    def test_update_project_name_clear_with_null(self, client, sample_project):
+        """测试 project_name 为 null 时清除显式名称"""
+        if not sample_project:
+            pytest.skip("项目创建失败")
+
+        project_id = sample_project['project_id']
+        set_response = client.put(f'/api/projects/{project_id}', json={
+            'project_name': '自定义名称'
+        })
+        assert_success_response(set_response)
+
+        clear_response = client.put(f'/api/projects/{project_id}', json={
+            'project_name': None
+        })
+        data = assert_success_response(clear_response)
+        assert data['data']['project_name'] is None
+
+    def test_update_project_name_rejects_too_long(self, client, sample_project):
+        """测试超过 255 字符的项目名称返回 400"""
+        if not sample_project:
+            pytest.skip("项目创建失败")
+
+        project_id = sample_project['project_id']
+        response = client.put(f'/api/projects/{project_id}', json={
+            'project_name': 'a' * 256
+        })
+
+        assert response.status_code == 400
+
 
 class TestProjectDelete:
     """项目删除测试"""
