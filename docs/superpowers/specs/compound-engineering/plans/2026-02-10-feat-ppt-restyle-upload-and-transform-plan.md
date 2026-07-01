@@ -166,9 +166,12 @@ original_slide_image_path: str  # 转换前的原始slide图片
 POST /api/projects/restyle
   Content-Type: multipart/form-data
   - source_file: File (PPT/PDF)
-  - style_refs: File[] (1-N张风格参考截图)
-  - brand_guidelines: str (可选文字描述)
+  - style_refs: File[] (可选；与 style_preset_id 二选一或组合，合计最多 5 张)
+  - style_preset_id: str (可选；如 ddi-standard，遗留 ddi / ddi-restyle-v2)
+  - restyle_prompt: str (可选；原 brand_guidelines 场景由 restyle_prompt / 预置 prompt 覆盖)
   Response: { project_id, pages: [{id, original_slide_image_url}...] }
+
+**已实现**：canonical 预置经 `GET /api/presets` 与 `GET /api/presets/<id>/image` 暴露；底图与 prompt 源为 `assets/presets/<id>/`（见 `assets/presets/README.md`）。
 
 # 批量风格转换 (异步任务)
 POST /api/projects/{id}/restyle/generate

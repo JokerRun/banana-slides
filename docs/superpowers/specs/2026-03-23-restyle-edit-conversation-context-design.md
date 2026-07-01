@@ -193,7 +193,7 @@ To avoid runaway payload size and latency:
 ## 11.1 Missing Baseline Snapshot
 
 If `restyle_base_prompt_snapshot` is null:
-1. reconstruct baseline prompt by calling the same first-pass prompt builder contract (`get_restyle_prompt(page_index, total_pages, num_style_refs, custom_prompt)`), using best-effort current metadata,
+1. reconstruct baseline prompt by calling the same first-pass prompt builder contract (`get_restyle_prompt(page_index, total_pages, num_style_refs, custom_prompt, preset_base_body=...)`), using best-effort current metadata and `project.style_preset_id` when present (canonical text from `style_preset_service`),
 2. reconstruction argument sources are fixed:
    - `page_index = page.order_index + 1`,
    - `total_pages = count(project.pages)`,

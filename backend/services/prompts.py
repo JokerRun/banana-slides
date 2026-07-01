@@ -1,5 +1,8 @@
 """
-AI Service Prompts - 集中管理所有 AI 服务的 prompt 模板
+AI Service Prompts - 集中管理所有 AI 服务的 prompt 模板。
+
+产品级 DDI 等风格预置的正文与底图以 ``assets/presets/<preset-id>/`` 为准，由
+``services.style_preset_service`` 加载；本模块负责通用组装与注入 ``preset_base_body``。
 """
 
 import json
@@ -906,6 +909,7 @@ def get_restyle_prompt(
     total_pages: int,
     num_style_refs: int = 1,
     custom_prompt: str = "",
+    preset_base_body: str | None = None,
 ) -> str:
     """
     Generate prompt for single-page DDI restyle.
@@ -973,6 +977,12 @@ Output: 16:9 landscape PPT slide, high resolution, crisp readable text."""
         )
         return prompt
 
+    preset_body = (preset_base_body or "").strip()
+    if not preset_body:
+        from services.style_preset_service import get_style_preset_prompt_text
+
+        preset_body = get_style_preset_prompt_text("ddi-standard", "restyle")
+
     prompt = f"""\
 {image_section}
 
@@ -980,200 +990,14 @@ Image role notes:
 - {template_ref_note}
 - IMAGE {original_image_num} is the original PPT slide. Extract content only.
 
-# Role: 资深商业咨询级 PPT 排版与视觉架构师
-
-# Core Objective:
-将 IMAGE {original_image_num} 套用参考图的 PPT 模板版式，在严格保留原始页面内容信息与业务逻辑的前提下，重新设计页面的信息架构、视觉层级、空间关系与排版方式，输出具有麦肯锡 / BCG 咨询报告风格的专业商务 PPT 页面。
+{preset_body}
 
 Page {page_index}/{total_pages}.
 
-# Execution Rules:
-1. 模板迁移与背景净化：将参考图的版式框架严格应用到原始页面上；彻底移除原始页面中的背景、页眉、页脚、页码、装饰线条、低质量图形、无意义色块、旧版式视觉干扰元素；仅保留原始文本内容、数据信息、业务逻辑。
-2. 零重写内容原则：严格保留 IMAGE {original_image_num} 的全部文字内容与逻辑层级；禁止修改、新增、删除、总结或重写任何文本；仅允许调整布局位置、对齐方式、字号层级和视觉排版。
-3. 内容逻辑理解与结构重组：原图只是排版草稿，禁止复刻遮挡块、涂抹痕迹、多余占位符或错位元素；先清点实际文本条目数，基于文本条目生成对应数量的几何区块或层级；完全依据文本间的并列、递进、包含、对比、因果关系重构版式。
-4. 标题规范：仅当原图存在标题时应用；若无标题，严禁新增。标题使用微软雅黑 Bold，32pt，DDI 板岩蓝 #3D4F5F，左对齐贴近内容区左侧。
-5. 色系规范：禁止继承原图旧颜色。标题/页眉/结构线/主视觉使用 #3D4F5F；强调色/流程箭头/重点标签使用 #F9A825；辅助色仅可使用 #2D72B2 / #E67E22 / #88A02C / #662D7C / #8B9A46；正文 #333333，次要文本 #666666，分割线 #E0E0E0，背景 #FFFFFF。
-6. 动态版式选择：时序/流程用线性流程或路线图；两方对比用左右对比；多维对比用矩阵；优先级/层级用分层架构或冰山图；核心主题+分支用辐射或树状；板块概览用网格卡片；漏斗/转化用漏斗图；指标/KPI 用 dashboard；交集关系用维恩图；循环用环形流转；问题到解决方案用桥接过渡；单一叙事用极简要点或图文注解；三项并列用三栏或图标网格。
-7. 视觉元素与密度：允许圆形节点、圆角矩形、房屋图标、粗体折线/S形箭头、带序号流程节点、矩阵表格、金字塔、文档图示、等轴测路径图；必须纯扁平化矢量风格。主区块尽量控制在 3–5 个内并容纳全部原文；留白 8%–10%；文字约 40%，结构化图形约 60%；线条一致，严格网格对齐；禁止文字与图形重叠。
-
-# Output Format:
-输出优化后的 16:9 高保真商业 PPT 页面。所有视觉块必须清晰、规整，具有明确边界逻辑。"""
-
+Output: 16:9 landscape PPT slide, high resolution, crisp readable text."""
     logger.info(
         f"[get_restyle_prompt] page {page_index}/{total_pages}, "
-        f"style_refs={num_style_refs}, custom_prompt=False, ddi_requirements=True"
-    )
-    return prompt
-
-    prompt = f"""\
-{image_section}
-
-Image role notes:
-- {template_ref_note}
-- IMAGE {original_image_num} is the original PPT slide. Analyze it as the KEY CONTENT source.
-- Do not alter source wording, numbers, labels, or chart values while migrating content.
-
-Page {page_index}/{total_pages}.
-
-Generate a 16:9 professional presentation slide image using [底版.png] as the EXCLUSIVE background template.
-
-═══════════════════════════════════════
-ROLE: THE ARCHITECT
-═══════════════════════════════════════
-You are a master visual storyteller producing consulting-grade slides that translate leadership/management concepts into clear visual frameworks. Your aesthetic: Swiss typographic precision, authoritative color restraint, modular structured layouts, high information density with professional clarity.
-
-═══════════════════════════════════════
-ABSOLUTE CONSTRAINTS (NON-NEGOTIABLE)
-═══════════════════════════════════════
-
-BASE TEMPLATE LOCK: [底版.png] is the SOLE background. ELIMINATE 100% of original PPT visual elements — backgrounds (无论相似与否一律清除), page numbers, footers, headers, decorative lines, borders, watermarks, logos, ornamental graphics.
-
-PURE CONTENT MIGRATION: Migrate ONLY text, data, and charts onto [底版.png]. Zero preservation of source visual styling.
-
-TEXT-GRAPHIC SEPARATION: Body text must occupy dedicated negative space — never overlap, intersect, or be obscured by icons/arrows/shapes. Enforce padding around all text boxes.
-
-NO ADDED CHROME: No slide numbers, footers, headers, or logos beyond elements already baked into [底版.png].
-
-═══════════════════════════════════════
-TITLE SPECIFICATION
-═══════════════════════════════════════
-
-Font size: EXACTLY 32pt (统一32号)
-
-Color: #3D4F5F on light bg / #FFFFFF on dark bg
-
-Position: Left-aligned at content area's left edge
-
-Spacing: ~1 character width gap from the orange arrow icon's right edge
-
-Alignment: Title's vertical center aligns with the orange arrow icon
-
-Exception: If source has no title, DO NOT invent one
-
-═══════════════════════════════════════
-TYPOGRAPHY
-═══════════════════════════════════════
-
-Font family: 微软雅黑 (Microsoft YaHei) — both headlines and body
-
-Headlines: Bold, clear hierarchy
-
-Body: Editorial-quality, fully legible
-
-Prohibited: Hand-drawn, organic, or generic computer-generated font styling
-
-═══════════════════════════════════════
-COLOR SYSTEM
-═══════════════════════════════════════
-PRIMARY:
-
-DDI Slate Blue #3D4F5F → titles, headers, structural elements, main graphics
-
-DDI Accent Orange #F9A825 → highlights, CTAs, flow arrows, key tags, title icons, secondary headers
-
-SECONDARY (categorization / visual interest):
-
-Tech Blue #2D72B2 | Energy Orange #E67E22 | Nature Green #88A02C | Quality Purple #662D7C | Olive Green #8B9A46
-
-NEUTRAL:
-
-Body Text #333333 | Secondary Text #666666 | Divider #E0E0E0 | Dark-BG Text #FFFFFF
-
-Background fills: #FFFFFF (with dark text) OR #3D4F5F (with white text)
-
-COLOR HIERARCHY RULE: Equal-status items (parallel viewpoints, peer categories, pyramid layers) MUST receive equal visual weight. Never create false importance via color contrast. Use uniform treatment for equivalent items. Multi-color schemes are permitted for categorization, not implicit ranking.
-
-═══════════════════════════════════════
-VISUAL ELEMENTS (FLAT VECTOR ONLY)
-═══════════════════════════════════════
-Permitted: circular nodes, rounded rectangles (8–10px radius), house/home symbols, bold angular or S-curved arrows, numbered flow nodes (1, 2, 3), matrix/grid tables, pyramids, document mockups, isometric pathway illustrations.
-Prohibited: hand-drawn shapes, decorative flourishes, photographic elements, soft curves used decoratively.
-
-═══════════════════════════════════════
-DENSITY & COMPOSITION
-═══════════════════════════════════════
-
-3–5 key points per slide with supporting details
-
-Margins: 8–10%; maximize usable area
-
-Section dividers: colored header bars (slate blue or orange)
-
-Text-to-visual ratio: ~40% text / ~60% structured graphics
-
-Layering: main concept → sub-bullets → visual icons
-
-Maintain consistent line weights and strict grid alignment
-
-═══════════════════════════════════════
-LAYOUT SELECTION
-═══════════════════════════════════════
-Analyze content and select the single best-fit layout:
-
-Sequential/timeline → linear-progression OR winding-roadmap
-
-A vs B → binary-comparison
-
-Multi-factor compare → comparison-matrix
-
-Priority/levels → hierarchical-layers OR iceberg
-
-Central concept w/ branches → hub-spoke OR tree-branching
-
-Overview tiles → bento-grid
-
-Funnel/conversion → funnel
-
-Metrics/KPIs → dashboard OR key-stat
-
-Overlap/relationships → venn-diagram
-
-Recurring cycle → circular-flow
-
-Problem→solution → bridge
-
-Single narrative → bullet-list OR image-caption
-
-Three peer items → three-columns OR icon-grid
-
-LAYOUT GUARDRAILS — DO NOT:
-
-Use 3-column layouts for 2 items (creates dead columns)
-
-Stack charts below text when side-by-side fits better
-
-Pick image-based layouts without actual images
-
-Use quote layouts for general emphasis (reserve for attributed quotes)
-
-Vary title sizing or icon spacing between slides
-
-Overlap text with shapes/icons/arrows
-
-═══════════════════════════════════════
-SLIDE CONTENT
-═══════════════════════════════════════
-KEY CONTENT: Analyze text, data, and charts from IMAGE {original_image_num}. Migrate ONLY the source content onto [底版.png]. Do not alter source wording, numbers, labels, or chart values.
-
-═══════════════════════════════════════
-EXECUTION
-═══════════════════════════════════════
-
-Parse KEY CONTENT → identify content type → select optimal layout from the table above.
-
-Apply [底版.png] as background; strip all source chrome.
-
-Lay out title (32pt, slate blue, left-aligned, 1-char gap from orange arrow icon, vertically centered with icon) — only if source has a title.
-
-Place modular content blocks per chosen layout, enforcing equal visual weight for parallel items and clear text/graphic separation.
-
-Render all typography in 微软雅黑, all graphics as flat vector with consistent line weights.
-
-Output: single 16:9 presentation slide image."""
-
-    logger.info(
-        f"[get_restyle_prompt] page {page_index}/{total_pages}, "
-        f"style_refs={num_style_refs}, custom_prompt=False"
+        f"style_refs={num_style_refs}, custom_prompt=False, preset_base=True"
     )
     return prompt
 
@@ -1397,6 +1221,7 @@ def get_translate_prompt(
     target_language: str,
     num_style_refs: int = 0,
     custom_prompt: str = "",
+    preset_base_body: str | None = None,
 ) -> str:
     """
     Generate prompt for PPT page translation via image-to-image generation.
@@ -1488,6 +1313,26 @@ def get_translate_prompt(
                 )
 
     image_section = "\n".join(image_labels)
+
+    preset_body = (preset_base_body or "").strip()
+    use_canonical_preset_body = bool(preset_body) and not custom_prompt_text
+    if use_canonical_preset_body:
+        prompt = f"""{image_section}
+
+Target language for translation: {target_language}
+
+{preset_body}
+
+Page {page_index}/{total_pages}.
+
+# Output:
+输出翻译后的16:9高保真商业PPT页面，所有文本已翻译为{target_language}。"""
+        logger.info(
+            f"[get_translate_prompt] page {page_index}/{total_pages}, "
+            f"target_language={target_language}, style_refs={num_style_refs}, "
+            f"custom_prompt=False, preset_base=True"
+        )
+        return prompt
 
     # Build final prompt
     prompt = f"""{image_section}

@@ -87,10 +87,10 @@ nl -ba frontend/src/api/endpoints.ts | sed -n '858,882p'
 创建一个 restyle project 时，会上传：
 
 - 一个 PPT / PPTX / PDF source file
-- 一到五张 style reference images
-- 可选的 `restyle_prompt`
+- 一到五张 style reference images **或** `style_preset_id`（如 `ddi-standard`；遗留 `ddi` / `ddi-restyle-v2` 会规范为 canonical id）。传预置 id 时后端从 `assets/presets/` 复制底图到项目 `style_refs`，并写入 `style_preset_id` / `style_preset_version` / `style_preset_sha256`。
+- 可选的 `restyle_prompt`（与 canonical `prompt-restyle.md` 相同时由后端走预置正文）
 
-控制器 controller 层会先把这些资产持久化，再把源 deck 拆成逐页 PNG，最后才创建 `Page` rows。所以后续每一次 Gemini 调用，吃的都是磁盘上已经落好的文件，不是临时 request blob。
+控制器 controller 层会先把这些资产持久化，再把源 deck 拆成逐页 PNG，最后才创建 `Page` rows。所以后续每一次 Gemini 调用，吃的都是磁盘上已经落好的文件，不是临时 request blob。预置元数据与底图对外暴露为 `GET /api/presets` 与 `GET /api/presets/<id>/image`。
 
 ```bash
 nl -ba backend/controllers/restyle_controller.py | sed -n '55,184p'
@@ -104,8 +104,9 @@ nl -ba backend/controllers/restyle_controller.py | sed -n '55,184p'
     59	
     60	    Multipart form data:
     61	    - source_file: File (PPT/PDF) — required
-    62	    - style_refs: File[] (1-N style reference images) — required
-    63	    - restyle_prompt: str (optional custom restyle prompt)
+    62	    - style_refs: File[] (optional when style_preset_id is provided)
+    63	    - style_preset_id: str (optional; legacy ddi/ddi-restyle-v2 accepted)
+    64	    - restyle_prompt: str (optional custom restyle prompt)
     64	
     65	    Flow:
     66	    1. Save source file
@@ -793,14 +794,16 @@ nl -ba backend/services/task_manager.py | sed -n '1289,1532p'
 
 ## 4. Request 发起时的 Prompt Template
 
-首轮 prompt 的拼接发生在 `get_restyle_prompt(...)`。
+首轮 prompt 的拼接发生在 `get_restyle_prompt(...)`（签名含可选 `preset_base_body`；未传 custom prompt 时默认正文来自 `style_preset_service` / `assets/presets/ddi/prompt-restyle.md`）。
 
 它有两种模式：
 
-- 没有 custom restyle prompt：走默认的 “apply style from IMAGE 2 to IMAGE 1” instruction
-- 有 custom restyle prompt：把用户文本塞进 `Use the following restyle instructions strictly:` 下面
+- 没有 custom restyle prompt：将 canonical 预置正文（或传入的 `preset_base_body`）嵌入 IMAGE 角色说明之后
+- 有 custom restyle prompt：把用户文本塞进 `Use the following restyle instructions strictly:` 下面（与预置 `prompt-restyle.md` 全文一致时，task 层可走预置路径）
 
 无论哪种模式，prompt 都会强行加一个 hard constraint：所有文本内容必须一字不差。
+
+> **文档与源码**：下方引用的 `prompts.py` 行号/片段可能早于 DDI 预置统一；以仓库内 `get_restyle_prompt` 实现与 `assets/presets/ddi/prompt-restyle.md` 为准。
 
 ```bash
 nl -ba backend/services/prompts.py | sed -n '781,856p'

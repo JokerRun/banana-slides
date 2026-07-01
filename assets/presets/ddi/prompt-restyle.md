@@ -1,16 +1,4 @@
-/** Local labels/fallback when GET /api/presets is unavailable; authoritative copy lives in assets/presets/. */
-export interface RestylePreset {
-  id: string;
-  legacyIds: string[];
-  name: string;
-  description: string;
-  prompt: string;
-  imageUrl: string;
-  sha256: string;
-  version: string;
-}
-
-export const DDI_RESTYLE_PROMPT = `# Role: 资深商业咨询级 PPT 排版与视觉架构师
+# Role: 资深商业咨询级 PPT 排版与视觉架构师
 
 # Inputs:
 - STYLE_REFERENCE = 标准 PPT 模板 / 风格参考图
@@ -88,21 +76,4 @@ ORIGINAL_SLIDE 套用 STYLE_REFERENCE 的 PPT 模板版式，在严格保留 ORI
 
 
 # Output Format: 
-请输出优化后的 16:9 高保真商业 PPT 页面。确保所有视觉块清晰、规整，具有明确的边界逻辑。`;
-
-export const RESTYLE_PRESETS: RestylePreset[] = [
-  {
-    id: 'ddi-standard',
-    legacyIds: ['ddi', 'ddi-standard', 'ddi-restyle-v2'],
-    name: 'DDI Restyle',
-    description: '使用 DDI 底版和需求文档 restyle prompt 的标准化风格转换模板。',
-    imageUrl: '/api/presets/ddi-standard/image',
-    sha256: 'f7f14464afd72793df3b68e5c06a91a32b4329c24d0886a7a557dd01bdcc112c',
-    version: '2026-07-01',
-    prompt: DDI_RESTYLE_PROMPT,
-  },
-];
-
-export const getRestylePresetById = (id: string): RestylePreset | undefined => {
-  return RESTYLE_PRESETS.find((preset) => preset.id === id || preset.legacyIds.includes(id));
-};
+请输出优化后的 16:9 高保真商业 PPT 页面。确保所有视觉块清晰、规整，具有明确的边界逻辑。

@@ -12,6 +12,10 @@ from werkzeug.utils import secure_filename
 
 from models import db, Project, Page, Task
 from services.restyle_service import RestyleService
+from services.style_preset_service import (
+    StylePresetError,
+    apply_style_preset_to_project,
+)
 from services.ai_service_manager import get_ai_service
 from services.task_manager import task_manager, translate_images_task
 from utils import (
@@ -95,7 +99,8 @@ def create_translate_project():
     - source_file: File (PPT/PDF) — required
     - target_language: str — required (e.g., "English", "中文", "日本語")
     - translate_mode: str — required ("pure" or "restyle")
-    - style_refs: File[] (1-N style reference images) — optional, required for "restyle" mode
+    - style_refs: File[] (optional; required for "restyle" mode only when style_preset_id is absent)
+    - style_preset_id: str (optional; legacy ddi/ddi-restyle-v2 accepted)
     - translate_prompt: str (optional custom translate prompt)
 
     Flow:
@@ -130,9 +135,14 @@ def create_translate_project():
 
         # Validate style refs for restyle mode
         style_refs = request.files.getlist("style_refs")
-        if translate_mode == "restyle" and (not style_refs or len(style_refs) == 0):
+        style_preset_id = request.form.get("style_preset_id", "").strip()
+        if (
+            translate_mode == "restyle"
+            and (not style_refs or len(style_refs) == 0)
+            and not style_preset_id
+        ):
             return bad_request(
-                "At least one style reference image is required for restyle mode"
+                "At least one style reference image or style_preset_id is required for restyle mode"
             )
         if len(style_refs) > MAX_STYLE_REFS:
             return bad_request(
@@ -142,6 +152,11 @@ def create_translate_project():
         for ref in style_refs:
             if not ref.filename or not _allowed_image_file(ref.filename):
                 return bad_request(f"Invalid style reference image: {ref.filename}")
+
+        if translate_mode == "pure" and style_preset_id:
+            return bad_request(
+                "style_preset_id is not supported when translate_mode is 'pure'"
+            )
 
         translate_prompt = request.form.get("translate_prompt", "").strip()
 
@@ -183,24 +198,48 @@ def create_translate_project():
             f"📁 Source file saved: {source_path} ({os.path.getsize(str(source_path)) / 1024:.1f} KB)"
         )
 
-        # Save style reference images (if provided)
+        # Save style reference images (restyle mode only)
         style_ref_paths = []
-        if style_refs:
-            style_ref_dir = project_dir / "style_refs"
-            style_ref_dir.mkdir(exist_ok=True, parents=True)
+        if translate_mode == "restyle":
+            if style_preset_id:
+                try:
+                    apply_style_preset_to_project(
+                        project=project,
+                        file_service=file_service,
+                        style_preset_id=style_preset_id,
+                        existing_paths=style_ref_paths,
+                    )
+                except StylePresetError as exc:
+                    db.session.rollback()
+                    return bad_request(str(exc))
 
-            for i, ref in enumerate(style_refs):
-                ref_ext = Path(ref.filename).suffix.lower().lstrip(".")
-                if ref_ext not in ALLOWED_IMAGE_EXTENSIONS:
-                    ref_ext = "png"
-                saved_name = f"style_ref_{i + 1}.{ref_ext}"
-                ref_path = style_ref_dir / saved_name
-                ref.save(str(ref_path))
-                rel_path = ref_path.relative_to(file_service.upload_folder).as_posix()
-                style_ref_paths.append(rel_path)
-                logger.info(f"🎨 Style ref {i + 1}/{len(style_refs)} saved: {ref_path}")
+            if len(style_ref_paths) + len(style_refs) > MAX_STYLE_REFS:
+                db.session.rollback()
+                return bad_request(
+                    f"Maximum {MAX_STYLE_REFS} style reference images allowed (preset plus uploads)"
+                )
 
-        project.set_style_ref_image_paths(style_ref_paths)
+            if style_refs:
+                style_ref_dir = project_dir / "style_refs"
+                style_ref_dir.mkdir(exist_ok=True, parents=True)
+
+                custom_ref_start = len(style_ref_paths) + 1
+                for i, ref in enumerate(style_refs):
+                    ref_ext = Path(ref.filename).suffix.lower().lstrip(".")
+                    if ref_ext not in ALLOWED_IMAGE_EXTENSIONS:
+                        ref_ext = "png"
+                    saved_name = f"style_ref_{custom_ref_start + i}.{ref_ext}"
+                    ref_path = style_ref_dir / saved_name
+                    ref.save(str(ref_path))
+                    rel_path = ref_path.relative_to(
+                        file_service.upload_folder
+                    ).as_posix()
+                    style_ref_paths.append(rel_path)
+                    logger.info(
+                        f"🎨 Style ref {i + 1}/{len(style_refs)} saved: {ref_path}"
+                    )
+
+            project.set_style_ref_image_paths(style_ref_paths[:MAX_STYLE_REFS])
 
         # Convert source file to images
         restyle_service = RestyleService()

@@ -41,6 +41,9 @@ class Project(db.Model):
     style_ref_image_paths = db.Column(
         db.Text, nullable=True
     )  # JSON: 风格参考图路径列表
+    style_preset_id = db.Column(db.String(100), nullable=True)
+    style_preset_version = db.Column(db.String(50), nullable=True)
+    style_preset_sha256 = db.Column(db.String(64), nullable=True)
     brand_guidelines = db.Column(db.Text, nullable=True)  # 品牌风格规范文本
     restyle_prompt = db.Column(db.Text, nullable=True)  # Restyle/Translate 自定义提示词
     # Translate 模式专用字段
@@ -139,6 +142,9 @@ class Project(db.Model):
             "style_ref_image_urls": [
                 f"/files/{path}" for path in self.get_style_ref_image_paths()
             ],
+            "style_preset_id": self.style_preset_id,
+            "style_preset_version": self.style_preset_version,
+            "style_preset_sha256": self.style_preset_sha256,
             "brand_guidelines": self.brand_guidelines,
             "restyle_prompt": self.restyle_prompt,
             "translate_mode": self.translate_mode,

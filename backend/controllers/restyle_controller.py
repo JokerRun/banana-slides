@@ -1,6 +1,7 @@
 """
 Restyle Controller - handles PPT/PDF restyle endpoints
 """
+
 import os
 import logging
 from datetime import datetime
@@ -11,16 +12,29 @@ from werkzeug.utils import secure_filename
 
 from models import db, Project, Page, Task
 from services.restyle_service import RestyleService
+from services.style_preset_service import (
+    StylePresetError,
+    apply_style_preset_to_project,
+)
 from services.ai_service_manager import get_ai_service
 from services.task_manager import task_manager, restyle_images_task
-from utils import success_response, error_response, not_found, bad_request, parse_page_ids_from_body, get_filtered_pages, get_current_user_id, require_auth_response
+from utils import (
+    success_response,
+    error_response,
+    not_found,
+    bad_request,
+    parse_page_ids_from_body,
+    get_filtered_pages,
+    get_current_user_id,
+    require_auth_response,
+)
 
 logger = logging.getLogger(__name__)
 
-restyle_bp = Blueprint('restyle', __name__, url_prefix='/api/projects')
+restyle_bp = Blueprint("restyle", __name__, url_prefix="/api/projects")
 
-ALLOWED_SOURCE_EXTENSIONS = {'pptx', 'ppt', 'pdf'}
-ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp', 'bmp'}
+ALLOWED_SOURCE_EXTENSIONS = {"pptx", "ppt", "pdf"}
+ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "bmp"}
 MAX_SOURCE_FILE_SIZE = 50 * 1024 * 1024  # 50MB
 MAX_STYLE_REFS = 5
 
@@ -31,11 +45,18 @@ def _restyle_auth_guard():
 
 
 def _allowed_source_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_SOURCE_EXTENSIONS
+    return (
+        "." in filename
+        and filename.rsplit(".", 1)[1].lower() in ALLOWED_SOURCE_EXTENSIONS
+    )
 
 
 def _allowed_image_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
+    return (
+        "." in filename
+        and filename.rsplit(".", 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
+    )
+
 
 def _safe_filename_with_original_ext(filename: str, default_stem: str) -> str:
     """
@@ -52,14 +73,15 @@ def _safe_filename_with_original_ext(filename: str, default_stem: str) -> str:
     return f"{safe_stem}{ext}"
 
 
-@restyle_bp.route('/restyle', methods=['POST'])
+@restyle_bp.route("/restyle", methods=["POST"])
 def create_restyle_project():
     """
     POST /api/projects/restyle - Create a restyle project
 
     Multipart form data:
     - source_file: File (PPT/PDF) — required
-    - style_refs: File[] (1-N style reference images) — required
+    - style_refs: File[] (optional when style_preset_id is provided)
+    - style_preset_id: str (optional; legacy ddi/ddi-restyle-v2 accepted)
     - restyle_prompt: str (optional custom restyle prompt)
 
     Flow:
@@ -71,84 +93,118 @@ def create_restyle_project():
     """
     try:
         # Validate source file
-        if 'source_file' not in request.files:
+        if "source_file" not in request.files:
             return bad_request("source_file is required")
 
-        source_file = request.files['source_file']
+        source_file = request.files["source_file"]
         if not source_file.filename or not _allowed_source_file(source_file.filename):
-            return bad_request(f"Invalid source file. Supported: {', '.join(ALLOWED_SOURCE_EXTENSIONS)}")
+            return bad_request(
+                f"Invalid source file. Supported: {', '.join(ALLOWED_SOURCE_EXTENSIONS)}"
+            )
 
         # Validate style refs
-        style_refs = request.files.getlist('style_refs')
-        if not style_refs or len(style_refs) == 0:
-            return bad_request("At least one style reference image is required")
+        style_refs = request.files.getlist("style_refs")
+        style_preset_id = request.form.get("style_preset_id", "").strip()
+        if (not style_refs or len(style_refs) == 0) and not style_preset_id:
+            return bad_request(
+                "At least one style reference image or style_preset_id is required"
+            )
         if len(style_refs) > MAX_STYLE_REFS:
-            return bad_request(f"Maximum {MAX_STYLE_REFS} style reference images allowed")
+            return bad_request(
+                f"Maximum {MAX_STYLE_REFS} style reference images allowed"
+            )
 
         for ref in style_refs:
             if not ref.filename or not _allowed_image_file(ref.filename):
                 return bad_request(f"Invalid style reference image: {ref.filename}")
 
-        restyle_prompt = request.form.get('restyle_prompt', '').strip()
+        restyle_prompt = request.form.get("restyle_prompt", "").strip()
 
         # Use source filename (without extension) as project name
-        source_name = Path(source_file.filename).stem or 'Restyle Project'
+        source_name = Path(source_file.filename).stem or "Restyle Project"
 
         # Create project
         project = Project(
             owner_id=get_current_user_id(),
-            creation_type='restyle',
+            creation_type="restyle",
             idea_prompt=source_name,
             restyle_prompt=restyle_prompt if restyle_prompt else None,
-            status='DRAFT'
+            status="DRAFT",
         )
         db.session.add(project)
         db.session.flush()  # Get project ID
 
         from services import FileService
-        file_service = FileService(current_app.config['UPLOAD_FOLDER'])
+
+        file_service = FileService(current_app.config["UPLOAD_FOLDER"])
 
         # Save source file
         project_dir = file_service._get_project_dir(project.id)
-        source_dir = project_dir / 'source'
+        source_dir = project_dir / "source"
         source_dir.mkdir(exist_ok=True, parents=True)
 
         source_filename = _safe_filename_with_original_ext(
-            source_file.filename,
-            default_stem='source_file'
+            source_file.filename, default_stem="source_file"
         )
         source_path = source_dir / source_filename
         source_file.save(str(source_path))
-        project.source_file_path = source_path.relative_to(file_service.upload_folder).as_posix()
+        project.source_file_path = source_path.relative_to(
+            file_service.upload_folder
+        ).as_posix()
 
-        logger.info(f"📁 Source file saved: {source_path} ({os.path.getsize(str(source_path)) / 1024:.1f} KB)")
+        logger.info(
+            f"📁 Source file saved: {source_path} ({os.path.getsize(str(source_path)) / 1024:.1f} KB)"
+        )
 
         # Save style reference images
-        style_ref_dir = project_dir / 'style_refs'
+        style_ref_dir = project_dir / "style_refs"
         style_ref_dir.mkdir(exist_ok=True, parents=True)
 
         style_ref_paths = []
+        if style_preset_id:
+            try:
+                apply_style_preset_to_project(
+                    project=project,
+                    file_service=file_service,
+                    style_preset_id=style_preset_id,
+                    existing_paths=style_ref_paths,
+                )
+            except StylePresetError as exc:
+                db.session.rollback()
+                return bad_request(str(exc))
+
+        if len(style_ref_paths) + len(style_refs) > MAX_STYLE_REFS:
+            db.session.rollback()
+            return bad_request(
+                f"Maximum {MAX_STYLE_REFS} style reference images allowed (preset plus uploads)"
+            )
+
+        custom_ref_start = len(style_ref_paths) + 1
         for i, ref in enumerate(style_refs):
-            ref_ext = Path(ref.filename).suffix.lower().lstrip('.')
+            ref_ext = Path(ref.filename).suffix.lower().lstrip(".")
             if ref_ext not in ALLOWED_IMAGE_EXTENSIONS:
-                ref_ext = 'png'
-            saved_name = f"style_ref_{i + 1}.{ref_ext}"
+                ref_ext = "png"
+            saved_name = f"style_ref_{custom_ref_start + i}.{ref_ext}"
             ref_path = style_ref_dir / saved_name
             ref.save(str(ref_path))
             rel_path = ref_path.relative_to(file_service.upload_folder).as_posix()
             style_ref_paths.append(rel_path)
-            logger.info(f"🎨 Style ref {i + 1}/{len(style_refs)} saved: {ref_path} ({os.path.getsize(str(ref_path)) / 1024:.1f} KB)")
+            logger.info(
+                f"🎨 Style ref {i + 1}/{len(style_refs)} saved: {ref_path} ({os.path.getsize(str(ref_path)) / 1024:.1f} KB)"
+            )
 
-        project.set_style_ref_image_paths(style_ref_paths)
+        project.set_style_ref_image_paths(style_ref_paths[:MAX_STYLE_REFS])
 
         # Convert source file to images
         restyle_service = RestyleService()
         pages_dir = file_service._get_pages_dir(project.id)
-        originals_dir = str(pages_dir / 'originals')
+        originals_dir = str(pages_dir / "originals")
         os.makedirs(originals_dir, exist_ok=True)
 
         logger.info(f"📄 Converting source file to images: {source_filename}")
-        slide_images = restyle_service.convert_to_images(str(source_path), originals_dir)
+        slide_images = restyle_service.convert_to_images(
+            str(source_path), originals_dir
+        )
         logger.info(f"✅ Converted {len(slide_images)} pages from {source_filename}")
 
         # Create Page records
@@ -159,37 +215,39 @@ def create_restyle_project():
                 project_id=project.id,
                 order_index=i,
                 original_slide_image_path=rel_path,
-                status='DRAFT'
+                status="DRAFT",
             )
             # Set minimal outline content (page number as title)
-            page.set_outline_content({
-                'title': f'Slide {i + 1}',
-                'points': []
-            })
+            page.set_outline_content({"title": f"Slide {i + 1}", "points": []})
             db.session.add(page)
             pages_list.append(page)
 
-        project.status = 'SLIDES_EXTRACTED'
+        project.status = "SLIDES_EXTRACTED"
         project.updated_at = datetime.utcnow()
         db.session.commit()
 
-        logger.info(f"✅ Restyle project created: id={project.id}, name='{source_name}', pages={len(pages_list)}, style_refs={len(style_refs)}, prompt={'yes' if restyle_prompt else 'no'}")
+        logger.info(
+            f"✅ Restyle project created: id={project.id}, name='{source_name}', pages={len(pages_list)}, style_refs={len(style_refs)}, prompt={'yes' if restyle_prompt else 'no'}"
+        )
 
-        return success_response({
-            'project_id': project.id,
-            'creation_type': 'restyle',
-            'status': project.status,
-            'pages': [page.to_dict() for page in pages_list],
-            'total_pages': len(pages_list)
-        }, status_code=201)
+        return success_response(
+            {
+                "project_id": project.id,
+                "creation_type": "restyle",
+                "status": project.status,
+                "pages": [page.to_dict() for page in pages_list],
+                "total_pages": len(pages_list),
+            },
+            status_code=201,
+        )
 
     except Exception as e:
         db.session.rollback()
         logger.error(f"create_restyle_project failed: {str(e)}", exc_info=True)
-        return error_response('SERVER_ERROR', str(e), 500)
+        return error_response("SERVER_ERROR", str(e), 500)
 
 
-@restyle_bp.route('/<project_id>/restyle/generate', methods=['POST'])
+@restyle_bp.route("/<project_id>/restyle/generate", methods=["POST"])
 def restyle_generate(project_id):
     """
     POST /api/projects/{id}/restyle/generate - Start batch restyle
@@ -201,16 +259,20 @@ def restyle_generate(project_id):
     }
     """
     try:
-        project = Project.query.filter_by(id=project_id, owner_id=get_current_user_id()).first()
+        project = Project.query.filter_by(
+            id=project_id, owner_id=get_current_user_id()
+        ).first()
         if not project:
-            return not_found('Project')
+            return not_found("Project")
 
-        if project.creation_type != 'restyle':
+        if project.creation_type != "restyle":
             return bad_request("This endpoint is only for restyle type projects")
 
         data = request.get_json() or {}
-        page_ids = data.get('page_ids')
-        max_workers = data.get('max_workers', current_app.config.get('MAX_IMAGE_WORKERS', 4))
+        page_ids = data.get("page_ids")
+        max_workers = data.get(
+            "max_workers", current_app.config.get("MAX_IMAGE_WORKERS", 4)
+        )
 
         # Get pages
         pages = get_filtered_pages(project_id, page_ids)
@@ -221,21 +283,18 @@ def restyle_generate(project_id):
         task = Task(
             project_id=project_id,
             owner_id=get_current_user_id(),
-            task_type='RESTYLE_IMAGES',
-            status='PENDING'
+            task_type="RESTYLE_IMAGES",
+            status="PENDING",
         )
-        task.set_progress({
-            'total': len(pages),
-            'completed': 0,
-            'failed': 0
-        })
+        task.set_progress({"total": len(pages), "completed": 0, "failed": 0})
         db.session.add(task)
         db.session.commit()
 
         # Get services
         ai_service = get_ai_service()
         from services import FileService
-        file_service = FileService(current_app.config['UPLOAD_FOLDER'])
+
+        file_service = FileService(current_app.config["UPLOAD_FOLDER"])
 
         app = current_app._get_current_object()
 
@@ -248,62 +307,64 @@ def restyle_generate(project_id):
             file_service,
             page_ids,
             max_workers,
-            current_app.config['DEFAULT_ASPECT_RATIO'],
-            current_app.config['DEFAULT_RESOLUTION'],
-            app
+            current_app.config["DEFAULT_ASPECT_RATIO"],
+            current_app.config["DEFAULT_RESOLUTION"],
+            app,
         )
 
-        project.status = 'GENERATING_IMAGES'
+        project.status = "GENERATING_IMAGES"
         db.session.commit()
 
-        return success_response({
-            'task_id': task.id,
-            'status': 'GENERATING_IMAGES',
-            'total_pages': len(pages)
-        }, status_code=202)
+        return success_response(
+            {
+                "task_id": task.id,
+                "status": "GENERATING_IMAGES",
+                "total_pages": len(pages),
+            },
+            status_code=202,
+        )
 
     except Exception as e:
         db.session.rollback()
         logger.error(f"restyle_generate failed: {str(e)}", exc_info=True)
-        return error_response('SERVER_ERROR', str(e), 500)
+        return error_response("SERVER_ERROR", str(e), 500)
 
 
-@restyle_bp.route('/<project_id>/pages/<page_id>/restyle/generate', methods=['POST'])
+@restyle_bp.route("/<project_id>/pages/<page_id>/restyle/generate", methods=["POST"])
 def restyle_single_page(project_id, page_id):
     """
     POST /api/projects/{id}/pages/{page_id}/restyle/generate - Restyle single page
     """
     try:
-        project = Project.query.filter_by(id=project_id, owner_id=get_current_user_id()).first()
+        project = Project.query.filter_by(
+            id=project_id, owner_id=get_current_user_id()
+        ).first()
         if not project:
-            return not_found('Project')
+            return not_found("Project")
 
-        if project.creation_type != 'restyle':
+        if project.creation_type != "restyle":
             return bad_request("This endpoint is only for restyle type projects")
 
         page = Page.query.filter_by(id=page_id, project_id=project_id).first()
         if not page or page.project_id != project_id:
-            return not_found('Page')
+            return not_found("Page")
 
         # Create task
         task = Task(
             project_id=project_id,
             owner_id=get_current_user_id(),
-            task_type='RESTYLE_IMAGES',
-            status='PENDING'
+            task_type="RESTYLE_IMAGES",
+            status="PENDING",
         )
-        task.set_progress({
-            'total': 1,
-            'completed': 0,
-            'failed': 0
-        })
+        task.set_progress({"total": 1, "completed": 0, "failed": 0})
         db.session.add(task)
         db.session.commit()
 
         # Get services
         ai_service = get_ai_service()
         from services import FileService
-        file_service = FileService(current_app.config['UPLOAD_FOLDER'])
+
+        file_service = FileService(current_app.config["UPLOAD_FOLDER"])
 
         app = current_app._get_current_object()
 
@@ -316,17 +377,20 @@ def restyle_single_page(project_id, page_id):
             file_service,
             [page_id],  # Single page
             1,  # max_workers
-            current_app.config['DEFAULT_ASPECT_RATIO'],
-            current_app.config['DEFAULT_RESOLUTION'],
-            app
+            current_app.config["DEFAULT_ASPECT_RATIO"],
+            current_app.config["DEFAULT_RESOLUTION"],
+            app,
         )
 
-        return success_response({
-            'task_id': task.id,
-            'status': 'GENERATING',
-        }, status_code=202)
+        return success_response(
+            {
+                "task_id": task.id,
+                "status": "GENERATING",
+            },
+            status_code=202,
+        )
 
     except Exception as e:
         db.session.rollback()
         logger.error(f"restyle_single_page failed: {str(e)}", exc_info=True)
-        return error_response('SERVER_ERROR', str(e), 500)
+        return error_response("SERVER_ERROR", str(e), 500)

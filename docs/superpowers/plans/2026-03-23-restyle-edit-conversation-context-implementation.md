@@ -254,6 +254,9 @@ snapshot = page.restyle_base_prompt_snapshot or get_restyle_prompt(
     total_pages=total_pages,
     num_style_refs=max(1, len(style_ref_paths)),
     custom_prompt=project.restyle_prompt or '',
+    preset_base_body=get_style_preset_prompt_text(project.style_preset_id, "restyle")
+    if project.style_preset_id
+    else None,
 )
 ```
 

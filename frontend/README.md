@@ -58,7 +58,8 @@ src/
 ├── api/              # API 封装
 │   ├── client.ts     # Axios 实例配置
 │   └── endpoints.ts  # API 端点
-├── config/           # 前端预设配置（含翻译语言/模式）
+├── config/           # UI 预置标签与离线 fallback；运行时 DDI 文案/底图以 GET /api/presets 为准
+├── hooks/            # 含 useRuntimePresets（拉取 /api/presets）
 ├── components/       # 组件
 │   ├── shared/       # 通用组件
 │   ├── outline/      # 大纲编辑组件
@@ -84,7 +85,8 @@ src/
 ### 1. 首页 (/)
 - 支持一句话生成、从大纲生成、从描述生成、Restyle、多语言翻译
 - 风格模板选择和上传
-- 翻译模式支持 PPT/PPTX/PDF 源文件、目标语言、纯翻译和翻译+风格转换；风格转换最多 5 张参考图
+- 翻译模式支持 PPT/PPTX/PDF 源文件、目标语言、纯翻译和翻译+风格转换；翻译+风格可传 `style_preset_id`（如 `ddi-standard`）或上传参考图（合计最多 5 张）
+- Restyle / 生成（DDI）：首页选择产品预置时提交 `style_preset_id`，由后端从 `assets/presets/` 复制底图；`src/config/*Presets.ts` 仅在 `/api/presets` 不可用时作 fallback
 
 ### 2. 大纲编辑页 (/project/:id/outline)
 - 拖拽排序页面

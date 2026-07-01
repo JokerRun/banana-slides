@@ -5,7 +5,6 @@ Project Controller - handles project-related endpoints
 import json
 import logging
 import traceback
-import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -23,6 +22,12 @@ from services.task_manager import (
     generate_images_task,
     restyle_images_task,
 )
+from services.style_preset_service import (
+    StylePresetError,
+    apply_style_preset_to_project,
+)
+
+MAX_STYLE_REFS = 5
 from utils import (
     success_response,
     error_response,
@@ -249,7 +254,7 @@ def upload_style_refs(project_id):
 
     Multipart form data:
     - style_refs: File[] (optional)
-    - style_preset_id: "ddi" (optional)
+    - style_preset_id: str (optional; e.g. ddi-standard; legacy ddi accepted)
     - replace: "true" to replace existing project style references
     """
     try:
@@ -284,21 +289,20 @@ def upload_style_refs(project_id):
         saved_paths = [] if replace_existing else project.get_style_ref_image_paths()
 
         if style_preset_id:
-            if style_preset_id != "ddi":
-                return bad_request("Unsupported style_preset_id")
-            preset_source = (
-                Path(current_app.root_path).parent
-                / "assets"
-                / "style-presets"
-                / "ddi-base.png"
+            try:
+                apply_style_preset_to_project(
+                    project=project,
+                    file_service=file_service,
+                    style_preset_id=style_preset_id,
+                    existing_paths=saved_paths,
+                )
+            except StylePresetError as exc:
+                return bad_request(str(exc))
+
+        if len(saved_paths) + len(style_refs) > MAX_STYLE_REFS:
+            return bad_request(
+                f"Maximum {MAX_STYLE_REFS} style reference images allowed (preset plus uploads)"
             )
-            if not preset_source.exists():
-                return error_response("SERVER_ERROR", "DDI style preset not found", 500)
-            preset_target = style_ref_dir / "style_ref_preset_ddi.png"
-            shutil.copyfile(preset_source, preset_target)
-            rel_path = preset_target.relative_to(file_service.upload_folder).as_posix()
-            if rel_path not in saved_paths:
-                saved_paths.append(rel_path)
 
         for i, ref in enumerate(style_refs):
             if not ref.filename or not _allowed_style_ref_file(ref.filename):
@@ -311,7 +315,11 @@ def upload_style_refs(project_id):
                 ref_path.relative_to(file_service.upload_folder).as_posix()
             )
 
-        project.set_style_ref_image_paths(saved_paths[:5])
+        project.set_style_ref_image_paths(saved_paths)
+        if replace_existing and not style_preset_id:
+            project.style_preset_id = None
+            project.style_preset_version = None
+            project.style_preset_sha256 = None
         project.updated_at = datetime.utcnow()
         db.session.commit()
 
@@ -949,10 +957,12 @@ def generate_images(project_id):
         ai_service = get_ai_service()
 
         # 合并额外要求和风格描述
-        combined_requirements = project.extra_requirements or ""
-        if project.template_style:
-            style_requirement = f"\n\nppt页面风格描述：\n\n{project.template_style}"
-            combined_requirements = combined_requirements + style_requirement
+        from services.style_preset_service import resolve_generate_style_requirements
+
+        try:
+            combined_requirements = resolve_generate_style_requirements(project)
+        except StylePresetError as exc:
+            return bad_request(str(exc))
 
         # Get app instance for background task
         app = current_app._get_current_object()
@@ -986,7 +996,11 @@ def generate_images(project_id):
                 current_app.config["DEFAULT_ASPECT_RATIO"],
                 current_app.config["DEFAULT_RESOLUTION"],
                 app,
-                combined_requirements if combined_requirements.strip() else None,
+                (
+                    combined_requirements
+                    if combined_requirements and combined_requirements.strip()
+                    else None
+                ),
                 language,
                 selected_page_ids if selected_page_ids else None,
             )
