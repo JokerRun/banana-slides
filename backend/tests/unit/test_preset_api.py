@@ -29,9 +29,9 @@ def test_presets_api_returns_canonical_ddi_manifest(client):
     assert ddi["sha256"] == expected_sha
     assert ddi["legacyIds"] == ["ddi", "ddi-standard", "ddi-restyle-v2"]
     assert ddi["imageUrl"] == "/api/presets/ddi-standard/image"
-    assert "DDI Generate Prompt" in ddi["prompts"]["generate"]
-    assert "DDI Restyle Prompt" in ddi["prompts"]["restyle"]
-    assert "DDI Translate + Restyle Prompt" in ddi["prompts"]["translateRestyle"]
+    assert "资深商业咨询级 PPT 排版与视觉架构师" in ddi["prompts"]["generate"]
+    assert "零重写内容原则" in ddi["prompts"]["restyle"]
+    assert "专业PPT翻译与视觉重构专家" in ddi["prompts"]["translateRestyle"]
 
 
 def test_legacy_ddi_style_preset_copies_canonical_base_and_records_metadata(client):

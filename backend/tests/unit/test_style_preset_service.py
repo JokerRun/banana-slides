@@ -8,11 +8,13 @@ from pathlib import Path
 import pytest
 
 from services.style_preset_service import (
+    StylePresetError,
     clear_style_preset_cache,
     get_style_preset,
     get_style_preset_prompt_text,
     list_style_presets,
     resolve_generate_style_requirements,
+    resolve_preset_prompt_body_for_flow,
 )
 
 
@@ -72,7 +74,8 @@ def test_list_style_presets_uses_cache_without_rescanning_manifest(tmp_path, mon
 
 def test_get_style_preset_prompt_text_loads_canonical_file():
     text = get_style_preset_prompt_text("ddi-standard", "restyle")
-    assert "DDI Restyle Prompt" in text
+    assert "资深商业咨询级 PPT 排版与视觉架构师" in text
+    assert "零重写内容原则" in text
 
 
 def test_resolve_generate_style_requirements_uses_preset_when_no_template_style():
@@ -83,4 +86,33 @@ def test_resolve_generate_style_requirements_uses_preset_when_no_template_style(
 
     combined = resolve_generate_style_requirements(Project())
     assert combined is not None
-    assert "DDI Generate Prompt" in combined
+    assert "资深商业咨询级 PPT 排版与视觉架构师" in combined
+
+
+def test_resolve_preset_prompt_body_uses_canonical_when_ui_prefill_matches():
+    canonical = get_style_preset_prompt_text("ddi-standard", "restyle")
+    preset_body, user = resolve_preset_prompt_body_for_flow(
+        "ddi-standard", "restyle", canonical
+    )
+    assert preset_body == canonical
+    assert user == ""
+
+
+def test_resolve_preset_prompt_body_keeps_custom_when_user_edits():
+    canonical = get_style_preset_prompt_text("ddi-standard", "restyle")
+    custom = "my unique restyle instructions"
+    preset_body, user = resolve_preset_prompt_body_for_flow(
+        "ddi-standard", "restyle", custom
+    )
+    assert preset_body is None
+    assert user == custom
+
+
+def test_resolve_generate_style_requirements_raises_on_bad_preset():
+    class Project:
+        extra_requirements = None
+        template_style = None
+        style_preset_id = "nonexistent-preset-id"
+
+    with pytest.raises(StylePresetError):
+        resolve_generate_style_requirements(Project())

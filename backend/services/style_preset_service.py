@@ -151,19 +151,35 @@ def get_style_preset(preset_id: str) -> StylePreset:
     raise StylePresetError(f"Unsupported style_preset_id: {preset_id}")
 
 
+def resolve_preset_prompt_body_for_flow(
+    style_preset_id: str | None,
+    prompt_key: str,
+    user_prompt: str,
+) -> tuple[str | None, str]:
+    """
+    When a style preset is active, use canonical prompt files unless the user
+    provided materially different text.
+    """
+    user = (user_prompt or "").strip()
+    if not style_preset_id:
+        return None, user
+    canonical = get_style_preset_prompt_text(style_preset_id, prompt_key)
+    if not user or user == canonical:
+        return canonical, ""
+    return None, user
+
+
 def resolve_generate_style_requirements(project) -> str | None:
     """Merge extra_requirements, explicit template_style, or canonical generate prompt."""
     combined = project.extra_requirements or ""
     template_style = (getattr(project, "template_style", None) or "").strip()
+    style_preset_id = getattr(project, "style_preset_id", None)
     if template_style:
         combined += f"\n\nppt页面风格描述：\n\n{template_style}"
-    elif getattr(project, "style_preset_id", None):
-        try:
-            combined += "\n\n" + get_style_preset_prompt_text(
-                project.style_preset_id, "generate"
-            )
-        except StylePresetError:
-            pass
+    elif style_preset_id:
+        combined += "\n\n" + get_style_preset_prompt_text(
+            style_preset_id, "generate"
+        )
     text = combined.strip()
     return text or None
 

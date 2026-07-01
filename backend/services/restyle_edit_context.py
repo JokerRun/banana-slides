@@ -54,22 +54,20 @@ def reconstruct_base_prompt_snapshot(
     """Best-effort reconstruction when page snapshot is null."""
     from services.prompts import get_restyle_prompt
     from services.style_preset_service import (
-        StylePresetError,
-        get_style_preset_prompt_text,
+        resolve_preset_prompt_body_for_flow,
     )
 
-    preset_base_body = None
-    if not (custom_prompt or "").strip() and style_preset_id:
-        try:
-            preset_base_body = get_style_preset_prompt_text(style_preset_id, "restyle")
-        except StylePresetError:
-            preset_base_body = None
+    preset_base_body, effective_custom = resolve_preset_prompt_body_for_flow(
+        style_preset_id,
+        "restyle",
+        custom_prompt or "",
+    )
 
     return get_restyle_prompt(
         page_index=page_index,
         total_pages=total_pages,
         num_style_refs=max(1, num_style_refs),
-        custom_prompt=custom_prompt,
+        custom_prompt=effective_custom,
         preset_base_body=preset_base_body,
     )
 

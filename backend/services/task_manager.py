@@ -1634,25 +1634,23 @@ def restyle_images_task(
                         original_image.load()  # Force decode into memory
 
                         # Build prompt with explicit style reference count for IMAGE labeling
-                        preset_base_body = None
-                        if not restyle_prompt and project.style_preset_id:
-                            from services.style_preset_service import (
-                                StylePresetError,
-                                get_style_preset_prompt_text,
-                            )
+                        from services.style_preset_service import (
+                            resolve_preset_prompt_body_for_flow,
+                        )
 
-                            try:
-                                preset_base_body = get_style_preset_prompt_text(
-                                    project.style_preset_id, "restyle"
-                                )
-                            except StylePresetError:
-                                preset_base_body = None
+                        preset_base_body, effective_restyle_prompt = (
+                            resolve_preset_prompt_body_for_flow(
+                                project.style_preset_id,
+                                "restyle",
+                                restyle_prompt or "",
+                            )
+                        )
 
                         prompt = get_restyle_prompt(
                             page_index=page_index,
                             total_pages=total_pages,
                             num_style_refs=len(style_ref_images),
-                            custom_prompt=restyle_prompt,
+                            custom_prompt=effective_restyle_prompt,
                             preset_base_body=preset_base_body,
                         )
 
@@ -2125,30 +2123,26 @@ def translate_images_task(
                         original_image.load()  # Force decode into memory
 
                         # Build prompt
-                        preset_base_body = None
-                        if (
-                            not translate_prompt
-                            and style_ref_images
-                            and project.style_preset_id
-                        ):
-                            from services.style_preset_service import (
-                                StylePresetError,
-                                get_style_preset_prompt_text,
-                            )
+                        from services.style_preset_service import (
+                            resolve_preset_prompt_body_for_flow,
+                        )
 
-                            try:
-                                preset_base_body = get_style_preset_prompt_text(
-                                    project.style_preset_id, "translateRestyle"
-                                )
-                            except StylePresetError:
-                                preset_base_body = None
+                        preset_base_body, effective_translate_prompt = (
+                            resolve_preset_prompt_body_for_flow(
+                                project.style_preset_id
+                                if style_ref_images
+                                else None,
+                                "translateRestyle",
+                                translate_prompt or "",
+                            )
+                        )
 
                         prompt = get_translate_prompt(
                             page_index=page_index,
                             total_pages=total_pages,
                             target_language=target_language,
                             num_style_refs=len(style_ref_images),
-                            custom_prompt=translate_prompt,
+                            custom_prompt=effective_translate_prompt,
                             preset_base_body=preset_base_body,
                         )
 

@@ -213,10 +213,9 @@ class TestRestylePrompt:
         assert "IMAGE 1: [底版.png] base template reference" in prompt
         assert "IMAGE 2: Original PPT slide (content source)" in prompt
         assert "1/5" in prompt
-        assert "ROLE: THE ARCHITECT" in prompt
-        assert "BASE TEMPLATE LOCK" in prompt
-        assert "Font size: EXACTLY 32pt" in prompt
-        assert "DDI Slate Blue #3D4F5F" in prompt
+        assert "资深商业咨询级 PPT 排版与视觉架构师" in prompt
+        assert "零重写内容原则" in prompt
+        assert "#3D4F5F" in prompt
 
     def test_prompt_migrates_source_content_to_base_template(self):
         """Prompt should map source slide content onto the base template"""
@@ -225,9 +224,23 @@ class TestRestylePrompt:
 
         assert "Brand guidelines" not in prompt
         assert "2/5" in prompt
-        assert "PURE CONTENT MIGRATION" in prompt
-        assert "KEY CONTENT: Analyze text, data, and charts from IMAGE 2" in prompt
-        assert "Apply [底版.png] as background" in prompt
+        assert "模板迁移与背景净化" in prompt
+        assert "IMAGE 2" in prompt
+
+    def test_preset_base_body_uses_canonical_without_custom_wrapper(self):
+        from services.prompts import get_restyle_prompt
+        from services.style_preset_service import get_style_preset_prompt_text
+
+        canonical = get_style_preset_prompt_text("ddi-standard", "restyle")
+        prompt = get_restyle_prompt(
+            page_index=1,
+            total_pages=3,
+            num_style_refs=1,
+            custom_prompt="",
+            preset_base_body=canonical,
+        )
+        assert canonical in prompt
+        assert "Use the following restyle instructions strictly" not in prompt
 
     def test_first_page_uses_product_prompt_without_legacy_cover_hint(self):
         """Product prompt should not add legacy cover-page styling hints"""
@@ -267,8 +280,8 @@ class TestRestylePrompt:
         from services.prompts import get_restyle_prompt
         prompt = get_restyle_prompt(page_index=2, total_pages=5)
 
-        assert "Migrate ONLY text, data, and charts" in prompt
-        assert "Do not alter source wording, numbers, labels, or chart values" in prompt
+        assert "零重写内容原则" in prompt
+        assert "禁止修改、新增、删除" in prompt
 
     def test_custom_prompt_overrides_default_body(self):
         """Custom prompt should be injected when provided"""
@@ -285,7 +298,7 @@ class TestRestylePrompt:
         assert custom in prompt
         assert "Use the following restyle instructions strictly" in prompt
         assert "Non-negotiable" in prompt
-        assert "ROLE: THE ARCHITECT" not in prompt
+        assert "资深商业咨询级 PPT 排版与视觉架构师" not in prompt
 
     def test_custom_prompt_keeps_image_labels(self):
         """Custom prompt mode should still include IMAGE label mapping"""
