@@ -563,14 +563,15 @@ banana-slides/
 │   │   ├── material.py         # Material模型（参考素材）
 │   │   ├── user_template.py    # UserTemplate模型（用户模板）
 │   │   ├── reference_file.py   # ReferenceFile模型（参考文件）
-│   │   ├── page_image_version.py # PageImageVersion模型（页面版本）
+│   │   ├── page_image_version.py # PageImageVersion（含 prompt_snapshot / ref_manifest）
 │   ├── services/               # 服务层
 │   │   ├── ai_service.py       # AI生成服务（Gemini集成）
 │   │   ├── file_service.py     # 文件管理服务
 │   │   ├── file_parser_service.py # 文件解析服务
 │   │   ├── export_service.py   # PPTX/PDF导出服务
 │   │   ├── task_manager.py     # 异步任务管理
-│   │   ├── prompts.py          # AI提示词模板（通用逻辑；DDI 预置正文见 style_preset_service）
+│   │   ├── prompts.py          # AI 提示词（通用生成默认中性；预置正文见 style_preset_service）
+│   │   ├── restyle_edit_context.py # Restyle/通用图片编辑多轮上下文组装
 │   │   ├── style_preset_service.py    # 运行时预置包（assets/presets/）
 │   ├── controllers/            # API控制器
 │   │   ├── project_controller.py      # 项目管理

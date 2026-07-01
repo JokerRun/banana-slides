@@ -7,13 +7,13 @@ Tests the wiring: edit_page_image_task → restyle detection → conversation co
 import os
 import json
 import tempfile
-import shutil
 import pytest
 from pathlib import Path
-from unittest.mock import patch, MagicMock, PropertyMock
+from unittest.mock import patch, MagicMock
 from PIL import Image
 
 import sys
+
 backend_path = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(backend_path))
 
@@ -21,11 +21,11 @@ sys.path.insert(0, str(backend_path))
 # ── Helpers ───────────────────────────────────────────────────
 
 
-def _create_test_image(color='red', size=(100, 100)):
+def _create_test_image(color="red", size=(100, 100)):
     """Create a temp PNG file and return its path."""
-    img = Image.new('RGB', size, color)
-    tmp = tempfile.NamedTemporaryFile(suffix='.png', delete=False)
-    img.save(tmp, format='PNG')
+    img = Image.new("RGB", size, color)
+    tmp = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+    img.save(tmp, format="PNG")
     tmp.close()
     return tmp.name
 
@@ -43,29 +43,29 @@ class TestRestyleEditConversationMode:
             from services.task_manager import edit_page_image_task
 
             # Setup data
-            user = User(display_name='Test', is_active=True)
+            user = User(display_name="Test", is_active=True)
             db.session.add(user)
             db.session.commit()
 
             project = Project(
-                idea_prompt='test',
-                creation_type='restyle',
+                idea_prompt="test",
+                creation_type="restyle",
                 owner_id=user.id,
-                restyle_prompt='apply dark style',
+                restyle_prompt="apply dark style",
             )
             db.session.add(project)
             db.session.commit()
 
-            orig_path = _create_test_image('red')
-            cur_path = _create_test_image('blue')
+            orig_path = _create_test_image("red")
+            cur_path = _create_test_image("blue")
 
             page = Page(
                 project_id=project.id,
                 order_index=0,
                 original_slide_image_path=orig_path,
                 generated_image_path=cur_path,
-                status='COMPLETED',
-                restyle_base_prompt_snapshot='ORIGINAL PROMPT SNAPSHOT',
+                status="COMPLETED",
+                restyle_base_prompt_snapshot="ORIGINAL PROMPT SNAPSHOT",
             )
             db.session.add(page)
             db.session.commit()
@@ -73,15 +73,15 @@ class TestRestyleEditConversationMode:
             task = Task(
                 project_id=project.id,
                 owner_id=user.id,
-                task_type='EDIT_PAGE_IMAGE',
-                status='PENDING',
+                task_type="EDIT_PAGE_IMAGE",
+                status="PENDING",
             )
             db.session.add(task)
             db.session.commit()
 
             # Mock AI service — edit_restyle_image_with_context should be called
             mock_ai = MagicMock()
-            result_img = Image.new('RGB', (1920, 1080), 'green')
+            result_img = Image.new("RGB", (1920, 1080), "green")
             mock_ai.edit_restyle_image_with_context.return_value = result_img
             # Legacy path should NOT be called
             mock_ai.edit_image.return_value = None
@@ -90,13 +90,23 @@ class TestRestyleEditConversationMode:
             mock_file_service.get_absolute_path.side_effect = lambda p: p
 
             try:
-                with patch('services.task_manager.save_image_with_version',
-                           return_value=(cur_path, 2)):
+                with patch(
+                    "services.task_manager.save_image_with_version",
+                    return_value=(cur_path, 2),
+                ):
                     edit_page_image_task(
-                        task.id, project.id, page.id,
-                        'make it brighter',
-                        mock_ai, mock_file_service,
-                        '16:9', '2K', None, None, None, app
+                        task.id,
+                        project.id,
+                        page.id,
+                        "make it brighter",
+                        mock_ai,
+                        mock_file_service,
+                        "16:9",
+                        "2K",
+                        None,
+                        None,
+                        None,
+                        app,
                     )
 
                 # Verify conversation path was called
@@ -107,36 +117,36 @@ class TestRestyleEditConversationMode:
                 # Verify task completed
                 db.session.expire_all()
                 task = Task.query.get(task.id)
-                assert task.status == 'COMPLETED'
+                assert task.status == "COMPLETED"
             finally:
                 os.unlink(orig_path)
                 os.unlink(cur_path)
 
-    def test_non_restyle_edit_uses_legacy_path(self, app, db_session):
-        """Non-restyle (idea) project edit should use legacy edit_image path."""
+    def test_non_restyle_edit_uses_unified_context_path(self, app, db_session):
+        """Non-restyle (idea) project edit should use unified edit context path."""
         with app.app_context():
             from models import db, Project, Page, Task, User
             from services.task_manager import edit_page_image_task
 
-            user = User(display_name='Test', is_active=True)
+            user = User(display_name="Test", is_active=True)
             db.session.add(user)
             db.session.commit()
 
             project = Project(
-                idea_prompt='test idea',
-                creation_type='idea',
+                idea_prompt="test idea",
+                creation_type="idea",
                 owner_id=user.id,
             )
             db.session.add(project)
             db.session.commit()
 
-            cur_path = _create_test_image('blue')
+            cur_path = _create_test_image("blue")
 
             page = Page(
                 project_id=project.id,
                 order_index=0,
                 generated_image_path=cur_path,
-                status='COMPLETED',
+                status="COMPLETED",
             )
             db.session.add(page)
             db.session.commit()
@@ -144,38 +154,52 @@ class TestRestyleEditConversationMode:
             task = Task(
                 project_id=project.id,
                 owner_id=user.id,
-                task_type='EDIT_PAGE_IMAGE',
-                status='PENDING',
+                task_type="EDIT_PAGE_IMAGE",
+                status="PENDING",
             )
             db.session.add(task)
             db.session.commit()
 
             mock_ai = MagicMock()
-            result_img = Image.new('RGB', (1920, 1080), 'green')
-            mock_ai.edit_image.return_value = result_img
+            result_img = Image.new("RGB", (1920, 1080), "green")
+            mock_ai.edit_restyle_image_with_context.return_value = result_img
 
             mock_file_service = MagicMock()
             mock_file_service.get_absolute_path.return_value = cur_path
 
             try:
-                with patch('services.task_manager.save_image_with_version',
-                           return_value=(cur_path, 2)):
+                with patch(
+                    "services.task_manager.save_image_with_version",
+                    return_value=(cur_path, 2),
+                ):
                     edit_page_image_task(
-                        task.id, project.id, page.id,
-                        'make it brighter',
-                        mock_ai, mock_file_service,
-                        '16:9', '2K', 'original desc', None, None, app
+                        task.id,
+                        project.id,
+                        page.id,
+                        "make it brighter",
+                        mock_ai,
+                        mock_file_service,
+                        "16:9",
+                        "2K",
+                        "original desc",
+                        None,
+                        None,
+                        app,
                     )
 
-                # Verify legacy path was used
-                mock_ai.edit_image.assert_called_once()
-                # Verify conversation path was NOT used
-                mock_ai.edit_restyle_image_with_context.assert_not_called()
+                # Verify unified context path was used
+                mock_ai.edit_restyle_image_with_context.assert_called_once()
+                ctx = mock_ai.edit_restyle_image_with_context.call_args.args[0]
+                assert ctx.snapshot_source == "fallback"
+                assert ctx.degraded_context is True
+                assert "original desc" in ctx.legacy_prompt
+                # Verify legacy direct path was NOT used
+                mock_ai.edit_image.assert_not_called()
 
                 # Verify task completed
                 db.session.expire_all()
                 task = Task.query.get(task.id)
-                assert task.status == 'COMPLETED'
+                assert task.status == "COMPLETED"
             finally:
                 os.unlink(cur_path)
 
@@ -186,37 +210,37 @@ class TestRestyleEditConversationMode:
             from services.task_manager import edit_page_image_task
             from services.restyle_edit_context import RestyleEditContext
 
-            user = User(display_name='Test', is_active=True)
+            user = User(display_name="Test", is_active=True)
             db.session.add(user)
             db.session.commit()
 
             project = Project(
-                idea_prompt='test',
-                creation_type='restyle',
+                idea_prompt="test",
+                creation_type="restyle",
                 owner_id=user.id,
-                restyle_prompt='corporate blue',
+                restyle_prompt="corporate blue",
             )
-            project.set_style_ref_image_paths(['/path/to/style1.png'])
+            project.set_style_ref_image_paths(["/path/to/style1.png"])
             db.session.add(project)
             db.session.commit()
 
-            orig_path = _create_test_image('red')
-            cur_path = _create_test_image('blue')
+            orig_path = _create_test_image("red")
+            cur_path = _create_test_image("blue")
 
             page = Page(
                 project_id=project.id,
                 order_index=2,
                 original_slide_image_path=orig_path,
                 generated_image_path=cur_path,
-                status='COMPLETED',
-                restyle_base_prompt_snapshot='SNAPSHOT TEXT',
+                status="COMPLETED",
+                restyle_base_prompt_snapshot="SNAPSHOT TEXT",
             )
             db.session.add(page)
             # Add a second page so total_pages > 1
             page2 = Page(
                 project_id=project.id,
                 order_index=1,
-                status='DRAFT',
+                status="DRAFT",
             )
             db.session.add(page2)
             db.session.commit()
@@ -224,14 +248,14 @@ class TestRestyleEditConversationMode:
             task = Task(
                 project_id=project.id,
                 owner_id=user.id,
-                task_type='EDIT_PAGE_IMAGE',
-                status='PENDING',
+                task_type="EDIT_PAGE_IMAGE",
+                status="PENDING",
             )
             db.session.add(task)
             db.session.commit()
 
             mock_ai = MagicMock()
-            result_img = Image.new('RGB', (1920, 1080), 'green')
+            result_img = Image.new("RGB", (1920, 1080), "green")
             mock_ai.edit_restyle_image_with_context.return_value = result_img
 
             mock_file_service = MagicMock()
@@ -243,7 +267,7 @@ class TestRestyleEditConversationMode:
                 captured_ctx_kwargs.update(kwargs)
                 return RestyleEditContext(
                     conversation_contents=[],
-                    legacy_prompt='fallback',
+                    legacy_prompt="fallback",
                     legacy_ref_images=[],
                     degraded_context=False,
                     baseline_images_count=1,
@@ -251,25 +275,44 @@ class TestRestyleEditConversationMode:
                 )
 
             try:
-                with patch('services.task_manager.save_image_with_version',
-                           return_value=(cur_path, 2)), \
-                     patch('services.restyle_edit_context.build_restyle_edit_context',
-                           side_effect=mock_build_ctx):
+                with (
+                    patch(
+                        "services.task_manager.save_image_with_version",
+                        return_value=(cur_path, 2),
+                    ),
+                    patch(
+                        "services.restyle_edit_context.build_restyle_edit_context",
+                        side_effect=mock_build_ctx,
+                    ),
+                ):
                     edit_page_image_task(
-                        task.id, project.id, page.id,
-                        'change the title',
-                        mock_ai, mock_file_service,
-                        '16:9', '2K', None, None, None, app
+                        task.id,
+                        project.id,
+                        page.id,
+                        "change the title",
+                        mock_ai,
+                        mock_file_service,
+                        "16:9",
+                        "2K",
+                        None,
+                        None,
+                        None,
+                        app,
                     )
 
                 # Verify context builder received correct params
-                assert captured_ctx_kwargs['restyle_base_prompt_snapshot'] == 'SNAPSHOT TEXT'
-                assert captured_ctx_kwargs['restyle_prompt'] == 'corporate blue'
-                assert captured_ctx_kwargs['edit_instruction'] == 'change the title'
-                assert captured_ctx_kwargs['page_index'] == 3  # 0-indexed 2 → 1-indexed 3
-                assert captured_ctx_kwargs['total_pages'] == 2
-                assert captured_ctx_kwargs['original_slide_path'] == orig_path
-                assert captured_ctx_kwargs['current_selected_path'] == cur_path
+                assert (
+                    captured_ctx_kwargs["restyle_base_prompt_snapshot"]
+                    == "SNAPSHOT TEXT"
+                )
+                assert captured_ctx_kwargs["restyle_prompt"] == "corporate blue"
+                assert captured_ctx_kwargs["edit_instruction"] == "change the title"
+                assert (
+                    captured_ctx_kwargs["page_index"] == 3
+                )  # 0-indexed 2 → 1-indexed 3
+                assert captured_ctx_kwargs["total_pages"] == 2
+                assert captured_ctx_kwargs["original_slide_path"] == orig_path
+                assert captured_ctx_kwargs["current_selected_path"] == cur_path
             finally:
                 os.unlink(orig_path)
                 os.unlink(cur_path)
@@ -287,23 +330,23 @@ class TestAIServiceRestyleEdit:
             mock_text = MagicMock()
             mock_image = MagicMock()
             mock_image.supports_conversation_contents = True
-            result_img = Image.new('RGB', (1920, 1080), 'green')
+            result_img = Image.new("RGB", (1920, 1080), "green")
             mock_image.generate_image_from_conversation.return_value = result_img
 
             ai = AIService(text_provider=mock_text, image_provider=mock_image)
 
             ctx = RestyleEditContext(
                 conversation_contents=[
-                    {'role': 'user', 'parts': [{'text': 'hello'}]},
+                    {"role": "user", "parts": [{"text": "hello"}]},
                 ],
-                legacy_prompt='fallback prompt',
+                legacy_prompt="fallback prompt",
                 legacy_ref_images=[],
                 degraded_context=False,
                 baseline_images_count=1,
                 current_images_count=1,
             )
 
-            result = ai.edit_restyle_image_with_context(ctx, '16:9', '2K')
+            result = ai.edit_restyle_image_with_context(ctx, "16:9", "2K")
 
             assert result == result_img
             mock_image.generate_image_from_conversation.assert_called_once()
@@ -322,19 +365,19 @@ class TestAIServiceRestyleEdit:
             mock_image.generate_image_from_conversation.side_effect = Exception(
                 "400 Bad Request: invalid_argument contents"
             )
-            result_img = Image.new('RGB', (1920, 1080), 'green')
+            result_img = Image.new("RGB", (1920, 1080), "green")
             mock_image.generate_image.return_value = result_img
 
             ai = AIService(text_provider=mock_text, image_provider=mock_image)
             debug_dir = tempfile.mkdtemp()
             config = get_config()
-            original_debug_dir = getattr(config, 'RESTYLE_EDIT_DEBUG_DIR', None)
+            original_debug_dir = getattr(config, "RESTYLE_EDIT_DEBUG_DIR", None)
 
             ctx = RestyleEditContext(
                 conversation_contents=[
-                    {'role': 'user', 'parts': [{'text': 'hello'}]},
+                    {"role": "user", "parts": [{"text": "hello"}]},
                 ],
-                legacy_prompt='fallback prompt',
+                legacy_prompt="fallback prompt",
                 legacy_ref_images=[],
                 degraded_context=False,
                 baseline_images_count=1,
@@ -345,24 +388,30 @@ class TestAIServiceRestyleEdit:
                 config.RESTYLE_EDIT_DEBUG_DIR = debug_dir
                 result = ai.edit_restyle_image_with_context(
                     ctx,
-                    '16:9',
-                    '2K',
-                    trace_context={'task_id': 'task-1', 'project_id': 'project-1', 'page_id': 'page-1'},
+                    "16:9",
+                    "2K",
+                    trace_context={
+                        "task_id": "task-1",
+                        "project_id": "project-1",
+                        "page_id": "page-1",
+                    },
                 )
             finally:
-                if original_debug_dir is None and hasattr(config, 'RESTYLE_EDIT_DEBUG_DIR'):
-                    delattr(config, 'RESTYLE_EDIT_DEBUG_DIR')
+                if original_debug_dir is None and hasattr(
+                    config, "RESTYLE_EDIT_DEBUG_DIR"
+                ):
+                    delattr(config, "RESTYLE_EDIT_DEBUG_DIR")
                 elif original_debug_dir is not None:
                     config.RESTYLE_EDIT_DEBUG_DIR = original_debug_dir
 
             assert result == result_img
             mock_image.generate_image_from_conversation.assert_called_once()
             mock_image.generate_image.assert_called_once()
-            fallback_artifact = Path(debug_dir) / 'task-1' / 'provider_fallback.json'
+            fallback_artifact = Path(debug_dir) / "task-1" / "provider_fallback.json"
             assert fallback_artifact.exists()
             payload = json.loads(fallback_artifact.read_text())
-            assert payload['trace']['task_id'] == 'task-1'
-            assert payload['event']['provider_fallback'] is True
+            assert payload["trace"]["task_id"] == "task-1"
+            assert payload["event"]["provider_fallback"] is True
 
     def test_conversation_fallback_can_be_disabled(self, app):
         """Providers can opt out of flattened fallback for strict structured-turn flows."""
@@ -382,9 +431,9 @@ class TestAIServiceRestyleEdit:
 
             ctx = RestyleEditContext(
                 conversation_contents=[
-                    {'role': 'user', 'parts': [{'text': 'hello'}]},
+                    {"role": "user", "parts": [{"text": "hello"}]},
                 ],
-                legacy_prompt='fallback prompt',
+                legacy_prompt="fallback prompt",
                 legacy_ref_images=[],
                 degraded_context=False,
                 baseline_images_count=1,
@@ -392,7 +441,7 @@ class TestAIServiceRestyleEdit:
             )
 
             with pytest.raises(Exception, match="invalid_argument"):
-                ai.edit_restyle_image_with_context(ctx, '16:9', '2K')
+                ai.edit_restyle_image_with_context(ctx, "16:9", "2K")
 
             mock_image.generate_image_from_conversation.assert_called_once()
             mock_image.generate_image.assert_not_called()
@@ -414,9 +463,9 @@ class TestAIServiceRestyleEdit:
 
             ctx = RestyleEditContext(
                 conversation_contents=[
-                    {'role': 'user', 'parts': [{'text': 'hello'}]},
+                    {"role": "user", "parts": [{"text": "hello"}]},
                 ],
-                legacy_prompt='fallback prompt',
+                legacy_prompt="fallback prompt",
                 legacy_ref_images=[],
                 degraded_context=False,
                 baseline_images_count=1,
@@ -424,7 +473,7 @@ class TestAIServiceRestyleEdit:
             )
 
             with pytest.raises(Exception, match="503"):
-                ai.edit_restyle_image_with_context(ctx, '16:9', '2K')
+                ai.edit_restyle_image_with_context(ctx, "16:9", "2K")
 
             # Legacy should NOT have been called
             mock_image.generate_image.assert_not_called()
@@ -438,23 +487,23 @@ class TestAIServiceRestyleEdit:
             mock_text = MagicMock()
             mock_image = MagicMock()
             mock_image.supports_conversation_contents = False
-            result_img = Image.new('RGB', (1920, 1080), 'green')
+            result_img = Image.new("RGB", (1920, 1080), "green")
             mock_image.generate_image.return_value = result_img
 
             ai = AIService(text_provider=mock_text, image_provider=mock_image)
 
             ctx = RestyleEditContext(
                 conversation_contents=[
-                    {'role': 'user', 'parts': [{'text': 'hello'}]},
+                    {"role": "user", "parts": [{"text": "hello"}]},
                 ],
-                legacy_prompt='fallback prompt',
+                legacy_prompt="fallback prompt",
                 legacy_ref_images=[],
                 degraded_context=False,
                 baseline_images_count=1,
                 current_images_count=1,
             )
 
-            result = ai.edit_restyle_image_with_context(ctx, '16:9', '2K')
+            result = ai.edit_restyle_image_with_context(ctx, "16:9", "2K")
 
             assert result == result_img
             mock_image.generate_image.assert_called_once()
@@ -468,20 +517,20 @@ class TestAIServiceRestyleEdit:
             mock_image = MagicMock()
             ai = AIService(text_provider=mock_text, image_provider=mock_image)
 
-            img_path = _create_test_image('red')
+            img_path = _create_test_image("red")
             try:
                 contents = [
                     {
-                        'role': 'user',
-                        'parts': [
-                            {'text': 'hello'},
-                            {'image_path': img_path},
+                        "role": "user",
+                        "parts": [
+                            {"text": "hello"},
+                            {"image_path": img_path},
                         ],
                     },
                     {
-                        'role': 'model',
-                        'parts': [
-                            {'image_path': img_path},
+                        "role": "model",
+                        "parts": [
+                            {"image_path": img_path},
                         ],
                     },
                 ]
@@ -489,13 +538,13 @@ class TestAIServiceRestyleEdit:
                 resolved = ai._resolve_conversation_images(contents)
 
                 # Text parts become strings
-                assert resolved[0]['parts'][0] == 'hello'
+                assert resolved[0]["parts"][0] == "hello"
                 # Image parts become PIL Images
-                assert isinstance(resolved[0]['parts'][1], Image.Image)
-                assert isinstance(resolved[1]['parts'][0], Image.Image)
+                assert isinstance(resolved[0]["parts"][1], Image.Image)
+                assert isinstance(resolved[1]["parts"][0], Image.Image)
                 # Roles preserved
-                assert resolved[0]['role'] == 'user'
-                assert resolved[1]['role'] == 'model'
+                assert resolved[0]["role"] == "user"
+                assert resolved[1]["role"] == "model"
             finally:
                 os.unlink(img_path)
 
@@ -510,10 +559,10 @@ class TestAIServiceRestyleEdit:
 
             contents = [
                 {
-                    'role': 'user',
-                    'parts': [
-                        {'text': 'hello'},
-                        {'image_path': '/nonexistent/image.png'},
+                    "role": "user",
+                    "parts": [
+                        {"text": "hello"},
+                        {"image_path": "/nonexistent/image.png"},
                     ],
                 },
             ]
@@ -521,8 +570,8 @@ class TestAIServiceRestyleEdit:
             resolved = ai._resolve_conversation_images(contents)
 
             # Only text should remain, missing image skipped
-            assert len(resolved[0]['parts']) == 1
-            assert resolved[0]['parts'][0] == 'hello'
+            assert len(resolved[0]["parts"]) == 1
+            assert resolved[0]["parts"][0] == "hello"
 
 
 class TestRestyleEditBackwardCompat:
@@ -537,56 +586,72 @@ class TestRestyleEditBackwardCompat:
             import tempfile, os
             from unittest.mock import patch, MagicMock
 
-            user = User(display_name='Test', is_active=True)
+            user = User(display_name="Test", is_active=True)
             db.session.add(user)
             db.session.commit()
 
             project = Project(
-                idea_prompt='t', creation_type='restyle',
-                owner_id=user.id, restyle_prompt='dark theme',
+                idea_prompt="t",
+                creation_type="restyle",
+                owner_id=user.id,
+                restyle_prompt="dark theme",
             )
             db.session.add(project)
             db.session.commit()
 
             tmp_dir = tempfile.mkdtemp()
-            orig_img = Image.new('RGB', (100, 100), 'red')
-            orig_path = os.path.join(tmp_dir, 'original.png')
+            orig_img = Image.new("RGB", (100, 100), "red")
+            orig_path = os.path.join(tmp_dir, "original.png")
             orig_img.save(orig_path)
 
-            cur_img = Image.new('RGB', (100, 100), 'blue')
-            cur_path = os.path.join(tmp_dir, 'current.png')
+            cur_img = Image.new("RGB", (100, 100), "blue")
+            cur_path = os.path.join(tmp_dir, "current.png")
             cur_img.save(cur_path)
 
             page = Page(
-                project_id=project.id, order_index=0,
+                project_id=project.id,
+                order_index=0,
                 original_slide_image_path=orig_path,
                 generated_image_path=cur_path,
-                status='COMPLETED',
+                status="COMPLETED",
                 restyle_base_prompt_snapshot=None,  # No snapshot!
             )
             db.session.add(page)
             db.session.commit()
 
             task = Task(
-                project_id=project.id, owner_id=user.id,
-                task_type='EDIT_PAGE_IMAGE', status='PENDING',
+                project_id=project.id,
+                owner_id=user.id,
+                task_type="EDIT_PAGE_IMAGE",
+                status="PENDING",
             )
             db.session.add(task)
             db.session.commit()
 
             mock_ai = MagicMock()
-            result_img = Image.new('RGB', (1920, 1080), 'green')
+            result_img = Image.new("RGB", (1920, 1080), "green")
             mock_ai.edit_restyle_image_with_context.return_value = result_img
 
             mock_fs = MagicMock()
             mock_fs.get_absolute_path.side_effect = lambda p: p
 
-            with patch('services.task_manager.save_image_with_version',
-                       return_value=(cur_path, 2)):
+            with patch(
+                "services.task_manager.save_image_with_version",
+                return_value=(cur_path, 2),
+            ):
                 edit_page_image_task(
-                    task.id, project.id, page.id,
-                    'brighten it', mock_ai, mock_fs,
-                    '16:9', '2K', None, None, None, app
+                    task.id,
+                    project.id,
+                    page.id,
+                    "brighten it",
+                    mock_ai,
+                    mock_fs,
+                    "16:9",
+                    "2K",
+                    None,
+                    None,
+                    None,
+                    app,
                 )
 
             # Should succeed even without snapshot
@@ -597,4 +662,5 @@ class TestRestyleEditBackwardCompat:
             assert ctx.degraded_context is True
 
             import shutil
+
             shutil.rmtree(tmp_dir)

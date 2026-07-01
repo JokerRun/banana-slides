@@ -1236,7 +1236,7 @@ nl -ba backend/services/ai_providers/image/genai_provider.py | sed -n '117,140p'
 
 一旦首张图已经生成，后续 image edit 就不再复用首轮那种 flat request。
 
-这个 edit endpoint 接受新的 `edit_instruction`，外加可选的 extra context images。如果这个 project 是 `restyle` 类型，background task 就会切到一条 context-aware pipeline，而不是 legacy 的单 prompt edit path。
+这个 edit endpoint 接受新的 `edit_instruction`，外加可选的 extra context images。`edit_page_image_task` 对 **restyle** 项目走 `build_restyle_edit_context`（基线含 `pages.restyle_base_prompt_snapshot`、原片与风格 ref）；对 **其他** `creation_type` 走 `build_image_edit_context`，从当前 `PageImageVersion` 的 `prompt_snapshot` / `ref_manifest` 恢复生成上下文（旧版本无元数据时 degrade）。两条路径都调用 `edit_restyle_image_with_context`（conversation 优先，legacy flattened 单次 fallback），不再对非 restyle 使用单纯的 `ai_service.edit_image` 单 prompt 路径。
 
 ```bash
 nl -ba backend/controllers/page_controller.py | sed -n '515,675p'

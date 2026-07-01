@@ -333,7 +333,7 @@ if project.creation_type == 'restyle':
     ctx = build_restyle_edit_context(...)
     image = ai_service.edit_restyle_image_with_context(ctx, aspect_ratio, resolution)
 else:
-    image = ai_service.edit_image(...)
+    image = ai_service.edit_restyle_image_with_context(...)  # non-restyle via build_image_edit_context (post-024 metadata)
 ```
 
 - [ ] **Step 4.1: 增加 retryable classifier 单测（避免 fallback 语义漂移）**

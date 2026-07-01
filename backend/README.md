@@ -27,7 +27,8 @@ backend/
 │   ├── ai_service.py        # AI相关服务
 │   ├── file_service.py      # 文件管理服务
 │   ├── export_service.py    # 导出服务
-│   ├── prompts.py           # AI提示词模板（通用逻辑；DDI 等产品预置正文见 style_preset_service）
+│   ├── prompts.py           # AI 提示词（通用生成默认中性；预置正文见 style_preset_service）
+│   ├── restyle_edit_context.py  # Restyle / 通用图片编辑多轮上下文
 │   ├── style_preset_service.py  # 运行时预置包加载、hash 校验、项目应用
 │   └── task_manager.py      # 异步任务管理
 ├── controllers/              # 控制器层
@@ -235,7 +236,13 @@ result = remove_regions(image, bboxes, expand_pixels=5)
 - 大纲内容（JSON）
 - 描述内容（JSON）
 - 生成的图片路径
+- `restyle_base_prompt_snapshot`：首轮 restyle 成功生成后写一次的 provider prompt 快照，供后续 restyle 编辑锚定风格
 - 页面状态
+
+#### PageImageVersion（页面图片版本）
+- 每页历史生成/编辑版本；`is_current` 标记当前展示版本
+- `prompt_snapshot`：保存该版本时发给 provider 的最终 prompt（或编辑 fallback prompt）
+- `ref_manifest`：JSON 数组，记录参与该次调用的参考图（`kind` / `bucket` / `path` / `selected` 等），供后续 image-to-image 编辑复用
 
 #### Task（任务）
 - 任务类型（生成描述/生成图片/Restyle图片/翻译图片）
@@ -279,7 +286,9 @@ class AIService:
 
 #### 自定义提示词模板
 
-通用 prompt 组装在 `services/prompts.py`。产品级 DDI 等预置的正文与底图以 `assets/presets/<preset-id>/` 为准，由 `services/style_preset_service.py` 加载并在 restyle / translate+restyle / generate 流程中注入；修改预置内容请改对应 `prompt-*.md` 与 `preset.json` 中的 `sha256`，不要依赖 `frontend/public` 或 `.agents/references` 作为运行时源。
+通用 prompt 组装在 `services/prompts.py`。产品级 DDI 等预置的正文与底图以 `assets/presets/<preset-id>/` 为准，由 `services/style_preset_service.py` 加载并在 restyle / translate+restyle 流程及带 `style_preset_id` 的 generate 流程中注入；修改预置内容请改对应 `prompt-*.md` 与 `preset.json` 中的 `sha256`，不要依赖 `frontend/public` 或 `.agents/references` 作为运行时源。
+
+未选择预置且无风格参考时，idea/outline/descriptions 图片生成使用中性 `get_image_generation_prompt`（`ImageGenerationStyleContract`：`preset` | `custom` | `no-style`），不会在通用模板里硬编码 DDI 色板或麦肯锡/BCG 表述。页面编辑：`restyle` 项目使用 `services/restyle_edit_context.build_restyle_edit_context`；其他 `creation_type` 使用 `build_image_edit_context`，从当前 `PageImageVersion` 的 `prompt_snapshot` / `ref_manifest` 组装多轮上下文；参考路径支持本地文件、`/files/...` 与 `http(s)` URL（见 `task_manager._normalize_ref_paths`）。
 
 扩展新的预置：在 `assets/presets/` 下新增目录与 `preset.json`，重启后 `GET /api/presets` 会自动发现（按目录 mtime 缓存）。
 

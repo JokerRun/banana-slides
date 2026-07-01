@@ -1,19 +1,54 @@
 """
 AI Service Prompts - 集中管理所有 AI 服务的 prompt 模板。
 
-产品级 DDI 等风格预置的正文与底图以 ``assets/presets/<preset-id>/`` 为准，由
-``services.style_preset_service`` 加载；本模块负责通用组装与注入 ``preset_base_body``。
+产品级风格预置的正文与底图以 ``assets/presets/<preset-id>/`` 为准，由
+``services.style_preset_service`` 加载；通用图片生成默认保持中性，不注入隐藏品牌风格。
 """
 
 import json
 import logging
-from textwrap import dedent
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, List, Optional
 
 if TYPE_CHECKING:
     from services.ai_service import ProjectContext
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class ImageGenerationStyleContract:
+    """Resolved style source for generic image generation."""
+
+    kind: str  # preset | custom | no-style
+    body: str = ""
+    style_preset_id: str | None = None
+    has_reference_image: bool = False
+
+
+def resolve_image_generation_style_contract(
+    *,
+    extra_requirements: str | None = None,
+    style_preset_id: str | None = None,
+    has_template: bool = False,
+) -> ImageGenerationStyleContract:
+    """Resolve explicit style input without adding hidden product defaults."""
+    body = (extra_requirements or "").strip()
+    preset_id = (style_preset_id or "").strip() or None
+    if preset_id:
+        return ImageGenerationStyleContract(
+            kind="preset",
+            body=body,
+            style_preset_id=preset_id,
+            has_reference_image=has_template,
+        )
+    if body or has_template:
+        return ImageGenerationStyleContract(
+            kind="custom",
+            body=body,
+            has_reference_image=has_template,
+        )
+    return ImageGenerationStyleContract(kind="no-style")
 
 
 # 语言配置映射
@@ -333,6 +368,7 @@ def get_image_generation_prompt(
     has_template: bool = True,
     page_index: int = 1,
     image_refs: list = None,
+    style_contract: ImageGenerationStyleContract | None = None,
 ) -> str:
     """
     生成图片生成 prompt。
@@ -380,7 +416,7 @@ def get_image_generation_prompt(
             manifest_lines.append(f"- {ref['id']}")
             manifest_lines.append(f'  caption: {ref.get("alt", "user provided image")}')
             manifest_lines.append(f'  source: {ref.get("url", "")}')
-            manifest_lines.append(f"  attached_as_reference_image: true")
+            manifest_lines.append("  attached_as_reference_image: true")
             manifest_lines.append(
                 f"  usage: Use this attached reference image at the semantic location "
                 f'of the [IMAGE_REF:{ref["id"]}] marker in the page text.'
@@ -395,34 +431,62 @@ def get_image_generation_prompt(
         )
         image_ref_manifest = "\n".join(manifest_lines)
 
-    # 添加额外要求到提示词
-    extra_req_text = ""
-    if extra_requirements and extra_requirements.strip():
-        extra_req_text = f"\n\n额外要求（请务必遵循）：\n{extra_requirements}\n"
+    style_contract = style_contract or resolve_image_generation_style_contract(
+        extra_requirements=extra_requirements,
+        has_template=has_template,
+    )
+
+    style_source_text = {
+        "preset": f"selected style preset: {style_contract.style_preset_id}",
+        "custom": "user-provided style references or style text",
+        "no-style": "no explicit style source",
+    }[style_contract.kind]
+    style_block = [
+        "# Style Contract:",
+        f"- source: {style_source_text}",
+    ]
+    if style_contract.kind == "preset" and style_contract.style_preset_id:
+        style_block.append(
+            f"- Apply only the selected preset's canonical style rules ({style_contract.style_preset_id})."
+        )
+    elif style_contract.has_reference_image:
+        style_block.append(
+            "- Use attached reference images only as visual style/layout references."
+        )
+    else:
+        style_block.append(
+            "- No preset or style reference is selected; choose a clean, neutral visual treatment appropriate to the content."
+        )
+    if style_contract.body:
+        style_block.append("\nUser style / extra requirements:\n" + style_contract.body)
+    style_contract_text = "\n".join(style_block)
 
     # 根据是否有模板/风格参考图生成不同的设计指南内容（保持原prompt要点顺序）
     template_style_guideline = (
         "- 深度解析参考图的版式框架、色彩系统、字体规范、图形语言，并将其完整应用于新页面。"
-        if has_template
-        else "- 严格按照风格描述进行设计。"
+        if style_contract.has_reference_image
+        else "- 未提供风格参考图时，不要模仿任何未被用户指定的品牌或模板体系。"
     )
     forbidden_template_text_guidline = (
-        "- 只参考风格设计，禁止出现模板中的文字。\n" if has_template else ""
+        "- 只参考风格设计，禁止出现模板中的文字。\n"
+        if style_contract.has_reference_image
+        else ""
     )
 
     prompt = f"""\
-# Role: 资深商业咨询级 PPT 内容架构师与视觉设计师
+# Role: PPT page information architect and visual designer
 
 # Inputs:
-- 参考图片 = 标准 PPT 模板 / 风格参考图（若提供）
+- 参考图片 = style/layout reference images or content images（若提供）
 - [文本] = 当前页需要转化为 PPT 的原始页面内容
 - [布局建议 / Layout Recommendation - ASCII Diagram] = layout-only instruction, not slide text
 {image_ref_manifest}
+{style_contract_text}
 
 # Core Objective:
-基于 [文本] 的内容与业务逻辑，套用参考图片的 PPT 模板风格，
-从零设计页面的信息架构、视觉层级、空间关系与排版方式，
-输出具有麦肯锡 / BCG 咨询报告风格的专业商务 PPT 页面。
+基于 [文本] 的内容与业务逻辑，结合明确提供的风格来源（如有），
+设计页面的信息架构、视觉层级、空间关系与排版方式，
+输出清晰、可读、16:9 的 PPT 页面。
 
 当前PPT页面的[文本]如下:
 <page_description>
@@ -448,22 +512,19 @@ def get_image_generation_prompt(
 - 深度理解 [文本] 的业务主题、逻辑关系（并列 / 递进 / 包含 / 对比 / 因果），再决定版式。
 - 强制执行文本条目与视觉区块的 1:1 映射，严格基于实际文本条目数生成对应数量的几何区块或层级。
 - 若 [文本] 中包含明确主题或标题，将其作为页面标题；若无法识别明确标题，严禁自行捏造标题。
-- 标题规范：默认微软雅黑 Bold，32pt，左对齐，贴近内容区左侧；若用户提供标题样式或配色，以用户要求为准。
-- Preserve any user-provided color scheme exactly. Use the default DDI palette only when [文本]、额外要求和参考信息均未指定配色：标题/页眉/结构线/主视觉使用 #3D4F5F；强调色/流程箭头/重点标签使用 #F9A825；辅助色仅使用 #2D72B2 / #E67E22 / #88A02C / #662D7C / #8B9A46；正文 #333333，次要文本 #666666，分割线 #E0E0E0，背景 #FFFFFF。
+- Preserve any user-provided color scheme exactly. Use preset colors only when a selected preset explicitly provides them. Otherwise choose accessible, content-appropriate colors without assuming a brand palette.
 - 优先理解内容逻辑并匹配最优版式：流程用路线图，对比用左右/矩阵，层级用分层/冰山，核心主题用辐射/树状，概览用网格卡片，指标用 dashboard，循环用环形流转，问题到解决方案用桥接版式。
-- 允许图形：圆形节点、圆角矩形、房屋图标、粗体折线/S形箭头、带序号流程节点、矩阵表格、金字塔、文档图示；必须为纯扁平化矢量风格。
-- 主视觉区块控制在 3–5 个内并容纳所有原文内容；整体留白 8%–10%；文字约 40%，结构化图形约 60%；线条粗细一致，严格网格对齐。
+- 允许使用与内容匹配的结构化图形、表格、节点、流程、矩阵、图标或插画；不要引入未被要求的品牌化图形语言。
+- 控制主视觉区块数量以容纳所有原文内容；保持合理留白、清晰层级、对齐一致。
 - 若文本缺乏视觉支撑，可生成与内容高度匹配的扁平化图标或配图，但不得与文字重叠。
 - 如非必要，禁止出现 markdown 格式符号（如 # 和 * 等）。
 {forbidden_template_text_guidline}- 使用大小恰当的装饰性图形或插画对空缺位置进行填补。
 </execution_rules>
 {get_ppt_language_instruction(language)}
-{material_images_note}{extra_req_text}
-
-{"**注意：当前页面为ppt的封面页，请你采用专业的封面设计美学技巧，务必凸显出页面标题，分清主次，确保一下就能抓住观众的注意力。**" if page_index == 1 else ""}
+{material_images_note}
 
 # Output Format:
-请输出基于 [文本] 内容生成的 16:9 高保真商业 PPT 页面，确保所有视觉块清晰规整，具有明确的边界逻辑。
+请输出基于 [文本] 内容生成的 16:9 高保真 PPT 页面，确保所有视觉块清晰规整，具有明确的边界逻辑。
 """
 
     logger.info(f"[get_image_generation_prompt] Final prompt:\n{prompt}")
@@ -1285,7 +1346,7 @@ def get_translate_prompt(
     # Add style reference instructions if in Translation+Restyle mode
     style_instruction = ""
     if num_style_refs > 0:
-        style_instruction = f"""
+        style_instruction = """
 
 ## 6. 风格应用原则 (Style Application - Translation+Restyle Mode)
 - 在翻译的同时，应用STYLE_REFERENCE的风格特征

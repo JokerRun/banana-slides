@@ -8,8 +8,6 @@ description"等诱导改写/幻觉的措辞。对应产品反馈：
 - 标题/要点被改写、图片信息被臆造
 """
 
-import pytest
-
 from services.ai_service import ProjectContext
 from services.prompts import (
     get_description_to_outline_prompt,
@@ -17,6 +15,7 @@ from services.prompts import (
     get_description_split_prompt,
     get_image_generation_prompt,
     get_page_description_prompt,
+    resolve_image_generation_style_contract,
 )
 
 
@@ -158,6 +157,68 @@ class TestPageDescriptionPrompt:
 
 
 class TestImageGenerationPrompt:
+    def test_no_style_prompt_has_no_hidden_ddi_or_consulting_defaults(self):
+        prompt = get_image_generation_prompt(
+            page_desc="页面标题：Market Growth\n页面文字：\n- Revenue up 30%",
+            outline_text="1. Market Growth",
+            current_section="Market Growth",
+            language="en",
+            has_template=False,
+        )
+
+        forbidden_terms = [
+            "DDI",
+            "麦肯锡",
+            "咨询",
+            "BCG",
+            "consulting report",
+            "consulting-grade",
+            "default DDI palette",
+            "#3D4F5F",
+            "#F9A825",
+        ]
+        for term in forbidden_terms:
+            assert term not in prompt
+
+    def test_custom_style_prompt_uses_only_user_style_contract(self):
+        style_contract = resolve_image_generation_style_contract(
+            extra_requirements="Use a playful neon editorial style.",
+            has_template=False,
+        )
+        prompt = get_image_generation_prompt(
+            page_desc="页面标题：Launch\n页面文字：\n- Ship beta",
+            outline_text="1. Launch",
+            current_section="Launch",
+            language="en",
+            has_template=False,
+            style_contract=style_contract,
+        )
+
+        assert style_contract.kind == "custom"
+        assert "Use a playful neon editorial style." in prompt
+        assert "DDI" not in prompt
+        assert "麦肯锡" not in prompt
+        assert "BCG" not in prompt
+
+    def test_ddi_prompt_appears_only_when_ddi_preset_selected(self):
+        style_contract = resolve_image_generation_style_contract(
+            extra_requirements="DDI canonical body",
+            style_preset_id="ddi-standard",
+            has_template=True,
+        )
+        prompt = get_image_generation_prompt(
+            page_desc="页面标题：Market Growth\n页面文字：\n- Revenue up 30%",
+            outline_text="1. Market Growth",
+            current_section="Market Growth",
+            language="en",
+            has_template=True,
+            style_contract=style_contract,
+        )
+
+        assert style_contract.kind == "preset"
+        assert "ddi-standard" in prompt
+        assert "DDI canonical body" in prompt
+
     def test_treats_ascii_layout_recommendation_as_non_rendered_instruction(self):
         prompt = get_image_generation_prompt(
             page_desc=(
@@ -196,7 +257,6 @@ class TestImageGenerationPrompt:
         )
 
         assert "user-provided color scheme" in prompt
-        assert "default DDI palette" in prompt
         assert "only when" in prompt
 
 

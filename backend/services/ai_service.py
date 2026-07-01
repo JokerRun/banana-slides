@@ -24,6 +24,7 @@ from .prompts import (
     get_description_split_prompt,
     get_outline_refinement_prompt,
     get_descriptions_refinement_prompt,
+    resolve_image_generation_style_contract,
 )
 from .ai_providers import (
     get_text_provider,
@@ -107,7 +108,9 @@ class AIService:
             from flask import current_app, has_app_context
         except ImportError:
             current_app = None  # type: ignore
-            has_app_context = lambda: False  # type: ignore
+
+            def has_app_context():  # type: ignore
+                return False
 
         if has_app_context() and current_app and hasattr(current_app, "config"):
             self.text_model = current_app.config.get("TEXT_MODEL", config.TEXT_MODEL)
@@ -500,6 +503,7 @@ class AIService:
         extra_requirements: Optional[str] = None,
         language="zh",
         has_template: bool = True,
+        style_preset_id: Optional[str] = None,
     ) -> str:
         """
         Generate image generation prompt for a page
@@ -543,6 +547,12 @@ class AIService:
             for ref in image_refs
         ]
 
+        style_contract = resolve_image_generation_style_contract(
+            extra_requirements=extra_requirements,
+            style_preset_id=style_preset_id,
+            has_template=has_template,
+        )
+
         prompt = get_image_generation_prompt(
             page_desc=normalized_page_desc,
             outline_text=outline_text,
@@ -553,6 +563,7 @@ class AIService:
             has_template=has_template,
             page_index=page_index,
             image_refs=image_refs_dict,
+            style_contract=style_contract,
         )
 
         return prompt
@@ -957,6 +968,16 @@ class AIService:
                         img = Image.open(path)
                         img.load()
                         new_parts.append(img)
+                    elif isinstance(path, str) and (
+                        path.startswith("http://") or path.startswith("https://")
+                    ):
+                        downloaded = self.download_image_from_url(path)
+                        if downloaded:
+                            new_parts.append(downloaded)
+                        else:
+                            logger.warning(
+                                f"Failed to download conversation image, skipping: {path}"
+                            )
                     else:
                         logger.warning(f"Image not found, skipping: {path}")
                 elif "text" in part:
@@ -974,6 +995,16 @@ class AIService:
                 img = Image.open(path)
                 img.load()
                 images.append(img)
+            elif isinstance(path, str) and (
+                path.startswith("http://") or path.startswith("https://")
+            ):
+                downloaded = self.download_image_from_url(path)
+                if downloaded:
+                    images.append(downloaded)
+                else:
+                    logger.warning(
+                        f"Failed to download legacy ref image, skipping: {path}"
+                    )
             else:
                 logger.warning(f"Legacy ref image not found, skipping: {path}")
         return images

@@ -7,8 +7,9 @@ import logging
 import os
 import time
 import threading
+import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Callable, List, Dict, Any, Optional
+from typing import Callable, List, Dict, Any
 from datetime import datetime
 from sqlalchemy import func
 from PIL import Image
@@ -81,6 +82,8 @@ def save_image_with_version(
     file_service,
     page_obj=None,
     image_format: str = "PNG",
+    prompt_snapshot: str = None,
+    ref_manifest: List[Dict[str, Any]] = None,
 ) -> tuple[str, int]:
     """
     保存图片并创建历史版本记录的公共函数
@@ -136,7 +139,9 @@ def save_image_with_version(
         image_path=image_path,
         version_number=next_version,
         is_current=True,
+        prompt_snapshot=prompt_snapshot,
     )
+    new_version.set_ref_manifest(ref_manifest or [])
     db.session.add(new_version)
 
     # 如果提供了 page_obj，更新页面状态和图片路径
@@ -154,6 +159,85 @@ def save_image_with_version(
     )
 
     return image_path, next_version
+
+
+def _build_generation_ref_manifest(
+    *,
+    primary_ref_path: str = None,
+    additional_ref_paths: List[str] = None,
+) -> List[Dict[str, Any]]:
+    """Persist enough generation refs for future image-to-image edits."""
+    manifest = []
+    if primary_ref_path:
+        manifest.append(
+            {
+                "kind": "primary_ref",
+                "bucket": "baseline",
+                "path": primary_ref_path,
+                "selected": True,
+            }
+        )
+    for path in additional_ref_paths or []:
+        manifest.append(
+            {
+                "kind": "additional_ref",
+                "bucket": "baseline",
+                "path": path,
+                "selected": True,
+            }
+        )
+    return manifest
+
+
+def _selected_manifest_paths(ref_manifest: Any) -> List[str]:
+    """Extract selected paths from stored version manifest."""
+    if not ref_manifest:
+        return []
+    if isinstance(ref_manifest, str):
+        try:
+            ref_manifest = json.loads(ref_manifest)
+        except json.JSONDecodeError:
+            return []
+    paths = []
+    for item in ref_manifest:
+        if isinstance(item, dict) and item.get("selected", True) and item.get("path"):
+            paths.append(item["path"])
+    return paths
+
+
+def _normalize_ref_paths(ref_paths: List[str], file_service) -> List[str]:
+    """Resolve temp, absolute, and /files paths to readable local paths."""
+    normalized = []
+    if not ref_paths:
+        return normalized
+    upload_folder = (
+        file_service.upload_folder if hasattr(file_service, "upload_folder") else ""
+    )
+    for ref in ref_paths:
+        if not ref:
+            continue
+        if os.path.exists(ref):
+            normalized.append(ref)
+        elif isinstance(ref, str) and (
+            ref.startswith("http://") or ref.startswith("https://")
+        ):
+            normalized.append(ref)
+        elif isinstance(ref, str) and ref.startswith("/files/") and upload_folder:
+            relative = ref[len("/files/") :].lstrip("/")
+            local = os.path.abspath(os.path.join(upload_folder, relative))
+            if os.path.exists(local):
+                normalized.append(local)
+            else:
+                logger.warning(f"Ref not found after /files/ resolve: {ref}")
+        elif upload_folder:
+            local = os.path.abspath(os.path.join(upload_folder, ref))
+            if os.path.exists(local):
+                normalized.append(local)
+            else:
+                logger.warning(f"Skipping unresolvable ref: {ref}")
+        else:
+            logger.warning(f"Skipping unresolvable ref: {ref}")
+    return normalized
 
 
 def generate_descriptions_task(
@@ -439,11 +523,11 @@ def generate_images_task(
                         # 在子线程中动态获取模板路径，确保使用最新模板
                         page_ref_image_path = None
                         style_ref_paths = []
+                        project_obj = Project.query.get(project_id)
                         if use_template:
                             page_ref_image_path = file_service.get_template_path(
                                 project_id
                             )
-                            project_obj = Project.query.get(project_id)
                             if project_obj:
                                 upload_folder = file_service.upload_folder
                                 for rel_path in project_obj.get_style_ref_image_paths():
@@ -469,6 +553,9 @@ def generate_images_task(
                             extra_requirements=extra_requirements,
                             language=language,
                             has_template=has_style_reference_image,
+                            style_preset_id=(
+                                project_obj.style_preset_id if project_obj else None
+                            ),
                         )
                         logger.debug(f"Generated image prompt for page {page_id}")
 
@@ -504,7 +591,19 @@ def generate_images_task(
                         # 优化：直接在子线程中计算版本号并保存到最终位置
                         # 每个页面独立，使用数据库事务保证版本号原子性，避免临时文件
                         image_path, next_version = save_image_with_version(
-                            image, project_id, page_id, file_service, page_obj=page_obj
+                            image,
+                            project_id,
+                            page_id,
+                            file_service,
+                            page_obj=page_obj,
+                            prompt_snapshot=prompt,
+                            ref_manifest=_build_generation_ref_manifest(
+                                primary_ref_path=page_ref_image_path,
+                                additional_ref_paths=[
+                                    *style_ref_paths,
+                                    *page_additional_ref_images,
+                                ],
+                            ),
                         )
 
                         return (page_id, image_path, None, not is_match)
@@ -675,9 +774,9 @@ def generate_single_page_image_task(
             # Get template path if use_template
             ref_image_path = None
             style_ref_paths = []
+            project_obj = Project.query.get(project_id)
             if use_template:
                 ref_image_path = file_service.get_template_path(project_id)
-                project_obj = Project.query.get(project_id)
                 if project_obj:
                     upload_folder = file_service.upload_folder
                     for rel_path in project_obj.get_style_ref_image_paths():
@@ -705,6 +804,7 @@ def generate_single_page_image_task(
                 extra_requirements=extra_requirements,
                 language=language,
                 has_template=has_style_reference_image,
+                style_preset_id=project_obj.style_preset_id if project_obj else None,
             )
 
             # Generate image
@@ -726,7 +826,16 @@ def generate_single_page_image_task(
 
             # 保存图片并创建历史版本记录
             image_path, next_version = save_image_with_version(
-                image, project_id, page_id, file_service, page_obj=page
+                image,
+                project_id,
+                page_id,
+                file_service,
+                page_obj=page,
+                prompt_snapshot=prompt,
+                ref_manifest=_build_generation_ref_manifest(
+                    primary_ref_path=ref_image_path,
+                    additional_ref_paths=[*style_ref_paths, *additional_ref_images],
+                ),
             )
 
             # Mark task as completed
@@ -811,9 +920,14 @@ def edit_page_image_task(
             logger.info(f"🎨 Editing image for page {page_id}...")
             is_restyle_project = False
             trace = None
+            edit_context = None
             try:
                 # Check if this is a restyle project
                 project = Project.query.get(project_id)
+                current_version = PageImageVersion.query.filter_by(
+                    page_id=page_id,
+                    is_current=True,
+                ).first()
 
                 if project and project.creation_type == "restyle":
                     is_restyle_project = True
@@ -831,10 +945,6 @@ def edit_page_image_task(
                     from config import get_config
 
                     config = get_config()
-                    current_version = PageImageVersion.query.filter_by(
-                        page_id=page_id,
-                        is_current=True,
-                    ).first()
                     trace = {
                         "task_id": task_id,
                         "project_id": project_id,
@@ -881,33 +991,9 @@ def edit_page_image_task(
                                 f"Style ref file missing on disk: {abs_path}"
                             )
 
-                    # Normalize extra ref paths (may be /files/..., abs paths, or temp uploads)
-                    normalized_extras = None
-                    if additional_ref_images:
-                        normalized_extras = []
-                        upload_folder = (
-                            file_service.upload_folder
-                            if hasattr(file_service, "upload_folder")
-                            else ""
-                        )
-                        for ref in additional_ref_images:
-                            if os.path.exists(ref):
-                                normalized_extras.append(ref)
-                            elif ref.startswith("/files/") and upload_folder:
-                                relative = ref[len("/files/") :].lstrip("/")
-                                local = os.path.abspath(
-                                    os.path.join(upload_folder, relative)
-                                )
-                                if os.path.exists(local):
-                                    normalized_extras.append(local)
-                                else:
-                                    logger.warning(
-                                        f"Extra ref not found after /files/ resolve: {ref}"
-                                    )
-                            else:
-                                logger.warning(
-                                    f"Skipping unresolvable extra ref in restyle edit: {ref}"
-                                )
+                    normalized_extras = _normalize_ref_paths(
+                        additional_ref_images or [], file_service
+                    )
 
                     total_pages_count = Page.query.filter_by(
                         project_id=project_id
@@ -928,6 +1014,7 @@ def edit_page_image_task(
                             prunable_cap=config.RESTYLE_EDIT_MAX_PRUNABLE_IMAGES,
                             total_cap=config.RESTYLE_EDIT_MAX_TOTAL_IMAGES,
                         )
+                        edit_context = ctx
                         context_event = {
                             "snapshot_source": ctx.snapshot_source,
                             "degraded_context": ctx.degraded_context,
@@ -955,16 +1042,64 @@ def edit_page_image_task(
                     ) as e:
                         raise ValueError(f"Restyle edit context error: {e}")
                 else:
-                    # Legacy path for non-restyle projects
-                    image = ai_service.edit_image(
-                        edit_instruction,
-                        current_image_path,
+                    from services.restyle_edit_context import (
+                        build_image_edit_context,
+                        MissingStructuralImagesError,
+                        ContextImageLimitExceeded,
+                    )
+                    from config import get_config
+
+                    config = get_config()
+                    baseline_ref_paths = _normalize_ref_paths(
+                        _selected_manifest_paths(
+                            current_version.ref_manifest if current_version else None
+                        ),
+                        file_service,
+                    )
+                    normalized_extras = _normalize_ref_paths(
+                        additional_ref_images or [], file_service
+                    )
+                    try:
+                        edit_context = build_image_edit_context(
+                            baseline_prompt_snapshot=(
+                                current_version.prompt_snapshot
+                                if current_version
+                                else None
+                            ),
+                            baseline_ref_paths=baseline_ref_paths,
+                            current_selected_path=(
+                                current_image_path
+                                if os.path.exists(current_image_path)
+                                else None
+                            ),
+                            edit_instruction=edit_instruction,
+                            original_description=original_description,
+                            current_extra_ref_paths=normalized_extras,
+                            prunable_cap=config.RESTYLE_EDIT_MAX_PRUNABLE_IMAGES,
+                            total_cap=config.RESTYLE_EDIT_MAX_TOTAL_IMAGES,
+                        )
+                    except (
+                        MissingStructuralImagesError,
+                        ContextImageLimitExceeded,
+                    ) as e:
+                        raise ValueError(f"Image edit context error: {e}")
+
+                    image = ai_service.edit_restyle_image_with_context(
+                        edit_context,
                         aspect_ratio,
                         resolution,
-                        original_description=original_description,
-                        additional_ref_images=(
-                            additional_ref_images if additional_ref_images else None
-                        ),
+                        trace_context={
+                            "task_id": task_id,
+                            "project_id": project_id,
+                            "page_id": page_id,
+                            "flow_kind": "edit_image",
+                            "page_order_index": page.order_index + 1,
+                            "source_version_number": (
+                                current_version.version_number
+                                if current_version
+                                else None
+                            ),
+                        },
                     )
             finally:
                 # Clean up temp directory if created
@@ -981,7 +1116,15 @@ def edit_page_image_task(
 
             # 保存编辑后的图片并创建历史版本记录
             image_path, next_version = save_image_with_version(
-                image, project_id, page_id, file_service, page_obj=page
+                image,
+                project_id,
+                page_id,
+                file_service,
+                page_obj=page,
+                prompt_snapshot=(
+                    edit_context.legacy_prompt if edit_context else edit_instruction
+                ),
+                ref_manifest=(edit_context.image_manifest if edit_context else []),
             )
 
             if is_restyle_project and trace:
@@ -1792,7 +1935,20 @@ def restyle_images_task(
                         # Save with version management
                         error_stage = "persist_result"
                         image_path, version = save_image_with_version(
-                            image, project_id, page_id, file_service, page_obj=page_obj
+                            image,
+                            project_id,
+                            page_id,
+                            file_service,
+                            page_obj=page_obj,
+                            prompt_snapshot=prompt,
+                            ref_manifest=_build_generation_ref_manifest(
+                                primary_ref_path=original_path,
+                                additional_ref_paths=[
+                                    item["path"]
+                                    for item in style_ref_manifest
+                                    if item["selected"]
+                                ],
+                            ),
                         )
 
                         # Persist first-pass prompt snapshot (write-once)
@@ -2031,9 +2187,6 @@ def translate_images_task(
     with app.app_context():
         try:
             from services.prompts import get_translate_prompt
-            from config import get_config
-
-            config = get_config()
 
             # Update task status
             task = Task.query.get(task_id)
@@ -2187,7 +2340,16 @@ def translate_images_task(
 
                         # Save with version management
                         image_path, version = save_image_with_version(
-                            image, project_id, page_id, file_service, page_obj=page_obj
+                            image,
+                            project_id,
+                            page_id,
+                            file_service,
+                            page_obj=page_obj,
+                            prompt_snapshot=prompt,
+                            ref_manifest=_build_generation_ref_manifest(
+                                primary_ref_path=original_path,
+                                additional_ref_paths=style_ref_paths,
+                            ),
                         )
 
                         logger.info(

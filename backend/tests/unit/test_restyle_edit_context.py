@@ -1,9 +1,11 @@
 """
 Restyle edit context — unit tests (Task 1 + Task 3)
 """
+
 import pytest
 
 from services.restyle_edit_context import (
+    build_image_edit_context,
     build_restyle_edit_context,
     reconstruct_base_prompt_snapshot,
     is_retryable_conversation_error,
@@ -21,15 +23,47 @@ class TestPageRestyleSnapshot:
 
     def test_page_has_restyle_base_prompt_snapshot_field(self, db_session):
         from models import Page
-        page = Page(project_id='p1', order_index=0, restyle_base_prompt_snapshot='BASE PROMPT')
-        assert page.restyle_base_prompt_snapshot == 'BASE PROMPT'
+
+        page = Page(
+            project_id="p1", order_index=0, restyle_base_prompt_snapshot="BASE PROMPT"
+        )
+        assert page.restyle_base_prompt_snapshot == "BASE PROMPT"
 
     def test_page_to_dict_includes_snapshot(self, db_session):
         from models import Page
-        page = Page(project_id='p1', order_index=0, restyle_base_prompt_snapshot='SNAP')
+
+        page = Page(project_id="p1", order_index=0, restyle_base_prompt_snapshot="SNAP")
         data = page.to_dict()
-        assert 'restyle_base_prompt_snapshot' in data
-        assert data['restyle_base_prompt_snapshot'] == 'SNAP'
+        assert "restyle_base_prompt_snapshot" in data
+        assert data["restyle_base_prompt_snapshot"] == "SNAP"
+
+
+class TestPageImageVersionMetadata:
+    """Generation metadata field tests for edit context reconstruction."""
+
+    def test_version_serializes_prompt_snapshot_and_ref_manifest(self, db_session):
+        from models import PageImageVersion
+
+        version = PageImageVersion(
+            page_id="p1",
+            image_path="p1/pages/page_v1.png",
+            version_number=1,
+            is_current=True,
+            prompt_snapshot="FINAL PROVIDER PROMPT",
+        )
+        version.set_ref_manifest(
+            [
+                {
+                    "kind": "primary_ref",
+                    "bucket": "baseline",
+                    "path": "/fake/ref.png",
+                    "selected": True,
+                }
+            ]
+        )
+
+        assert version.prompt_snapshot == "FINAL PROVIDER PROMPT"
+        assert version.get_ref_manifest()[0]["path"] == "/fake/ref.png"
 
 
 class TestRestyleEditConfig:
@@ -37,6 +71,7 @@ class TestRestyleEditConfig:
 
     def test_restyle_edit_caps_default_from_config(self):
         from config import Config
+
         assert Config.RESTYLE_EDIT_MAX_PRUNABLE_IMAGES == 6
         assert Config.RESTYLE_EDIT_MAX_TOTAL_IMAGES == 8
 
@@ -49,12 +84,12 @@ class TestBuildRestyleEditContext:
 
     def test_full_context_all_components_present(self):
         ctx = build_restyle_edit_context(
-            original_slide_path='/fake/original.png',
-            style_ref_paths=['/fake/ref1.png', '/fake/ref2.png'],
-            restyle_base_prompt_snapshot='BASE PROMPT SNAPSHOT',
-            restyle_prompt='custom style instruction',
-            current_selected_path='/fake/current.png',
-            edit_instruction='make it blue',
+            original_slide_path="/fake/original.png",
+            style_ref_paths=["/fake/ref1.png", "/fake/ref2.png"],
+            restyle_base_prompt_snapshot="BASE PROMPT SNAPSHOT",
+            restyle_prompt="custom style instruction",
+            current_selected_path="/fake/current.png",
+            edit_instruction="make it blue",
         )
         assert isinstance(ctx, RestyleEditContext)
         assert ctx.degraded_context is False
@@ -62,32 +97,32 @@ class TestBuildRestyleEditContext:
         assert ctx.current_images_count >= 1
         # 4 turns: baseline text, baseline images, current selected image, delta
         assert len(ctx.conversation_contents) == 4
-        assert ctx.conversation_contents[0]['role'] == 'user'
-        assert ctx.conversation_contents[2]['role'] == 'user'
-        assert ctx.snapshot_source == 'persisted'
+        assert ctx.conversation_contents[0]["role"] == "user"
+        assert ctx.conversation_contents[2]["role"] == "user"
+        assert ctx.snapshot_source == "persisted"
         assert len(ctx.turns_summary) == 4
-        assert ctx.turns_summary[1]['image_count'] == 3
+        assert ctx.turns_summary[1]["image_count"] == 3
         assert any(
-            item['kind'] == 'original_slide' and item['selected'] is True
+            item["kind"] == "original_slide" and item["selected"] is True
             for item in ctx.image_manifest
         )
         assert any(
-            item['kind'] == 'style_ref' and item['selected'] is True
+            item["kind"] == "style_ref" and item["selected"] is True
             for item in ctx.image_manifest
         )
         assert any(
-            item['kind'] == 'current_selected' and item['selected'] is True
+            item["kind"] == "current_selected" and item["selected"] is True
             for item in ctx.image_manifest
         )
 
     def test_minimum_executable_original_only(self):
         ctx = build_restyle_edit_context(
-            original_slide_path='/fake/original.png',
+            original_slide_path="/fake/original.png",
             style_ref_paths=[],
-            restyle_base_prompt_snapshot='SNAP',
-            restyle_prompt='',
+            restyle_base_prompt_snapshot="SNAP",
+            restyle_prompt="",
             current_selected_path=None,
-            edit_instruction='edit me',
+            edit_instruction="edit me",
         )
         assert ctx.degraded_context is True
 
@@ -95,10 +130,10 @@ class TestBuildRestyleEditContext:
         ctx = build_restyle_edit_context(
             original_slide_path=None,
             style_ref_paths=[],
-            restyle_base_prompt_snapshot='SNAP',
-            restyle_prompt='',
-            current_selected_path='/fake/current.png',
-            edit_instruction='edit me',
+            restyle_base_prompt_snapshot="SNAP",
+            restyle_prompt="",
+            current_selected_path="/fake/current.png",
+            edit_instruction="edit me",
         )
         assert ctx.degraded_context is True
 
@@ -106,34 +141,34 @@ class TestBuildRestyleEditContext:
         with pytest.raises(MissingStructuralImagesError):
             build_restyle_edit_context(
                 original_slide_path=None,
-                style_ref_paths=['/fake/ref.png'],
-                restyle_base_prompt_snapshot='SNAP',
-                restyle_prompt='',
+                style_ref_paths=["/fake/ref.png"],
+                restyle_base_prompt_snapshot="SNAP",
+                restyle_prompt="",
                 current_selected_path=None,
-                edit_instruction='edit me',
+                edit_instruction="edit me",
             )
 
     def test_total_cap_exceeded_raises(self):
         with pytest.raises(ContextImageLimitExceeded):
             build_restyle_edit_context(
-                original_slide_path='/fake/orig.png',
-                style_ref_paths=[f'/fake/ref{i}.png' for i in range(10)],
-                restyle_base_prompt_snapshot='SNAP',
-                restyle_prompt='',
-                current_selected_path='/fake/cur.png',
-                edit_instruction='edit',
+                original_slide_path="/fake/orig.png",
+                style_ref_paths=[f"/fake/ref{i}.png" for i in range(10)],
+                restyle_base_prompt_snapshot="SNAP",
+                restyle_prompt="",
+                current_selected_path="/fake/cur.png",
+                edit_instruction="edit",
                 prunable_cap=10,
                 total_cap=3,  # Too small for 2 anchors + style refs
             )
 
     def test_pruning_preserves_at_least_one_style_ref(self):
         ctx = build_restyle_edit_context(
-            original_slide_path='/fake/orig.png',
-            style_ref_paths=['/fake/ref1.png', '/fake/ref2.png', '/fake/ref3.png'],
-            restyle_base_prompt_snapshot='SNAP',
-            restyle_prompt='',
-            current_selected_path='/fake/cur.png',
-            edit_instruction='edit',
+            original_slide_path="/fake/orig.png",
+            style_ref_paths=["/fake/ref1.png", "/fake/ref2.png", "/fake/ref3.png"],
+            restyle_base_prompt_snapshot="SNAP",
+            restyle_prompt="",
+            current_selected_path="/fake/cur.png",
+            edit_instruction="edit",
             prunable_cap=1,  # Only room for 1 prunable
             total_cap=8,
         )
@@ -142,13 +177,13 @@ class TestBuildRestyleEditContext:
 
     def test_pruning_fills_extras_after_style_refs(self):
         ctx = build_restyle_edit_context(
-            original_slide_path='/fake/orig.png',
-            style_ref_paths=['/fake/ref1.png'],
-            restyle_base_prompt_snapshot='SNAP',
-            restyle_prompt='',
-            current_selected_path='/fake/cur.png',
-            edit_instruction='edit',
-            current_extra_ref_paths=['/fake/extra1.png', '/fake/extra2.png'],
+            original_slide_path="/fake/orig.png",
+            style_ref_paths=["/fake/ref1.png"],
+            restyle_base_prompt_snapshot="SNAP",
+            restyle_prompt="",
+            current_selected_path="/fake/cur.png",
+            edit_instruction="edit",
+            current_extra_ref_paths=["/fake/extra1.png", "/fake/extra2.png"],
             prunable_cap=2,  # 1 style ref + 1 extra
             total_cap=8,
         )
@@ -158,140 +193,205 @@ class TestBuildRestyleEditContext:
     def test_pruning_extras_newest_first(self):
         """Extra refs are added newest-first (last in list = newest)"""
         ctx = build_restyle_edit_context(
-            original_slide_path='/fake/orig.png',
+            original_slide_path="/fake/orig.png",
             style_ref_paths=[],
-            restyle_base_prompt_snapshot='SNAP',
-            restyle_prompt='',
-            current_selected_path='/fake/cur.png',
-            edit_instruction='edit',
-            current_extra_ref_paths=['/fake/old.png', '/fake/mid.png', '/fake/new.png'],
+            restyle_base_prompt_snapshot="SNAP",
+            restyle_prompt="",
+            current_selected_path="/fake/cur.png",
+            edit_instruction="edit",
+            current_extra_ref_paths=["/fake/old.png", "/fake/mid.png", "/fake/new.png"],
             prunable_cap=2,  # only room for 2
             total_cap=8,
         )
         # anchors + 2 extras (newest first: new, mid)
-        selected_extras = [p for p in ctx.legacy_ref_images
-                           if p not in ('/fake/orig.png', '/fake/cur.png')]
-        assert '/fake/new.png' in selected_extras
-        assert '/fake/mid.png' in selected_extras
-        assert '/fake/old.png' not in selected_extras
-        old_extra = next(item for item in ctx.image_manifest if item['path'] == '/fake/old.png')
-        assert old_extra['selected'] is False
-        assert old_extra['selection_reason'] == 'pruned_budget'
+        selected_extras = [
+            p
+            for p in ctx.legacy_ref_images
+            if p not in ("/fake/orig.png", "/fake/cur.png")
+        ]
+        assert "/fake/new.png" in selected_extras
+        assert "/fake/mid.png" in selected_extras
+        assert "/fake/old.png" not in selected_extras
+        old_extra = next(
+            item for item in ctx.image_manifest if item["path"] == "/fake/old.png"
+        )
+        assert old_extra["selected"] is False
+        assert old_extra["selection_reason"] == "pruned_budget"
 
     def test_legacy_ref_images_deterministic_order(self):
         """Legacy images follow: style refs, original, current selected, extras"""
         ctx = build_restyle_edit_context(
-            original_slide_path='/fake/orig.png',
-            style_ref_paths=['/fake/ref1.png'],
-            restyle_base_prompt_snapshot='SNAP',
-            restyle_prompt='',
-            current_selected_path='/fake/cur.png',
-            edit_instruction='edit',
-            current_extra_ref_paths=['/fake/extra.png'],
+            original_slide_path="/fake/orig.png",
+            style_ref_paths=["/fake/ref1.png"],
+            restyle_base_prompt_snapshot="SNAP",
+            restyle_prompt="",
+            current_selected_path="/fake/cur.png",
+            edit_instruction="edit",
+            current_extra_ref_paths=["/fake/extra.png"],
             prunable_cap=6,
             total_cap=8,
         )
         assert ctx.legacy_ref_images == [
-            '/fake/ref1.png',
-            '/fake/orig.png',
-            '/fake/cur.png',
-            '/fake/extra.png',
+            "/fake/ref1.png",
+            "/fake/orig.png",
+            "/fake/cur.png",
+            "/fake/extra.png",
         ]
 
     def test_conversation_baseline_images_match_prompt_order(self):
         """Baseline conversation images follow: style refs first, then original slide."""
         ctx = build_restyle_edit_context(
-            original_slide_path='/fake/orig.png',
-            style_ref_paths=['/fake/ref1.png', '/fake/ref2.png'],
-            restyle_base_prompt_snapshot='SNAP',
-            restyle_prompt='',
-            current_selected_path='/fake/cur.png',
-            edit_instruction='edit',
+            original_slide_path="/fake/orig.png",
+            style_ref_paths=["/fake/ref1.png", "/fake/ref2.png"],
+            restyle_base_prompt_snapshot="SNAP",
+            restyle_prompt="",
+            current_selected_path="/fake/cur.png",
+            edit_instruction="edit",
         )
         baseline_image_paths = [
-            part['image_path']
-            for part in ctx.conversation_contents[1]['parts']
-            if 'image_path' in part
+            part["image_path"]
+            for part in ctx.conversation_contents[1]["parts"]
+            if "image_path" in part
         ]
         assert baseline_image_paths == [
-            '/fake/ref1.png',
-            '/fake/ref2.png',
-            '/fake/orig.png',
+            "/fake/ref1.png",
+            "/fake/ref2.png",
+            "/fake/orig.png",
         ]
 
     def test_conversation_turn1_contains_baseline_text(self):
         ctx = build_restyle_edit_context(
-            original_slide_path='/fake/orig.png',
-            style_ref_paths=['/fake/ref.png'],
-            restyle_base_prompt_snapshot='MY SNAPSHOT',
-            restyle_prompt='my custom prompt',
-            current_selected_path='/fake/cur.png',
-            edit_instruction='change color',
+            original_slide_path="/fake/orig.png",
+            style_ref_paths=["/fake/ref.png"],
+            restyle_base_prompt_snapshot="MY SNAPSHOT",
+            restyle_prompt="my custom prompt",
+            current_selected_path="/fake/cur.png",
+            edit_instruction="change color",
         )
         turn1 = ctx.conversation_contents[0]
-        assert turn1['role'] == 'user'
-        text_parts = [p['text'] for p in turn1['parts'] if 'text' in p]
-        combined = ' '.join(text_parts)
-        assert 'MY SNAPSHOT' in combined
-        assert 'my custom prompt' in combined
+        assert turn1["role"] == "user"
+        text_parts = [p["text"] for p in turn1["parts"] if "text" in p]
+        combined = " ".join(text_parts)
+        assert "MY SNAPSHOT" in combined
+        assert "my custom prompt" in combined
 
     def test_conversation_turn4_contains_edit_instruction(self):
         ctx = build_restyle_edit_context(
-            original_slide_path='/fake/orig.png',
-            style_ref_paths=['/fake/ref.png'],
-            restyle_base_prompt_snapshot='SNAP',
-            restyle_prompt='',
-            current_selected_path='/fake/cur.png',
-            edit_instruction='make it red',
+            original_slide_path="/fake/orig.png",
+            style_ref_paths=["/fake/ref.png"],
+            restyle_base_prompt_snapshot="SNAP",
+            restyle_prompt="",
+            current_selected_path="/fake/cur.png",
+            edit_instruction="make it red",
         )
         turn4 = ctx.conversation_contents[3]
-        assert turn4['role'] == 'user'
-        text_parts = [p['text'] for p in turn4['parts'] if 'text' in p]
-        assert any('make it red' in t for t in text_parts)
+        assert turn4["role"] == "user"
+        text_parts = [p["text"] for p in turn4["parts"] if "text" in p]
+        assert any("make it red" in t for t in text_parts)
 
     def test_no_current_selected_skips_turn3(self):
         """When current selected is missing, conversation has 3 turns (skip current-image turn)"""
         ctx = build_restyle_edit_context(
-            original_slide_path='/fake/orig.png',
-            style_ref_paths=['/fake/ref.png'],
-            restyle_base_prompt_snapshot='SNAP',
-            restyle_prompt='',
+            original_slide_path="/fake/orig.png",
+            style_ref_paths=["/fake/ref.png"],
+            restyle_base_prompt_snapshot="SNAP",
+            restyle_prompt="",
             current_selected_path=None,
-            edit_instruction='edit me',
+            edit_instruction="edit me",
         )
         # No synthetic model turn
-        roles = [t['role'] for t in ctx.conversation_contents]
-        assert 'model' not in roles
+        roles = [t["role"] for t in ctx.conversation_contents]
+        assert "model" not in roles
 
     def test_current_selected_image_is_user_context_not_model_history(self):
         """Current selected version should be provided as user context, not fake model output."""
         ctx = build_restyle_edit_context(
-            original_slide_path='/fake/orig.png',
-            style_ref_paths=['/fake/ref.png'],
-            restyle_base_prompt_snapshot='SNAP',
-            restyle_prompt='',
-            current_selected_path='/fake/cur.png',
-            edit_instruction='edit me',
+            original_slide_path="/fake/orig.png",
+            style_ref_paths=["/fake/ref.png"],
+            restyle_base_prompt_snapshot="SNAP",
+            restyle_prompt="",
+            current_selected_path="/fake/cur.png",
+            edit_instruction="edit me",
         )
         current_turn = ctx.conversation_contents[2]
-        assert current_turn['role'] == 'user'
-        assert current_turn['parts'] == [{'image_path': '/fake/cur.png'}]
+        assert current_turn["role"] == "user"
+        assert current_turn["parts"] == [{"image_path": "/fake/cur.png"}]
 
     def test_no_original_slide_skips_from_turn2(self):
         """When original slide missing, Turn 2 only has style refs"""
         ctx = build_restyle_edit_context(
             original_slide_path=None,
-            style_ref_paths=['/fake/ref.png'],
-            restyle_base_prompt_snapshot='SNAP',
-            restyle_prompt='',
-            current_selected_path='/fake/cur.png',
-            edit_instruction='edit me',
+            style_ref_paths=["/fake/ref.png"],
+            restyle_base_prompt_snapshot="SNAP",
+            restyle_prompt="",
+            current_selected_path="/fake/cur.png",
+            edit_instruction="edit me",
         )
-        turn2 = [t for t in ctx.conversation_contents
-                 if t['role'] == 'user' and any('image_path' in p for p in t['parts'])]
+        turn2 = [
+            t
+            for t in ctx.conversation_contents
+            if t["role"] == "user" and any("image_path" in p for p in t["parts"])
+        ]
         if turn2:
-            image_paths = [p['image_path'] for p in turn2[0]['parts'] if 'image_path' in p]
-            assert '/fake/orig.png' not in image_paths
+            image_paths = [
+                p["image_path"] for p in turn2[0]["parts"] if "image_path" in p
+            ]
+            assert "/fake/orig.png" not in image_paths
+
+
+class TestBuildImageEditContext:
+    """Unified edit context tests for non-restyle edit flows."""
+
+    def test_normal_edit_uses_persisted_generation_snapshot_as_baseline(self):
+        ctx = build_image_edit_context(
+            baseline_prompt_snapshot="ORIGINAL GENERATION PROMPT",
+            baseline_ref_paths=["/fake/style.png"],
+            current_selected_path="/fake/current.png",
+            edit_instruction="make the chart larger",
+            current_extra_ref_paths=["/fake/extra.png"],
+        )
+
+        assert isinstance(ctx, RestyleEditContext)
+        assert ctx.snapshot_source == "persisted"
+        assert ctx.degraded_context is False
+        assert (
+            "ORIGINAL GENERATION PROMPT"
+            in ctx.conversation_contents[0]["parts"][0]["text"]
+        )
+        assert ctx.legacy_ref_images == [
+            "/fake/style.png",
+            "/fake/current.png",
+            "/fake/extra.png",
+        ]
+        assert any(
+            item["kind"] == "generation_ref" and item["bucket"] == "baseline"
+            for item in ctx.image_manifest
+        )
+
+    def test_normal_edit_degrades_for_old_versions_without_snapshot(self):
+        ctx = build_image_edit_context(
+            baseline_prompt_snapshot=None,
+            baseline_ref_paths=[],
+            current_selected_path="/fake/current.png",
+            edit_instruction="make title larger",
+            original_description="页面标题：A",
+        )
+
+        assert ctx.degraded_context is True
+        assert ctx.snapshot_source == "fallback"
+        assert "页面标题：A" in ctx.legacy_prompt
+
+    def test_fallback_legacy_prompt_does_not_duplicate_edit_instruction(self):
+        instruction = "make title larger"
+        ctx = build_image_edit_context(
+            baseline_prompt_snapshot=None,
+            baseline_ref_paths=[],
+            current_selected_path="/fake/current.png",
+            edit_instruction=instruction,
+            original_description="页面标题：A",
+        )
+        assert ctx.legacy_prompt.count(instruction) == 1
+        assert "Edit instruction:" not in ctx.legacy_prompt
 
 
 class TestReconstructBasePromptSnapshot:
@@ -299,22 +399,31 @@ class TestReconstructBasePromptSnapshot:
 
     def test_reconstruct_returns_string(self):
         result = reconstruct_base_prompt_snapshot(
-            page_index=1, total_pages=5, num_style_refs=2, custom_prompt='',
+            page_index=1,
+            total_pages=5,
+            num_style_refs=2,
+            custom_prompt="",
         )
         assert isinstance(result, str)
         assert len(result) > 0
 
     def test_reconstruct_includes_page_info(self):
         result = reconstruct_base_prompt_snapshot(
-            page_index=3, total_pages=10, num_style_refs=1, custom_prompt='my style',
+            page_index=3,
+            total_pages=10,
+            num_style_refs=1,
+            custom_prompt="my style",
         )
-        assert '3' in result or 'Page' in result
+        assert "3" in result or "Page" in result
 
     def test_reconstruct_with_zero_refs_uses_min_one(self):
         result = reconstruct_base_prompt_snapshot(
-            page_index=1, total_pages=1, num_style_refs=0, custom_prompt='',
+            page_index=1,
+            total_pages=1,
+            num_style_refs=0,
+            custom_prompt="",
         )
-        assert 'IMAGE' in result
+        assert "IMAGE" in result
 
 
 class TestSnapshotFallbackInContext:
@@ -322,51 +431,72 @@ class TestSnapshotFallbackInContext:
 
     def test_missing_snapshot_uses_reconstruction(self):
         ctx = build_restyle_edit_context(
-            original_slide_path='/fake/orig.png',
-            style_ref_paths=['/fake/ref.png'],
+            original_slide_path="/fake/orig.png",
+            style_ref_paths=["/fake/ref.png"],
             restyle_base_prompt_snapshot=None,
-            restyle_prompt='custom style',
-            current_selected_path='/fake/cur.png',
-            edit_instruction='edit me',
+            restyle_prompt="custom style",
+            current_selected_path="/fake/cur.png",
+            edit_instruction="edit me",
             page_index=2,
             total_pages=5,
         )
         assert ctx.degraded_context is True
         assert len(ctx.conversation_contents) >= 3
-        assert ctx.snapshot_source == 'reconstructed'
+        assert ctx.snapshot_source == "reconstructed"
 
 
 class TestRetryableConversationError:
     """Tests for is_retryable_conversation_error classifier"""
 
     def test_400_error_is_retryable(self):
-        assert is_retryable_conversation_error(
-            Exception("400 Bad Request: invalid contents format")) is True
+        assert (
+            is_retryable_conversation_error(
+                Exception("400 Bad Request: invalid contents format")
+            )
+            is True
+        )
 
     def test_422_error_is_retryable(self):
-        assert is_retryable_conversation_error(
-            Exception("422 invalid_argument: schema validation failed")) is True
+        assert (
+            is_retryable_conversation_error(
+                Exception("422 invalid_argument: schema validation failed")
+            )
+            is True
+        )
 
     def test_schema_error_is_retryable(self):
-        assert is_retryable_conversation_error(
-            Exception("inline_data format not supported")) is True
+        assert (
+            is_retryable_conversation_error(
+                Exception("inline_data format not supported")
+            )
+            is True
+        )
 
     def test_parts_error_is_retryable(self):
-        assert is_retryable_conversation_error(
-            Exception("Invalid parts in contents")) is True
+        assert (
+            is_retryable_conversation_error(Exception("Invalid parts in contents"))
+            is True
+        )
 
     def test_timeout_error_is_not_retryable(self):
-        assert is_retryable_conversation_error(
-            Exception("Request timed out after 300s")) is False
+        assert (
+            is_retryable_conversation_error(Exception("Request timed out after 300s"))
+            is False
+        )
 
     def test_500_error_is_not_retryable(self):
-        assert is_retryable_conversation_error(
-            Exception("500 Internal Server Error")) is False
+        assert (
+            is_retryable_conversation_error(Exception("500 Internal Server Error"))
+            is False
+        )
 
     def test_503_error_is_not_retryable(self):
-        assert is_retryable_conversation_error(
-            Exception("503 Service Unavailable")) is False
+        assert (
+            is_retryable_conversation_error(Exception("503 Service Unavailable"))
+            is False
+        )
 
     def test_generic_error_is_not_retryable(self):
-        assert is_retryable_conversation_error(
-            Exception("something went wrong")) is False
+        assert (
+            is_retryable_conversation_error(Exception("something went wrong")) is False
+        )
