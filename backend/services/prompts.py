@@ -8,7 +8,6 @@ AI Service Prompts - 集中管理所有 AI 服务的 prompt 模板。
 import json
 import logging
 from dataclasses import dataclass
-from textwrap import dedent
 from typing import TYPE_CHECKING, Dict, List, Optional
 
 if TYPE_CHECKING:
@@ -417,7 +416,7 @@ def get_image_generation_prompt(
             manifest_lines.append(f"- {ref['id']}")
             manifest_lines.append(f'  caption: {ref.get("alt", "user provided image")}')
             manifest_lines.append(f'  source: {ref.get("url", "")}')
-            manifest_lines.append(f"  attached_as_reference_image: true")
+            manifest_lines.append("  attached_as_reference_image: true")
             manifest_lines.append(
                 f"  usage: Use this attached reference image at the semantic location "
                 f'of the [IMAGE_REF:{ref["id"]}] marker in the page text.'
@@ -1347,7 +1346,7 @@ def get_translate_prompt(
     # Add style reference instructions if in Translation+Restyle mode
     style_instruction = ""
     if num_style_refs > 0:
-        style_instruction = f"""
+        style_instruction = """
 
 ## 6. 风格应用原则 (Style Application - Translation+Restyle Mode)
 - 在翻译的同时，应用STYLE_REFERENCE的风格特征

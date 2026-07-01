@@ -108,7 +108,9 @@ class AIService:
             from flask import current_app, has_app_context
         except ImportError:
             current_app = None  # type: ignore
-            has_app_context = lambda: False  # type: ignore
+
+            def has_app_context():  # type: ignore
+                return False
 
         if has_app_context() and current_app and hasattr(current_app, "config"):
             self.text_model = current_app.config.get("TEXT_MODEL", config.TEXT_MODEL)

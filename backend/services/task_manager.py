@@ -9,7 +9,7 @@ import time
 import threading
 import json
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Callable, List, Dict, Any, Optional
+from typing import Callable, List, Dict, Any
 from datetime import datetime
 from sqlalchemy import func
 from PIL import Image
@@ -210,7 +210,9 @@ def _normalize_ref_paths(ref_paths: List[str], file_service) -> List[str]:
     normalized = []
     if not ref_paths:
         return normalized
-    upload_folder = file_service.upload_folder if hasattr(file_service, "upload_folder") else ""
+    upload_folder = (
+        file_service.upload_folder if hasattr(file_service, "upload_folder") else ""
+    )
     for ref in ref_paths:
         if not ref:
             continue
@@ -2185,9 +2187,6 @@ def translate_images_task(
     with app.app_context():
         try:
             from services.prompts import get_translate_prompt
-            from config import get_config
-
-            config = get_config()
 
             # Update task status
             task = Task.query.get(task_id)

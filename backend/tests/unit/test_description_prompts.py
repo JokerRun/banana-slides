@@ -8,8 +8,6 @@ description"等诱导改写/幻觉的措辞。对应产品反馈：
 - 标题/要点被改写、图片信息被臆造
 """
 
-import pytest
-
 from services.ai_service import ProjectContext
 from services.prompts import (
     get_description_to_outline_prompt,
