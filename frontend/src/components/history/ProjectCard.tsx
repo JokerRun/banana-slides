@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Clock, FileText, ChevronRight, Trash2 } from 'lucide-react';
 import { useT } from '@/hooks/useT';
 import { Card } from '@/components/shared';
-import { getProjectTitle, getFirstPageImage, formatDate, getStatusText, getStatusColor } from '@/utils/projectUtils';
+import { getProjectTitle, getFirstPageImage, formatDate, getStatusText, getStatusColor, PROJECT_NAME_MAX_LENGTH } from '@/utils/projectUtils';
 import type { Project } from '@/types';
 
 // ProjectCard 组件自包含翻译
@@ -97,6 +97,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
               <input
                 type="text"
                 value={editingTitle}
+                maxLength={PROJECT_NAME_MAX_LENGTH}
                 onChange={(e) => onTitleChange(e.target.value)}
                 onKeyDown={(e) => onTitleKeyDown(e, projectId)}
                 onBlur={() => onSaveEdit(projectId)}

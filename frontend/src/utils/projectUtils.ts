@@ -2,6 +2,9 @@ import { getImageUrl } from '@/api/client';
 import type { Project, Page, DescriptionContent } from '@/types';
 import { downloadFile } from './index';
 
+/** Matches backend `projects.project_name` String(255). */
+export const PROJECT_NAME_MAX_LENGTH = 255;
+
 /**
  * 获取项目标题。
  * 优先使用用户显式重命名的 project_name；文件型项目未重命名时使用源文件名；

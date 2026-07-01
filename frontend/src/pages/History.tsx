@@ -9,7 +9,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { useT } from '@/hooks/useT';
 import * as api from '@/api/endpoints';
 import { normalizeProject } from '@/utils';
-import { getProjectTitle, getProjectRoute } from '@/utils/projectUtils';
+import { getProjectTitle, getProjectRoute, PROJECT_NAME_MAX_LENGTH } from '@/utils/projectUtils';
 import type { Project } from '@/types';
 
 // 页面特有翻译 - AI 可以直接看到所有文案
@@ -37,6 +37,7 @@ const historyI18n = {
       openFailed: '打开项目失败',
       loadFailed: '加载历史项目失败',
       titleEmpty: '项目名称不能为空',
+      titleTooLong: '项目名称不能超过 {{max}} 个字符',
       titleUpdated: '项目名称已更新',
       titleUpdateFailed: '更新项目名称失败',
     },
@@ -64,6 +65,7 @@ const historyI18n = {
       openFailed: 'Failed to open project',
       loadFailed: 'Failed to load project history',
       titleEmpty: 'Project name cannot be empty',
+      titleTooLong: 'Project name cannot exceed {{max}} characters',
       titleUpdated: 'Project name updated',
       titleUpdateFailed: 'Failed to update project name',
     },
@@ -295,20 +297,28 @@ export const History: React.FC = () => {
   }, []);
 
   const handleSaveEdit = useCallback(async (projectId: string) => {
-    if (!editingTitle.trim()) {
+    const trimmed = editingTitle.trim();
+    if (!trimmed) {
       show({ message: t('history.titleEmpty'), type: 'error' });
+      return;
+    }
+    if (trimmed.length > PROJECT_NAME_MAX_LENGTH) {
+      show({
+        message: t('history.titleTooLong', { max: PROJECT_NAME_MAX_LENGTH }),
+        type: 'error',
+      });
       return;
     }
 
     try {
       // 调用API更新项目名称
-      await api.updateProject(projectId, { project_name: editingTitle.trim() });
+      await api.updateProject(projectId, { project_name: trimmed });
 
       // 更新本地状态
       setProjects(prev => prev.map(p => {
         const id = p.id || p.project_id;
         if (id === projectId) {
-          return { ...p, project_name: editingTitle.trim() };
+          return { ...p, project_name: trimmed };
         }
         return p;
       }));
@@ -324,7 +334,7 @@ export const History: React.FC = () => {
       });
     }
    
-  }, [editingTitle, show]);
+  }, [editingTitle, show, t]);
 
   const handleTitleKeyDown = useCallback((e: React.KeyboardEvent, projectId: string) => {
     if (e.key === 'Enter') {
