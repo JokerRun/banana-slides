@@ -150,6 +150,11 @@ def create_translate_project():
             if not ref.filename or not _allowed_image_file(ref.filename):
                 return bad_request(f"Invalid style reference image: {ref.filename}")
 
+        if translate_mode == "pure" and style_preset_id:
+            return bad_request(
+                "style_preset_id is not supported when translate_mode is 'pure'"
+            )
+
         translate_prompt = request.form.get("translate_prompt", "").strip()
 
         # Use source filename (without extension) as project name
@@ -190,43 +195,48 @@ def create_translate_project():
             f"📁 Source file saved: {source_path} ({os.path.getsize(str(source_path)) / 1024:.1f} KB)"
         )
 
-        # Save style reference images (if provided)
+        # Save style reference images (restyle mode only)
         style_ref_paths = []
-        if style_preset_id:
-            try:
-                apply_style_preset_to_project(
-                    project=project,
-                    file_service=file_service,
-                    style_preset_id=style_preset_id,
-                    existing_paths=style_ref_paths,
-                )
-            except StylePresetError as exc:
+        if translate_mode == "restyle":
+            if style_preset_id:
+                try:
+                    apply_style_preset_to_project(
+                        project=project,
+                        file_service=file_service,
+                        style_preset_id=style_preset_id,
+                        existing_paths=style_ref_paths,
+                    )
+                except StylePresetError as exc:
+                    db.session.rollback()
+                    return bad_request(str(exc))
+
+            if len(style_ref_paths) + len(style_refs) > MAX_STYLE_REFS:
                 db.session.rollback()
-                return bad_request(str(exc))
+                return bad_request(
+                    f"Maximum {MAX_STYLE_REFS} style reference images allowed (preset plus uploads)"
+                )
 
-        if len(style_ref_paths) + len(style_refs) > MAX_STYLE_REFS:
-            db.session.rollback()
-            return bad_request(
-                f"Maximum {MAX_STYLE_REFS} style reference images allowed (preset plus uploads)"
-            )
+            if style_refs:
+                style_ref_dir = project_dir / "style_refs"
+                style_ref_dir.mkdir(exist_ok=True, parents=True)
 
-        if style_refs:
-            style_ref_dir = project_dir / "style_refs"
-            style_ref_dir.mkdir(exist_ok=True, parents=True)
+                custom_ref_start = len(style_ref_paths) + 1
+                for i, ref in enumerate(style_refs):
+                    ref_ext = Path(ref.filename).suffix.lower().lstrip(".")
+                    if ref_ext not in ALLOWED_IMAGE_EXTENSIONS:
+                        ref_ext = "png"
+                    saved_name = f"style_ref_{custom_ref_start + i}.{ref_ext}"
+                    ref_path = style_ref_dir / saved_name
+                    ref.save(str(ref_path))
+                    rel_path = ref_path.relative_to(
+                        file_service.upload_folder
+                    ).as_posix()
+                    style_ref_paths.append(rel_path)
+                    logger.info(
+                        f"🎨 Style ref {i + 1}/{len(style_refs)} saved: {ref_path}"
+                    )
 
-            custom_ref_start = len(style_ref_paths) + 1
-            for i, ref in enumerate(style_refs):
-                ref_ext = Path(ref.filename).suffix.lower().lstrip(".")
-                if ref_ext not in ALLOWED_IMAGE_EXTENSIONS:
-                    ref_ext = "png"
-                saved_name = f"style_ref_{custom_ref_start + i}.{ref_ext}"
-                ref_path = style_ref_dir / saved_name
-                ref.save(str(ref_path))
-                rel_path = ref_path.relative_to(file_service.upload_folder).as_posix()
-                style_ref_paths.append(rel_path)
-                logger.info(f"🎨 Style ref {i + 1}/{len(style_refs)} saved: {ref_path}")
-
-        project.set_style_ref_image_paths(style_ref_paths[:MAX_STYLE_REFS])
+            project.set_style_ref_image_paths(style_ref_paths[:MAX_STYLE_REFS])
 
         # Convert source file to images
         restyle_service = RestyleService()

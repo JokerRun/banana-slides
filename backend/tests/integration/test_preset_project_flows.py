@@ -74,6 +74,30 @@ def test_create_translate_restyle_project_accepts_ddi_preset_without_uploaded_st
     ]
 
 
+def test_create_translate_pure_rejects_style_preset_id(client, tmp_path):
+    original = tmp_path / "slide.png"
+    original.write_bytes(_png_bytes("white"))
+
+    with patch(
+        "services.restyle_service.RestyleService.convert_to_images",
+        return_value=[str(original)],
+    ):
+        response = client.post(
+            "/api/projects/translate",
+            data={
+                "source_file": (io.BytesIO(b"pptx"), "slides.pptx"),
+                "target_language": "English",
+                "translate_mode": "pure",
+                "style_preset_id": "ddi-standard",
+            },
+            content_type="multipart/form-data",
+        )
+
+    assert response.status_code == 400
+    body = response.get_json()
+    assert "pure" in body["error"]["message"].lower()
+
+
 def test_create_restyle_project_still_accepts_custom_style_refs(client, tmp_path):
     original = tmp_path / "slide.png"
     original.write_bytes(_png_bytes("white"))
