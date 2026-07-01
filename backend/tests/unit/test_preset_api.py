@@ -3,9 +3,19 @@ Canonical preset API tests.
 """
 
 import hashlib
+import io
 from pathlib import Path
 
+from PIL import Image
+
 from conftest import assert_success_response
+
+
+def _png_bytes(color: str = "blue") -> bytes:
+    image = Image.new("RGB", (16, 16), color=color)
+    buf = io.BytesIO()
+    image.save(buf, format="PNG")
+    return buf.getvalue()
 
 
 def test_presets_api_returns_canonical_ddi_manifest(client):
@@ -69,3 +79,57 @@ def test_legacy_ddi_style_preset_copies_canonical_base_and_records_metadata(clie
     assert project["style_preset_id"] == "ddi-standard"
     assert project["style_preset_version"] == "2026-07-01"
     assert project["style_preset_sha256"] == expected_sha
+
+
+def test_upload_style_refs_rejects_preset_plus_too_many_uploads(client):
+    create_response = client.post(
+        "/api/projects",
+        json={"creation_type": "idea", "idea_prompt": "DDI deck"},
+    )
+    project_id = assert_success_response(create_response, 201)["data"]["project_id"]
+
+    refs = [
+        (io.BytesIO(_png_bytes("red")), f"ref{i}.png")
+        for i in range(5)
+    ]
+    upload_response = client.post(
+        f"/api/projects/{project_id}/style-refs",
+        data={
+            "style_preset_id": "ddi-standard",
+            "style_refs": refs,
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert upload_response.status_code == 400
+    body = upload_response.get_json()
+    assert "Maximum 5" in body["error"]["message"]
+
+
+def test_batch_generate_images_returns_bad_request_for_invalid_style_preset(client):
+    create_response = client.post(
+        "/api/projects",
+        json={"creation_type": "idea", "idea_prompt": "test"},
+    )
+    project_id = assert_success_response(create_response, 201)["data"]["project_id"]
+
+    bind_response = client.post(
+        f"/api/projects/{project_id}/style-refs",
+        data={"style_preset_id": "ddi"},
+        content_type="multipart/form-data",
+    )
+    assert_success_response(bind_response)
+
+    from models import db, Project
+
+    with client.application.app_context():
+        project = Project.query.filter_by(id=project_id).first()
+        project.style_preset_id = "nonexistent-preset-id"
+        db.session.commit()
+
+    gen_response = client.post(
+        f"/api/projects/{project_id}/generate/images",
+        json={},
+    )
+
+    assert gen_response.status_code == 400

@@ -26,6 +26,8 @@ from services.style_preset_service import (
     StylePresetError,
     apply_style_preset_to_project,
 )
+
+MAX_STYLE_REFS = 5
 from utils import (
     success_response,
     error_response,
@@ -297,6 +299,11 @@ def upload_style_refs(project_id):
             except StylePresetError as exc:
                 return bad_request(str(exc))
 
+        if len(saved_paths) + len(style_refs) > MAX_STYLE_REFS:
+            return bad_request(
+                f"Maximum {MAX_STYLE_REFS} style reference images allowed (preset plus uploads)"
+            )
+
         for i, ref in enumerate(style_refs):
             if not ref.filename or not _allowed_style_ref_file(ref.filename):
                 return bad_request(f"Invalid style reference image: {ref.filename}")
@@ -308,7 +315,7 @@ def upload_style_refs(project_id):
                 ref_path.relative_to(file_service.upload_folder).as_posix()
             )
 
-        project.set_style_ref_image_paths(saved_paths[:5])
+        project.set_style_ref_image_paths(saved_paths)
         project.updated_at = datetime.utcnow()
         db.session.commit()
 
@@ -948,7 +955,10 @@ def generate_images(project_id):
         # 合并额外要求和风格描述
         from services.style_preset_service import resolve_generate_style_requirements
 
-        combined_requirements = resolve_generate_style_requirements(project)
+        try:
+            combined_requirements = resolve_generate_style_requirements(project)
+        except StylePresetError as exc:
+            return bad_request(str(exc))
 
         # Get app instance for background task
         app = current_app._get_current_object()
