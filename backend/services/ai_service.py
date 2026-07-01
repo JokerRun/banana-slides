@@ -24,6 +24,7 @@ from .prompts import (
     get_description_split_prompt,
     get_outline_refinement_prompt,
     get_descriptions_refinement_prompt,
+    resolve_image_generation_style_contract,
 )
 from .ai_providers import (
     get_text_provider,
@@ -500,6 +501,7 @@ class AIService:
         extra_requirements: Optional[str] = None,
         language="zh",
         has_template: bool = True,
+        style_preset_id: Optional[str] = None,
     ) -> str:
         """
         Generate image generation prompt for a page
@@ -543,6 +545,12 @@ class AIService:
             for ref in image_refs
         ]
 
+        style_contract = resolve_image_generation_style_contract(
+            extra_requirements=extra_requirements,
+            style_preset_id=style_preset_id,
+            has_template=has_template,
+        )
+
         prompt = get_image_generation_prompt(
             page_desc=normalized_page_desc,
             outline_text=outline_text,
@@ -553,6 +561,7 @@ class AIService:
             has_template=has_template,
             page_index=page_index,
             image_refs=image_refs_dict,
+            style_contract=style_contract,
         )
 
         return prompt

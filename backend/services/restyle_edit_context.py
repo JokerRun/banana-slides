@@ -227,6 +227,55 @@ def _build_image_manifest(
     return manifest
 
 
+def _build_generic_image_manifest(
+    *,
+    baseline_ref_paths: List[str],
+    current_selected_path: Optional[str],
+    current_extra_ref_paths: List[str],
+    selected_baseline_refs: List[str],
+    selected_extras: List[str],
+) -> List[dict]:
+    """Build manifest for non-restyle generation/edit contexts."""
+    manifest: List[dict] = []
+    for path in baseline_ref_paths:
+        manifest.append(
+            {
+                "kind": "generation_ref",
+                "bucket": "baseline",
+                "path": path,
+                "selected": path in selected_baseline_refs,
+                "selection_reason": (
+                    "kept_generation_ref"
+                    if path in selected_baseline_refs
+                    else "pruned_budget"
+                ),
+            }
+        )
+    if current_selected_path:
+        manifest.append(
+            {
+                "kind": "current_selected",
+                "bucket": "current",
+                "path": current_selected_path,
+                "selected": True,
+                "selection_reason": "anchor",
+            }
+        )
+    for path in current_extra_ref_paths:
+        manifest.append(
+            {
+                "kind": "current_extra_ref",
+                "bucket": "current",
+                "path": path,
+                "selected": path in selected_extras,
+                "selection_reason": (
+                    "current_extra_ref" if path in selected_extras else "pruned_budget"
+                ),
+            }
+        )
+    return manifest
+
+
 def _build_turns_summary(contents: List[dict]) -> List[dict]:
     """Summarize turns for fast inspection/logging."""
     summary = []
@@ -446,6 +495,111 @@ def build_restyle_edit_context(
         current_images_count=current_count,
         snapshot_source=snapshot_source,
         turns_summary=turns_summary,
+        image_manifest=image_manifest,
+    )
+
+
+def build_image_edit_context(
+    *,
+    baseline_prompt_snapshot: Optional[str],
+    baseline_ref_paths: Optional[List[str]],
+    current_selected_path: Optional[str],
+    edit_instruction: str,
+    original_description: Optional[str] = None,
+    current_extra_ref_paths: Optional[List[str]] = None,
+    prunable_cap: int = 6,
+    total_cap: int = 8,
+) -> RestyleEditContext:
+    """
+    Build unified image edit context for ordinary/translate edit flows.
+
+    Old versions may not have prompt metadata; in that case the builder degrades
+    to the legacy edit prompt while still using the current image as anchor.
+    """
+    from services.prompts import get_image_edit_prompt
+
+    baseline_refs = baseline_ref_paths or []
+    extras = current_extra_ref_paths or []
+    degraded = False
+    snapshot_source = "persisted"
+
+    if not current_selected_path:
+        raise MissingStructuralImagesError("Missing current selected version")
+
+    baseline_text = baseline_prompt_snapshot
+    if not baseline_text:
+        baseline_text = get_image_edit_prompt(
+            edit_instruction=edit_instruction,
+            original_description=original_description,
+        )
+        degraded = True
+        snapshot_source = "fallback"
+
+    budget = prunable_cap
+    selected_baseline_refs: List[str] = []
+    for ref in baseline_refs:
+        if budget <= 0:
+            break
+        selected_baseline_refs.append(ref)
+        budget -= 1
+
+    selected_extras: List[str] = []
+    if budget > 0 and extras:
+        for extra in reversed(extras):
+            if budget <= 0:
+                break
+            selected_extras.append(extra)
+            budget -= 1
+
+    total = 1 + len(selected_baseline_refs) + len(selected_extras)
+    if total > total_cap:
+        raise ContextImageLimitExceeded(
+            f"Assembled image set ({total}) exceeds total cap ({total_cap})"
+        )
+
+    if len(selected_baseline_refs) < len(baseline_refs) or len(selected_extras) < len(
+        extras
+    ):
+        degraded = True
+
+    baseline_parts = [
+        "BASELINE CONTEXT: The following prompt and reference images describe the current slide's original generation context.",
+        f"Original generation prompt:\n{baseline_text}",
+    ]
+    baseline_block = "\n\n".join(baseline_parts)
+
+    conversation = _build_conversation_contents(
+        baseline_text=baseline_block,
+        original_slide_path=None,
+        selected_style_refs=selected_baseline_refs,
+        current_selected_path=current_selected_path,
+        edit_instruction=edit_instruction,
+        selected_extras=selected_extras,
+    )
+    legacy_prompt = _build_legacy_prompt(baseline_block, edit_instruction)
+    legacy_images = _build_legacy_ref_images(
+        original_slide_path=None,
+        selected_style_refs=selected_baseline_refs,
+        current_selected_path=current_selected_path,
+        selected_extras=selected_extras,
+    )
+    image_manifest = _build_generic_image_manifest(
+        baseline_ref_paths=baseline_refs,
+        current_selected_path=current_selected_path,
+        current_extra_ref_paths=extras,
+        selected_baseline_refs=selected_baseline_refs,
+        selected_extras=selected_extras,
+    )
+
+    return RestyleEditContext(
+        conversation_contents=conversation,
+        legacy_prompt=legacy_prompt,
+        legacy_ref_images=legacy_images,
+        degraded_context=degraded,
+        baseline_images_count=len(selected_baseline_refs),
+        current_images_count=1 + len(selected_extras),
+        snapshot_source=snapshot_source,
+        turns_summary=_build_turns_summary(conversation),
         image_manifest=image_manifest,
     )
 

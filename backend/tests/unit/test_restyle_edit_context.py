@@ -4,6 +4,7 @@ Restyle edit context — unit tests (Task 1 + Task 3)
 import pytest
 
 from services.restyle_edit_context import (
+    build_image_edit_context,
     build_restyle_edit_context,
     reconstruct_base_prompt_snapshot,
     is_retryable_conversation_error,
@@ -30,6 +31,34 @@ class TestPageRestyleSnapshot:
         data = page.to_dict()
         assert 'restyle_base_prompt_snapshot' in data
         assert data['restyle_base_prompt_snapshot'] == 'SNAP'
+
+
+class TestPageImageVersionMetadata:
+    """Generation metadata field tests for edit context reconstruction."""
+
+    def test_version_serializes_prompt_snapshot_and_ref_manifest(self, db_session):
+        from models import PageImageVersion
+
+        version = PageImageVersion(
+            page_id='p1',
+            image_path='p1/pages/page_v1.png',
+            version_number=1,
+            is_current=True,
+            prompt_snapshot='FINAL PROVIDER PROMPT',
+        )
+        version.set_ref_manifest(
+            [
+                {
+                    'kind': 'primary_ref',
+                    'bucket': 'baseline',
+                    'path': '/fake/ref.png',
+                    'selected': True,
+                }
+            ]
+        )
+
+        assert version.prompt_snapshot == 'FINAL PROVIDER PROMPT'
+        assert version.get_ref_manifest()[0]['path'] == '/fake/ref.png'
 
 
 class TestRestyleEditConfig:
@@ -292,6 +321,49 @@ class TestBuildRestyleEditContext:
         if turn2:
             image_paths = [p['image_path'] for p in turn2[0]['parts'] if 'image_path' in p]
             assert '/fake/orig.png' not in image_paths
+
+
+class TestBuildImageEditContext:
+    """Unified edit context tests for non-restyle edit flows."""
+
+    def test_normal_edit_uses_persisted_generation_snapshot_as_baseline(self):
+        ctx = build_image_edit_context(
+            baseline_prompt_snapshot='ORIGINAL GENERATION PROMPT',
+            baseline_ref_paths=['/fake/style.png'],
+            current_selected_path='/fake/current.png',
+            edit_instruction='make the chart larger',
+            current_extra_ref_paths=['/fake/extra.png'],
+        )
+
+        assert isinstance(ctx, RestyleEditContext)
+        assert ctx.snapshot_source == 'persisted'
+        assert ctx.degraded_context is False
+        assert (
+            'ORIGINAL GENERATION PROMPT'
+            in ctx.conversation_contents[0]['parts'][0]['text']
+        )
+        assert ctx.legacy_ref_images == [
+            '/fake/style.png',
+            '/fake/current.png',
+            '/fake/extra.png',
+        ]
+        assert any(
+            item['kind'] == 'generation_ref' and item['bucket'] == 'baseline'
+            for item in ctx.image_manifest
+        )
+
+    def test_normal_edit_degrades_for_old_versions_without_snapshot(self):
+        ctx = build_image_edit_context(
+            baseline_prompt_snapshot=None,
+            baseline_ref_paths=[],
+            current_selected_path='/fake/current.png',
+            edit_instruction='make title larger',
+            original_description='页面标题：A',
+        )
+
+        assert ctx.degraded_context is True
+        assert ctx.snapshot_source == 'fallback'
+        assert '页面标题：A' in ctx.legacy_prompt
 
 
 class TestReconstructBasePromptSnapshot:

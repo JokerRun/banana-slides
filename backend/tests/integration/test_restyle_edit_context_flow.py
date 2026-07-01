@@ -112,8 +112,8 @@ class TestRestyleEditConversationMode:
                 os.unlink(orig_path)
                 os.unlink(cur_path)
 
-    def test_non_restyle_edit_uses_legacy_path(self, app, db_session):
-        """Non-restyle (idea) project edit should use legacy edit_image path."""
+    def test_non_restyle_edit_uses_unified_context_path(self, app, db_session):
+        """Non-restyle (idea) project edit should use unified edit context path."""
         with app.app_context():
             from models import db, Project, Page, Task, User
             from services.task_manager import edit_page_image_task
@@ -152,7 +152,7 @@ class TestRestyleEditConversationMode:
 
             mock_ai = MagicMock()
             result_img = Image.new('RGB', (1920, 1080), 'green')
-            mock_ai.edit_image.return_value = result_img
+            mock_ai.edit_restyle_image_with_context.return_value = result_img
 
             mock_file_service = MagicMock()
             mock_file_service.get_absolute_path.return_value = cur_path
@@ -167,10 +167,14 @@ class TestRestyleEditConversationMode:
                         '16:9', '2K', 'original desc', None, None, app
                     )
 
-                # Verify legacy path was used
-                mock_ai.edit_image.assert_called_once()
-                # Verify conversation path was NOT used
-                mock_ai.edit_restyle_image_with_context.assert_not_called()
+                # Verify unified context path was used
+                mock_ai.edit_restyle_image_with_context.assert_called_once()
+                ctx = mock_ai.edit_restyle_image_with_context.call_args.args[0]
+                assert ctx.snapshot_source == 'fallback'
+                assert ctx.degraded_context is True
+                assert 'original desc' in ctx.legacy_prompt
+                # Verify legacy direct path was NOT used
+                mock_ai.edit_image.assert_not_called()
 
                 # Verify task completed
                 db.session.expire_all()

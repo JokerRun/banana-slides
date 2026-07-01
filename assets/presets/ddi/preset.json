@@ -4,7 +4,7 @@
   "version": "2026-07-01",
   "name": "DDI Standard",
   "baseImage": "base.png",
-  "sha256": "f7f14464afd72793df3b68e5c06a91a32b4329c24d0886a7a557dd01bdcc112c",
+  "sha256": "ad64b80ef8b468953a66e0c33036b17d0b73f89de9f99401b711aab079cb36eb",
   "prompts": {
     "generate": "prompt-generate.md",
     "restyle": "prompt-restyle.md",
