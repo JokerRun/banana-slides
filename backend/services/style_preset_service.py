@@ -178,12 +178,14 @@ def resolve_generate_style_requirements(project) -> str | None:
     combined = project.extra_requirements or ""
     template_style = (getattr(project, "template_style", None) or "").strip()
     style_preset_id = getattr(project, "style_preset_id", None)
-    if template_style:
+    if style_preset_id:
+        canonical = get_style_preset_prompt_text(style_preset_id, "generate")
+        if template_style and template_style != canonical:
+            combined += f"\n\nppt页面风格描述：\n\n{template_style}"
+        else:
+            combined += "\n\n" + canonical
+    elif template_style:
         combined += f"\n\nppt页面风格描述：\n\n{template_style}"
-    elif style_preset_id:
-        combined += "\n\n" + get_style_preset_prompt_text(
-            style_preset_id, "generate"
-        )
     text = combined.strip()
     return text or None
 

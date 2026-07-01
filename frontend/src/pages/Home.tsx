@@ -802,7 +802,9 @@ export const Home: React.FC = () => {
         styleDesc,
         refFileIds.length > 0 ? refFileIds : undefined,
         generateStyleRefs,
-        selectedGeneratePresetId === 'ddi-standard' && generateStyleRefs.length === 0 ? 'ddi' : undefined
+        selectedGeneratePresetId === 'ddi-standard' && generateStyleRefs.length === 0
+          ? 'ddi-standard'
+          : undefined
       );
       
       // 根据类型跳转到不同页面

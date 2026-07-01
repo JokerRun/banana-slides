@@ -89,6 +89,35 @@ def test_resolve_generate_style_requirements_uses_preset_when_no_template_style(
     assert "资深商业咨询级 PPT 排版与视觉架构师" in combined
 
 
+def test_resolve_generate_style_requirements_prefers_canonical_over_ui_prefill():
+    canonical = get_style_preset_prompt_text("ddi-standard", "generate")
+
+    class Project:
+        extra_requirements = None
+        template_style = canonical
+        style_preset_id = "ddi-standard"
+
+    combined = resolve_generate_style_requirements(Project())
+    assert combined is not None
+    assert canonical in combined
+    assert "ppt页面风格描述" not in combined
+
+
+def test_resolve_generate_style_requirements_uses_custom_template_when_edited():
+    canonical = get_style_preset_prompt_text("ddi-standard", "generate")
+    custom = "my custom generate style"
+
+    class Project:
+        extra_requirements = None
+        template_style = custom
+        style_preset_id = "ddi-standard"
+
+    combined = resolve_generate_style_requirements(Project())
+    assert combined is not None
+    assert custom in combined
+    assert canonical not in combined
+
+
 def test_resolve_preset_prompt_body_uses_canonical_when_ui_prefill_matches():
     canonical = get_style_preset_prompt_text("ddi-standard", "restyle")
     preset_body, user = resolve_preset_prompt_body_for_flow(
