@@ -204,6 +204,12 @@ def create_translate_project():
                 db.session.rollback()
                 return bad_request(str(exc))
 
+        if len(style_ref_paths) + len(style_refs) > MAX_STYLE_REFS:
+            db.session.rollback()
+            return bad_request(
+                f"Maximum {MAX_STYLE_REFS} style reference images allowed (preset plus uploads)"
+            )
+
         if style_refs:
             style_ref_dir = project_dir / "style_refs"
             style_ref_dir.mkdir(exist_ok=True, parents=True)
@@ -220,7 +226,7 @@ def create_translate_project():
                 style_ref_paths.append(rel_path)
                 logger.info(f"🎨 Style ref {i + 1}/{len(style_refs)} saved: {ref_path}")
 
-        project.set_style_ref_image_paths(style_ref_paths)
+        project.set_style_ref_image_paths(style_ref_paths[:MAX_STYLE_REFS])
 
         # Convert source file to images
         restyle_service = RestyleService()

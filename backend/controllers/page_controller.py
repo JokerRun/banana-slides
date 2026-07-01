@@ -466,9 +466,15 @@ def generate_page_image(project_id, page_id):
                 has_material_images = True
         
         # 合并额外要求和风格描述
-        from services.style_preset_service import resolve_generate_style_requirements
+        from services.style_preset_service import (
+            StylePresetError,
+            resolve_generate_style_requirements,
+        )
 
-        combined_requirements = resolve_generate_style_requirements(project)
+        try:
+            combined_requirements = resolve_generate_style_requirements(project)
+        except StylePresetError as exc:
+            return bad_request(str(exc))
         
         # Create async task for image generation
         task = Task(

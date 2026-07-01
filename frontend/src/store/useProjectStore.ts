@@ -175,8 +175,10 @@ const debouncedUpdatePage = debounce(
         try {
           await api.uploadStyleRefs(projectId, styleRefImages || [], stylePresetId);
         } catch (error) {
+          if (stylePresetId) {
+            throw error;
+          }
           console.warn('风格参考图上传失败:', error);
-          // 风格参考图失败不影响项目创建，后续图片生成时会提示补充风格
         }
       }
 

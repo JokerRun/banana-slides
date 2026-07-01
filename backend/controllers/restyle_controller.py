@@ -143,6 +143,12 @@ def create_restyle_project():
                 db.session.rollback()
                 return bad_request(str(exc))
 
+        if len(style_ref_paths) + len(style_refs) > MAX_STYLE_REFS:
+            db.session.rollback()
+            return bad_request(
+                f"Maximum {MAX_STYLE_REFS} style reference images allowed (preset plus uploads)"
+            )
+
         custom_ref_start = len(style_ref_paths) + 1
         for i, ref in enumerate(style_refs):
             ref_ext = Path(ref.filename).suffix.lower().lstrip('.')
@@ -155,7 +161,7 @@ def create_restyle_project():
             style_ref_paths.append(rel_path)
             logger.info(f"🎨 Style ref {i + 1}/{len(style_refs)} saved: {ref_path} ({os.path.getsize(str(ref_path)) / 1024:.1f} KB)")
 
-        project.set_style_ref_image_paths(style_ref_paths)
+        project.set_style_ref_image_paths(style_ref_paths[:MAX_STYLE_REFS])
 
         # Convert source file to images
         restyle_service = RestyleService()
