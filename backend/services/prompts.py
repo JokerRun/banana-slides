@@ -447,7 +447,7 @@ def get_image_generation_prompt(
     ]
     if style_contract.kind == "preset" and style_contract.style_preset_id:
         style_block.append(
-            f"- Apply only the selected preset's canonical style rules ({style_contract.style_preset_id})."
+            "- Use only the selected preset metadata and attached style reference images as the style source."
         )
     elif style_contract.has_reference_image:
         style_block.append(
@@ -455,17 +455,17 @@ def get_image_generation_prompt(
         )
     else:
         style_block.append(
-            "- No preset or style reference is selected; choose a clean, neutral visual treatment appropriate to the content."
+            "- No preset, custom style text, or style reference is selected; follow only the page content and user-provided constraints."
         )
     if style_contract.body:
         style_block.append("\nUser style / extra requirements:\n" + style_contract.body)
     style_contract_text = "\n".join(style_block)
 
-    # 根据是否有模板/风格参考图生成不同的设计指南内容（保持原prompt要点顺序）
+    # 根据是否有模板/风格参考图生成不同的设计指南内容
     template_style_guideline = (
-        "- 深度解析参考图的版式框架、色彩系统、字体规范、图形语言，并将其完整应用于新页面。"
+        "- Use attached style reference images only for user-provided style/layout constraints."
         if style_contract.has_reference_image
-        else "- 未提供风格参考图时，不要模仿任何未被用户指定的品牌或模板体系。"
+        else "- No style reference image is provided; do not invent or assume a brand/template system."
     )
     forbidden_template_text_guidline = (
         "- 只参考风格设计，禁止出现模板中的文字。\n"
@@ -474,19 +474,18 @@ def get_image_generation_prompt(
     )
 
     prompt = f"""\
-# Role: PPT page information architect and visual designer
-
 # Inputs:
-- 参考图片 = style/layout reference images or content images（若提供）
-- [文本] = 当前页需要转化为 PPT 的原始页面内容
-- [布局建议 / Layout Recommendation - ASCII Diagram] = layout-only instruction, not slide text
+- page_desc = current page content to convert into one slide
+- outline_text = full deck outline
+- current_section = current section
+- image_ref_manifest = attached user image references, if any
+- style_contract = explicit style source selected by preset, user refs, or user text
+- Layout Recommendation / ASCII Diagram blocks are layout-only instruction, not slide text
 {image_ref_manifest}
 {style_contract_text}
 
-# Core Objective:
-基于 [文本] 的内容与业务逻辑，结合明确提供的风格来源（如有），
-设计页面的信息架构、视觉层级、空间关系与排版方式，
-输出清晰、可读、16:9 的 PPT 页面。
+# Task:
+Create one clear, readable 16:9 PPT page from page_desc. Follow only the content and explicit style sources provided in this prompt and attached references.
 
 当前PPT页面的[文本]如下:
 <page_description>
@@ -505,20 +504,13 @@ def get_image_generation_prompt(
 - 要求文字清晰锐利，画面为高分辨率，16:9比例。
 {template_style_guideline}
 - 严格基于 [文本] 中的原始文字内容进行排版设计，禁止凭空新增、替换、总结或重写未出现的文字信息。
+- Preserve any user-provided color scheme and base template constraints exactly.
 - 若 [文本] 包含"布局建议（Layout Recommendation - ASCII Diagram）"，该区块仅作为版式指令使用，must not be rendered as slide text。
 - Do not draw ASCII borders, plus signs, pipes, labels such as "title area" / "visual area" / "bullet list" / "chart/image area", or the layout recommendation heading as visible slide content.
-- 文本条目与视觉区块的 1:1 映射只适用于"页面标题"、"页面文字"和用户明确要求展示的内容，不适用于布局建议区块。
-- 可以对内容进行视觉化拆分、归类、层级化呈现，以及必要的版式适配（如将长句拆分为要点列表）。
-- 深度理解 [文本] 的业务主题、逻辑关系（并列 / 递进 / 包含 / 对比 / 因果），再决定版式。
-- 强制执行文本条目与视觉区块的 1:1 映射，严格基于实际文本条目数生成对应数量的几何区块或层级。
 - 若 [文本] 中包含明确主题或标题，将其作为页面标题；若无法识别明确标题，严禁自行捏造标题。
-- Preserve any user-provided color scheme exactly. Use preset colors only when a selected preset explicitly provides them. Otherwise choose accessible, content-appropriate colors without assuming a brand palette.
-- 优先理解内容逻辑并匹配最优版式：流程用路线图，对比用左右/矩阵，层级用分层/冰山，核心主题用辐射/树状，概览用网格卡片，指标用 dashboard，循环用环形流转，问题到解决方案用桥接版式。
-- 允许使用与内容匹配的结构化图形、表格、节点、流程、矩阵、图标或插画；不要引入未被要求的品牌化图形语言。
-- 控制主视觉区块数量以容纳所有原文内容；保持合理留白、清晰层级、对齐一致。
-- 若文本缺乏视觉支撑，可生成与内容高度匹配的扁平化图标或配图，但不得与文字重叠。
+- If [文本] contains [IMAGE_REF:*] markers, use the attached reference images at those semantic locations and preserve the subject/identity.
 - 如非必要，禁止出现 markdown 格式符号（如 # 和 * 等）。
-{forbidden_template_text_guidline}- 使用大小恰当的装饰性图形或插画对空缺位置进行填补。
+{forbidden_template_text_guidline}- Do not render markdown markers, ASCII layout syntax, or IMAGE_REF markers as visible slide text.
 </execution_rules>
 {get_ppt_language_instruction(language)}
 {material_images_note}

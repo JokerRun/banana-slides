@@ -172,7 +172,7 @@ def resolve_preset_prompt_body_for_flow(
 
 
 def resolve_generate_style_requirements(project) -> str | None:
-    """Merge extra_requirements, explicit template_style, or canonical generate prompt."""
+    """Merge only explicit generate-time requirements from the user/project."""
     combined = project.extra_requirements or ""
     template_style = (getattr(project, "template_style", None) or "").strip()
     style_preset_id = getattr(project, "style_preset_id", None)
@@ -180,8 +180,6 @@ def resolve_generate_style_requirements(project) -> str | None:
         canonical = get_style_preset_prompt_text(style_preset_id, "generate")
         if template_style and template_style != canonical:
             combined += f"\n\nppt页面风格描述：\n\n{template_style}"
-        else:
-            combined += "\n\n" + canonical
     elif template_style:
         combined += f"\n\nppt页面风格描述：\n\n{template_style}"
     text = combined.strip()

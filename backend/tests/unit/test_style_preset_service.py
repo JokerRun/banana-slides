@@ -80,18 +80,17 @@ def test_get_style_preset_prompt_text_loads_canonical_file():
     assert "零重写内容原则" in text
 
 
-def test_resolve_generate_style_requirements_uses_preset_when_no_template_style():
+def test_resolve_generate_style_requirements_does_not_inject_preset_when_no_template_style():
     class Project:
         extra_requirements = None
         template_style = None
         style_preset_id = "ddi-standard"
 
     combined = resolve_generate_style_requirements(Project())
-    assert combined is not None
-    assert "资深商业咨询级 PPT 排版与视觉架构师" in combined
+    assert combined is None
 
 
-def test_resolve_generate_style_requirements_prefers_canonical_over_ui_prefill():
+def test_resolve_generate_style_requirements_ignores_canonical_ui_prefill():
     canonical = get_style_preset_prompt_text("ddi-standard", "generate")
 
     class Project:
@@ -100,9 +99,7 @@ def test_resolve_generate_style_requirements_prefers_canonical_over_ui_prefill()
         style_preset_id = "ddi-standard"
 
     combined = resolve_generate_style_requirements(Project())
-    assert combined is not None
-    assert canonical in combined
-    assert "ppt页面风格描述" not in combined
+    assert combined is None
 
 
 def test_resolve_generate_style_requirements_uses_custom_template_when_edited():
