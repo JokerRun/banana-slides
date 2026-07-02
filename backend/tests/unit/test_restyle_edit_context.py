@@ -61,9 +61,25 @@ class TestPageImageVersionMetadata:
                 }
             ]
         )
+        version.set_provider_input_snapshot(
+            {
+                "mode": "conversation",
+                "parts": [
+                    {"index": 0, "type": "text", "role": "main_prompt"},
+                    {
+                        "index": 1,
+                        "type": "image",
+                        "role": "content_reference",
+                        "loaded": True,
+                    },
+                ],
+            }
+        )
 
         assert version.prompt_snapshot == "FINAL PROVIDER PROMPT"
         assert version.get_ref_manifest()[0]["path"] == "/fake/ref.png"
+        assert version.get_provider_input_snapshot()["mode"] == "conversation"
+        assert version.to_dict()["provider_input_snapshot"]["parts"][1]["loaded"] is True
 
 
 class TestRestyleEditConfig:

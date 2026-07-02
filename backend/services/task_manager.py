@@ -84,6 +84,7 @@ def save_image_with_version(
     image_format: str = "PNG",
     prompt_snapshot: str = None,
     ref_manifest: List[Dict[str, Any]] = None,
+    provider_input_snapshot: Dict[str, Any] = None,
 ) -> tuple[str, int]:
     """
     保存图片并创建历史版本记录的公共函数
@@ -142,6 +143,7 @@ def save_image_with_version(
         prompt_snapshot=prompt_snapshot,
     )
     new_version.set_ref_manifest(ref_manifest or [])
+    new_version.set_provider_input_snapshot(provider_input_snapshot)
     db.session.add(new_version)
 
     # 如果提供了 page_obj，更新页面状态和图片路径
@@ -591,6 +593,7 @@ def generate_images_task(
                         logger.info(
                             f"🎨 Calling AI service to generate image for page {page_index}/{len(pages)}..."
                         )
+                        provider_input_snapshot = {}
                         image = ai_service.generate_image(
                             prompt,
                             page_ref_image_path,
@@ -602,6 +605,7 @@ def generate_images_task(
                                 else None
                             ),
                             content_ref_images=page_additional_ref_images or None,
+                            provider_input_snapshot_out=provider_input_snapshot,
                         )
                         logger.info(
                             f"✅ Image generated successfully for page {page_index}"
@@ -631,6 +635,7 @@ def generate_images_task(
                                 style_ref_paths=style_ref_paths,
                                 content_ref_paths=page_additional_ref_images,
                             ),
+                            provider_input_snapshot=provider_input_snapshot,
                         )
 
                         return (page_id, image_path, None, not is_match)
@@ -836,6 +841,7 @@ def generate_single_page_image_task(
 
             # Generate image
             logger.info(f"🎨 Generating image for page {page_id}...")
+            provider_input_snapshot = {}
             image = ai_service.generate_image(
                 prompt,
                 ref_image_path,
@@ -845,6 +851,7 @@ def generate_single_page_image_task(
                     style_ref_paths if (ref_image_path or style_ref_paths) else None
                 ),
                 content_ref_images=additional_ref_images or None,
+                provider_input_snapshot_out=provider_input_snapshot,
             )
 
             if not image:
@@ -863,6 +870,7 @@ def generate_single_page_image_task(
                     style_ref_paths=style_ref_paths,
                     content_ref_paths=additional_ref_images,
                 ),
+                provider_input_snapshot=provider_input_snapshot,
             )
 
             # Mark task as completed
