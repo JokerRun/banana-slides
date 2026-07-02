@@ -224,10 +224,31 @@ class TestImageGenerationPrompt:
         )
 
         assert style_contract.kind == "preset"
-        assert "ddi-standard" in prompt
         assert "selected style preset: ddi-standard" in prompt
+        assert "DDI compact style brief" in prompt
+        assert "attached DDI base template" in prompt
+        assert "primary style and layout reference" in prompt
+        assert "DDI visual identity" in prompt
+        assert "palette" in prompt
+        assert "hierarchy" in prompt
+        assert "whitespace" in prompt
+        assert "typography" in prompt
+        assert "do not rewrite or change the slide content" in prompt
         assert "资深商业咨询级 PPT 排版与视觉架构师" not in prompt
         assert "零重写内容原则" not in prompt
+
+    def test_no_style_prompt_has_no_ddi_preset_style_brief(self):
+        prompt = get_image_generation_prompt(
+            page_desc="页面标题：Launch\n页面文字：\n- Ship beta",
+            outline_text="1. Launch",
+            current_section="Launch",
+            language="en",
+            has_template=False,
+        )
+
+        assert "DDI compact style brief" not in prompt
+        assert "attached DDI base template" not in prompt
+        assert "DDI visual identity" not in prompt
 
     def test_treats_ascii_layout_recommendation_as_non_rendered_instruction(self):
         prompt = get_image_generation_prompt(
