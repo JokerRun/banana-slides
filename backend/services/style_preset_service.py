@@ -172,7 +172,12 @@ def resolve_preset_prompt_body_for_flow(
 
 
 def resolve_generate_style_requirements(project) -> str | None:
-    """Merge only explicit generate-time requirements from the user/project."""
+    """Merge extra_requirements or explicit custom template_style.
+
+    Preset generate style is carried separately as a compact style brief in the
+    image-generation style contract; do not inject the full canonical preset
+    prompt body here.
+    """
     combined = project.extra_requirements or ""
     template_style = (getattr(project, "template_style", None) or "").strip()
     style_preset_id = getattr(project, "style_preset_id", None)
@@ -194,6 +199,32 @@ def get_style_preset_prompt_text(preset_id: str, prompt_key: str) -> str:
             f"Style preset {preset.id} has no prompt text for key: {prompt_key}"
         )
     return text
+
+
+def get_generate_preset_style_brief(style_preset_id: str | None) -> str:
+    """Return compact generate-time style brief for a selected preset.
+
+    The preset id is resolved through the canonical manifest/prompt loader so
+    unsupported presets still fail fast. This intentionally summarizes the
+    canonical generate prompt instead of returning its full body.
+    """
+    if not style_preset_id:
+        return ""
+    preset = get_style_preset(style_preset_id)
+    # Validate that this preset owns a canonical generate prompt without
+    # re-injecting the full text into generic generate prompts.
+    get_style_preset_prompt_text(preset.id, "generate")
+
+    if preset.id == "ddi-standard":
+        return (
+            "DDI compact style brief: use the attached DDI base template as the "
+            "primary style and layout reference. Preserve DDI visual identity, "
+            "palette, hierarchy, whitespace, typography, and consulting-grade "
+            "visual treatment. Apply these rules only to layout, color, "
+            "typography, and visual treatment; do not rewrite or change the "
+            "slide content."
+        )
+    raise StylePresetError(f"Style preset {preset.id} has no generate style brief")
 
 
 def apply_style_preset_to_project(

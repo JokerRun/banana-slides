@@ -10,6 +10,8 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Dict, List, Optional
 
+from .style_preset_service import get_generate_preset_style_brief
+
 if TYPE_CHECKING:
     from services.ai_service import ProjectContext
 
@@ -23,6 +25,7 @@ class ImageGenerationStyleContract:
     kind: str  # preset | custom | no-style
     body: str = ""
     style_preset_id: str | None = None
+    preset_style_brief: str = ""
     has_reference_image: bool = False
 
 
@@ -40,6 +43,7 @@ def resolve_image_generation_style_contract(
             kind="preset",
             body=body,
             style_preset_id=preset_id,
+            preset_style_brief=get_generate_preset_style_brief(preset_id),
             has_reference_image=has_template,
         )
     if body or has_template:
@@ -449,6 +453,8 @@ def get_image_generation_prompt(
         style_block.append(
             "- Use only the selected preset metadata and attached style reference images as the style source."
         )
+        if style_contract.preset_style_brief:
+            style_block.append("\nPreset style brief:\n" + style_contract.preset_style_brief)
     elif style_contract.has_reference_image:
         style_block.append(
             "- Use attached reference images only as visual style/layout references."
