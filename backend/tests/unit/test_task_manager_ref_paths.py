@@ -30,6 +30,52 @@ class TestBuildGenerationRefManifest:
         ]
         assert all(item.get("selected") is True for item in manifest)
 
+    def test_preserves_role_aware_order_for_generate_refs(self):
+        manifest = _build_generation_ref_manifest(
+            primary_ref_path="/tmp/template.png",
+            style_ref_paths=["/tmp/style-extra.png"],
+            content_ref_paths=[
+                "https://cdn.example.com/logo.png",
+                "/files/materials/chart.png",
+            ],
+        )
+
+        assert [
+            (item["kind"], item["bucket"], item["path"], item["selection_reason"])
+            for item in manifest
+        ] == [
+            (
+                "style_ref",
+                "style",
+                "/tmp/template.png",
+                "generate_style_reference",
+            ),
+            (
+                "style_ref",
+                "style",
+                "/tmp/style-extra.png",
+                "generate_style_reference",
+            ),
+            (
+                "content_ref",
+                "content",
+                "https://cdn.example.com/logo.png",
+                "generate_content_reference",
+            ),
+            (
+                "content_ref",
+                "content",
+                "/files/materials/chart.png",
+                "generate_content_reference",
+            ),
+        ]
+        assert _selected_manifest_paths(manifest) == [
+            "/tmp/template.png",
+            "/tmp/style-extra.png",
+            "https://cdn.example.com/logo.png",
+            "/files/materials/chart.png",
+        ]
+
 
 class TestNormalizeRefPaths:
     def test_passes_through_http_urls(self):

@@ -165,27 +165,55 @@ def _build_generation_ref_manifest(
     *,
     primary_ref_path: str = None,
     additional_ref_paths: List[str] = None,
+    style_ref_paths: List[str] = None,
+    content_ref_paths: List[str] = None,
 ) -> List[Dict[str, Any]]:
     """Persist enough generation refs for future image-to-image edits."""
     manifest = []
-    if primary_ref_path:
-        manifest.append(
-            {
-                "kind": "primary_ref",
-                "bucket": "baseline",
-                "path": primary_ref_path,
-                "selected": True,
-            }
-        )
-    for path in additional_ref_paths or []:
-        manifest.append(
-            {
-                "kind": "additional_ref",
-                "bucket": "baseline",
-                "path": path,
-                "selected": True,
-            }
-        )
+    if style_ref_paths is not None or content_ref_paths is not None:
+        ordered_style_refs = []
+        if primary_ref_path:
+            ordered_style_refs.append(primary_ref_path)
+        ordered_style_refs.extend(style_ref_paths or [])
+        for path in ordered_style_refs:
+            manifest.append(
+                {
+                    "kind": "style_ref",
+                    "bucket": "style",
+                    "path": path,
+                    "selected": True,
+                    "selection_reason": "generate_style_reference",
+                }
+            )
+        for path in content_ref_paths or []:
+            manifest.append(
+                {
+                    "kind": "content_ref",
+                    "bucket": "content",
+                    "path": path,
+                    "selected": True,
+                    "selection_reason": "generate_content_reference",
+                }
+            )
+    else:
+        if primary_ref_path:
+            manifest.append(
+                {
+                    "kind": "primary_ref",
+                    "bucket": "baseline",
+                    "path": primary_ref_path,
+                    "selected": True,
+                }
+            )
+        for path in additional_ref_paths or []:
+            manifest.append(
+                {
+                    "kind": "additional_ref",
+                    "bucket": "baseline",
+                    "path": path,
+                    "selected": True,
+                }
+            )
     return manifest
 
 
@@ -568,11 +596,12 @@ def generate_images_task(
                             page_ref_image_path,
                             aspect_ratio,
                             resolution,
-                            additional_ref_images=(
-                                [*style_ref_paths, *page_additional_ref_images]
-                                if (style_ref_paths or page_additional_ref_images)
+                            style_ref_images=(
+                                style_ref_paths
+                                if (page_ref_image_path or style_ref_paths)
                                 else None
                             ),
+                            content_ref_images=page_additional_ref_images or None,
                         )
                         logger.info(
                             f"✅ Image generated successfully for page {page_index}"
@@ -599,10 +628,8 @@ def generate_images_task(
                             prompt_snapshot=prompt,
                             ref_manifest=_build_generation_ref_manifest(
                                 primary_ref_path=page_ref_image_path,
-                                additional_ref_paths=[
-                                    *style_ref_paths,
-                                    *page_additional_ref_images,
-                                ],
+                                style_ref_paths=style_ref_paths,
+                                content_ref_paths=page_additional_ref_images,
                             ),
                         )
 
@@ -814,11 +841,10 @@ def generate_single_page_image_task(
                 ref_image_path,
                 aspect_ratio,
                 resolution,
-                additional_ref_images=(
-                    [*style_ref_paths, *additional_ref_images]
-                    if (style_ref_paths or additional_ref_images)
-                    else None
+                style_ref_images=(
+                    style_ref_paths if (ref_image_path or style_ref_paths) else None
                 ),
+                content_ref_images=additional_ref_images or None,
             )
 
             if not image:
@@ -834,7 +860,8 @@ def generate_single_page_image_task(
                 prompt_snapshot=prompt,
                 ref_manifest=_build_generation_ref_manifest(
                     primary_ref_path=ref_image_path,
-                    additional_ref_paths=[*style_ref_paths, *additional_ref_images],
+                    style_ref_paths=style_ref_paths,
+                    content_ref_paths=additional_ref_images,
                 ),
             )
 
