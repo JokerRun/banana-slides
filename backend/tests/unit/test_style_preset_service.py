@@ -10,7 +10,7 @@ import pytest
 from services.style_preset_service import (
     StylePresetError,
     clear_style_preset_cache,
-    get_generate_preset_style_brief,
+    get_generate_preset_prompt_body,
     get_style_preset,
     get_style_preset_prompt_text,
     list_style_presets,
@@ -80,21 +80,14 @@ def test_get_style_preset_prompt_text_loads_canonical_file():
     assert "资深商业咨询级 PPT 排版与视觉架构师" in text
     assert "零重写内容原则" in text
 
-def test_get_generate_preset_style_brief_returns_compact_ddi_brief():
-    brief = get_generate_preset_style_brief("ddi-standard")
+def test_get_generate_preset_prompt_body_returns_canonical_generate_prompt():
+    body = get_generate_preset_prompt_body("ddi-standard")
 
-    assert "DDI compact style brief" in brief
-    assert "attached DDI base template" in brief
-    assert "primary style and layout reference" in brief
-    assert "visual identity" in brief
-    assert "palette" in brief
-    assert "hierarchy" in brief
-    assert "whitespace" in brief
-    assert "typography" in brief
-    assert "layout, color, typography, and visual treatment" in brief
-    assert "do not rewrite or change the slide content" in brief
-    assert "资深商业咨询级 PPT 排版与视觉架构师" not in brief
-    assert "零重写内容原则" not in brief
+    assert body == get_style_preset_prompt_text("ddi-standard", "generate")
+    assert "资深商业咨询级 PPT 排版与视觉架构师" in body
+    assert "零重写内容原则" in body
+    assert "PPT Master Template" in body
+    assert "DDI compact style brief" not in body
 
 
 def test_resolve_generate_style_requirements_does_not_inject_preset_body_when_no_template_style():
