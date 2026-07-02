@@ -596,11 +596,12 @@ def generate_images_task(
                             page_ref_image_path,
                             aspect_ratio,
                             resolution,
-                            additional_ref_images=(
-                                [*style_ref_paths, *page_additional_ref_images]
-                                if (style_ref_paths or page_additional_ref_images)
+                            style_ref_images=(
+                                style_ref_paths
+                                if (page_ref_image_path or style_ref_paths)
                                 else None
                             ),
+                            content_ref_images=page_additional_ref_images or None,
                         )
                         logger.info(
                             f"✅ Image generated successfully for page {page_index}"
@@ -840,11 +841,10 @@ def generate_single_page_image_task(
                 ref_image_path,
                 aspect_ratio,
                 resolution,
-                additional_ref_images=(
-                    [*style_ref_paths, *additional_ref_images]
-                    if (style_ref_paths or additional_ref_images)
-                    else None
+                style_ref_images=(
+                    style_ref_paths if (ref_image_path or style_ref_paths) else None
                 ),
+                content_ref_images=additional_ref_images or None,
             )
 
             if not image:

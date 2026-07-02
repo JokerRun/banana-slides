@@ -575,6 +575,8 @@ class AIService:
         aspect_ratio: str = "16:9",
         resolution: str = "2K",
         additional_ref_images: Optional[List[Union[str, Image.Image]]] = None,
+        style_ref_images: Optional[List[Union[str, Image.Image]]] = None,
+        content_ref_images: Optional[List[Union[str, Image.Image]]] = None,
     ) -> Optional[Image.Image]:
         """
         Generate image using configured image provider
@@ -586,6 +588,8 @@ class AIService:
             aspect_ratio: Image aspect ratio
             resolution: Image resolution (note: OpenAI format only supports 1K)
             additional_ref_images: 额外的参考图片列表，可以是本地路径、URL 或 PIL Image 对象
+            style_ref_images: 风格/模板参考图，不作为内容素材
+            content_ref_images: 页面描述 / IMAGE_REF 产生的内容参考图
 
         Returns:
             PIL Image object or None if failed
@@ -603,9 +607,108 @@ class AIService:
                 f"Config - aspect_ratio: {aspect_ratio}, resolution: {resolution}"
             )
 
+            def load_ref_image(ref_img):
+                if isinstance(ref_img, Image.Image):
+                    return ref_img
+                if isinstance(ref_img, str):
+                    if os.path.exists(ref_img):
+                        return Image.open(ref_img)
+                    if ref_img.startswith("http://") or ref_img.startswith(
+                        "https://"
+                    ):
+                        downloaded_img = self.download_image_from_url(ref_img)
+                        if downloaded_img:
+                            return downloaded_img
+                        logger.warning(
+                            f"Failed to download image from URL: {ref_img}, skipping..."
+                        )
+                        return None
+                    if ref_img.startswith("/files/mineru/"):
+                        local_path = self._convert_mineru_path_to_local(ref_img)
+                        if local_path and os.path.exists(local_path):
+                            logger.debug(
+                                f"Loaded MinerU image from local path: {local_path}"
+                            )
+                            return Image.open(local_path)
+                        logger.warning(
+                            f"MinerU image file not found (with prefix matching): {ref_img}, skipping..."
+                        )
+                        return None
+                    if ref_img.startswith("/files/"):
+                        upload_folder = os.environ.get("UPLOAD_FOLDER", "")
+                        relative_path = ref_img[len("/files/") :].lstrip("/")
+                        local_path = os.path.abspath(
+                            os.path.join(upload_folder, relative_path)
+                        )
+                        if not local_path.startswith(os.path.abspath(upload_folder)):
+                            logger.warning(
+                                f"Path traversal attempt blocked: {ref_img}, skipping..."
+                            )
+                        elif os.path.exists(local_path):
+                            logger.debug(f"Loaded image from local path: {local_path}")
+                            return Image.open(local_path)
+                        else:
+                            logger.warning(
+                                f"Local file not found: {local_path} (from {ref_img}), skipping..."
+                            )
+                        return None
+                logger.warning(f"Invalid image reference: {ref_img}, skipping...")
+                return None
+
+            def load_refs(refs):
+                images = []
+                for ref_img in refs or []:
+                    loaded = load_ref_image(ref_img)
+                    if loaded:
+                        images.append(loaded)
+                return images
+
+            grouped_refs_requested = (
+                style_ref_images is not None or content_ref_images is not None
+            )
+            if grouped_refs_requested:
+                style_ref_inputs = []
+                if ref_image_path:
+                    style_ref_inputs.append(ref_image_path)
+                style_ref_inputs.extend(style_ref_images or [])
+                content_ref_inputs = list(content_ref_images or [])
+                if additional_ref_images:
+                    content_ref_inputs.extend(additional_ref_images)
+
+                style_refs = load_refs(style_ref_inputs)
+                content_refs = load_refs(content_ref_inputs)
+                if getattr(self.image_provider, "supports_conversation_contents", False):
+                    parts = [{"text": prompt}]
+                    if style_refs:
+                        parts.append({"text": "STYLE_REFERENCE_IMAGES_BEGIN"})
+                        for idx, image in enumerate(style_refs, start=1):
+                            parts.append({"text": f"STYLE_REFERENCE image {idx}"})
+                            parts.append({"image": image})
+                        parts.append({"text": "STYLE_REFERENCE_IMAGES_END"})
+                    if content_refs:
+                        parts.append({"text": "CONTENT_REFERENCE_IMAGES_BEGIN"})
+                        for idx, image in enumerate(content_refs, start=1):
+                            parts.append({"text": f"CONTENT_REFERENCE image {idx}"})
+                            parts.append({"image": image})
+                        parts.append({"text": "CONTENT_REFERENCE_IMAGES_END"})
+                    return self.image_provider.generate_image_from_conversation(
+                        contents=[{"role": "user", "parts": parts}],
+                        aspect_ratio=aspect_ratio,
+                        resolution=resolution,
+                        thinking_level=self._get_image_thinking_level(),
+                    )
+
+                ref_images = [*style_refs, *content_refs]
+                return self.image_provider.generate_image(
+                    prompt=prompt,
+                    ref_images=ref_images if ref_images else None,
+                    aspect_ratio=aspect_ratio,
+                    resolution=resolution,
+                    thinking_level=self._get_image_thinking_level(),
+                )
+
             # 构建参考图片列表
             ref_images = []
-
             # 添加主参考图片（如果提供了路径）
             if ref_image_path:
                 if not os.path.exists(ref_image_path):
@@ -618,63 +721,9 @@ class AIService:
             # 添加额外的参考图片
             if additional_ref_images:
                 for ref_img in additional_ref_images:
-                    if isinstance(ref_img, Image.Image):
-                        # 已经是 PIL Image 对象
-                        ref_images.append(ref_img)
-                    elif isinstance(ref_img, str):
-                        # 可能是本地路径或 URL
-                        if os.path.exists(ref_img):
-                            # 本地路径
-                            ref_images.append(Image.open(ref_img))
-                        elif ref_img.startswith("http://") or ref_img.startswith(
-                            "https://"
-                        ):
-                            # URL，需要下载
-                            downloaded_img = self.download_image_from_url(ref_img)
-                            if downloaded_img:
-                                ref_images.append(downloaded_img)
-                            else:
-                                logger.warning(
-                                    f"Failed to download image from URL: {ref_img}, skipping..."
-                                )
-                        elif ref_img.startswith("/files/mineru/"):
-                            # MinerU 本地文件路径，需要转换为文件系统路径（支持前缀匹配）
-                            local_path = self._convert_mineru_path_to_local(ref_img)
-                            if local_path and os.path.exists(local_path):
-                                ref_images.append(Image.open(local_path))
-                                logger.debug(
-                                    f"Loaded MinerU image from local path: {local_path}"
-                                )
-                            else:
-                                logger.warning(
-                                    f"MinerU image file not found (with prefix matching): {ref_img}, skipping..."
-                                )
-                        elif ref_img.startswith("/files/"):
-                            # 通用 /files/ 路径（materials、项目文件等），转换为文件系统路径
-                            upload_folder = os.environ.get("UPLOAD_FOLDER", "")
-                            relative_path = ref_img[len("/files/") :].lstrip("/")
-                            local_path = os.path.abspath(
-                                os.path.join(upload_folder, relative_path)
-                            )
-                            if not local_path.startswith(
-                                os.path.abspath(upload_folder)
-                            ):
-                                logger.warning(
-                                    f"Path traversal attempt blocked: {ref_img}, skipping..."
-                                )
-                            elif os.path.exists(local_path):
-                                ref_images.append(Image.open(local_path))
-                                logger.debug(
-                                    f"Loaded image from local path: {local_path}"
-                                )
-                            else:
-                                logger.warning(
-                                    f"Local file not found: {local_path} (from {ref_img}), skipping..."
-                                )
-                        else:
-                            logger.warning(
-                                f"Invalid image reference: {ref_img}, skipping..."
-                            )
+                    loaded = load_ref_image(ref_img)
+                    if loaded:
+                        ref_images.append(loaded)
 
             logger.debug(
                 f"Calling image provider for generation with {len(ref_images)} reference images..."
