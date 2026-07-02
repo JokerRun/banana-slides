@@ -349,6 +349,7 @@ def get_page_description_prompt(
 | bullet list               | chart/image area     |
 +---------------------------+----------------------+
 说明：用 ASCII Diagram 表达页面区域、层级和内容映射，可按内容选择标题区、主视觉区、关键结论区、要点列表、图表/图片区、对比区、流程区等结构。
+ASCII Layout 可命名区域并映射已有内容，但不得发明可见 slide copy；不得写新的副标题、核心结论、口号或任何可见文案，除非逐字来自 页面标题、页面文字或用户原文。
 
 其他页面素材（如果文件中存在请积极添加，包括markdown图片链接、公式、表格等）
 
@@ -440,39 +441,30 @@ def get_image_generation_prompt(
         has_template=has_template,
     )
 
-    style_source_text = {
-        "preset": f"selected style preset: {style_contract.style_preset_id}",
-        "custom": "user-provided style references or style text",
-        "no-style": "no explicit style source",
-    }[style_contract.kind]
-    style_block = [
-        "# Style Contract:",
-        f"- source: {style_source_text}",
-    ]
-    if style_contract.kind == "preset" and style_contract.style_preset_id:
-        style_block.append(
-            "- Use only the selected preset metadata and attached style reference images as the style source."
-        )
-        if style_contract.preset_prompt_body:
-            style_block.append("\nPreset generate prompt:\n" + style_contract.preset_prompt_body)
-    elif style_contract.has_reference_image:
-        style_block.append(
-            "- Use attached reference images only as visual style/layout references."
+    if style_contract.kind == "preset":
+        style_prompt_section = (
+            f"# STYLE_PRESET_PROMPT\n"
+            f"selected style preset: {style_contract.style_preset_id}\n"
+            "Term binding: In that prompt, [参考图片] means STYLE_REFERENCE; [文本内容] means TEXT_CONTENT.\n\n"
+            f"{style_contract.preset_prompt_body or '(none)'}"
         )
     else:
-        style_block.append(
-            "- No preset, custom style text, or style reference is selected; follow only the page content and user-provided constraints."
-        )
-    if style_contract.body:
-        style_block.append("\nUser style / extra requirements:\n" + style_contract.body)
-    style_contract_text = "\n".join(style_block)
+        style_prompt_section = "# STYLE_PRESET_PROMPT\n(none)"
 
-    # 根据是否有模板/风格参考图生成不同的设计指南内容
-    template_style_guideline = (
-        "- Use attached style reference images only for user-provided style/layout constraints."
-        if style_contract.has_reference_image
-        else "- No style reference image is provided; do not invent or assume a brand/template system."
-    )
+    user_style_section = ""
+    if style_contract.kind == "custom":
+        reference_note = (
+            "\nAttached reference images, if any, are USER_STYLE_REQUIREMENTS and style/layout references only."
+            if style_contract.has_reference_image
+            else ""
+        )
+        user_style_section = (
+            "\n\n# USER_STYLE_REQUIREMENTS\n"
+            f"{style_contract.body or '(none)'}{reference_note}"
+        )
+    elif style_contract.body:
+        user_style_section = "\n\n# USER_STYLE_REQUIREMENTS\n" + style_contract.body
+
     forbidden_template_text_guidline = (
         "- 只参考风格设计，禁止出现模板中的文字。\n"
         if style_contract.has_reference_image
@@ -480,24 +472,32 @@ def get_image_generation_prompt(
     )
 
     prompt = f"""\
-# Inputs:
-- page_desc = current page content to convert into one slide
-- outline_text = full deck outline
-- current_section = current section
-- image_ref_manifest = attached user image references, if any
-- style_contract = explicit style source selected by preset, user refs, or user text
-- Layout Recommendation / ASCII Diagram blocks are layout-only instruction, not slide text
+# Input Mapping
+- TEXT_CONTENT = content inside <page_description>
+- STYLE_REFERENCE = attached preset/template/style image(s)
+- OUTLINE_CONTEXT = outline/current section context only
+- LAYOUT_RECOMMENDATION = ASCII layout block inside TEXT_CONTENT, placement guidance only, not visible slide text
+- USER_IMAGE_REFS = IMAGE_REF manifest if present
 {image_ref_manifest}
-{style_contract_text}
 
-# Task:
-Create one clear, readable 16:9 PPT page from page_desc. Follow only the content and explicit style sources provided in this prompt and attached references.
+# Priority Rules
+a. Preserve all visible text from TEXT_CONTENT exactly; do not add/delete/summarize/rewrite.
+b. STYLE_PRESET_PROMPT applies only to layout/color/typography/visual hierarchy/template style.
+c. Never render ASCII layout syntax, layout labels, markdown markers, IMAGE_REF markers.
+d. OUTLINE_CONTEXT is continuity context only; do not introduce new visible slide text from it.
+e. If STYLE_PRESET_PROMPT conflicts with TEXT_CONTENT preservation, TEXT_CONTENT preservation wins.
+
+{style_prompt_section}{user_style_section}
+
+# TEXT_CONTENT
+Create one clear, readable 16:9 PPT page from TEXT_CONTENT. Follow only the content and explicit style sources provided in this prompt and attached references.
 
 当前PPT页面的[文本]如下:
 <page_description>
 {page_desc}
 </page_description>
 
+# OUTLINE_CONTEXT
 <reference_information>
 整个PPT的大纲为：
 {outline_text}
@@ -506,18 +506,14 @@ Create one clear, readable 16:9 PPT page from page_desc. Follow only the content
 </reference_information>
 
 
-<execution_rules>
+# Final Guardrails
 - 要求文字清晰锐利，画面为高分辨率，16:9比例。
-{template_style_guideline}
-- 严格基于 [文本] 中的原始文字内容进行排版设计，禁止凭空新增、替换、总结或重写未出现的文字信息。
+- Layout Recommendation / ASCII Diagram blocks are layout-only instruction and must not be rendered as slide text.
+- Do not draw ASCII borders, plus signs, pipes, layout labels, markdown markers, or IMAGE_REF markers as visible slide text.
 - Preserve any user-provided color scheme and base template constraints exactly.
-- 若 [文本] 包含"布局建议（Layout Recommendation - ASCII Diagram）"，该区块仅作为版式指令使用，must not be rendered as slide text。
-- Do not draw ASCII borders, plus signs, pipes, labels such as "title area" / "visual area" / "bullet list" / "chart/image area", or the layout recommendation heading as visible slide content.
-- 若 [文本] 中包含明确主题或标题，将其作为页面标题；若无法识别明确标题，严禁自行捏造标题。
 - If [文本] contains [IMAGE_REF:*] markers, use the attached reference images at those semantic locations and preserve the subject/identity.
-- 如非必要，禁止出现 markdown 格式符号（如 # 和 * 等）。
+- STYLE_REFERENCE/template images are for style only; do not render text from template images.
 {forbidden_template_text_guidline}- Do not render markdown markers, ASCII layout syntax, or IMAGE_REF markers as visible slide text.
-</execution_rules>
 {get_ppt_language_instruction(language)}
 {material_images_note}
 
@@ -720,6 +716,7 @@ Fidelity rules (CRITICAL — do not paraphrase or invent):
 - must not modify user-provided base template constraints: preserve any user-provided base template constraints exactly.
 - Design / style / material / visual instructions (排版、风格、素材、视觉元素、配色、Logo 尺寸) belong ONLY in the "其他页面素材" section. They must NEVER appear in "页面文字". Conversely, body copy must NEVER appear in "其他页面素材".
 - Layout instructions must be expressed in the separate "布局建议（Layout Recommendation - ASCII Diagram）" section. Analyze the page content and context, then recommend a layout using ASCII Diagram boxes/regions such as title area, visual area, key message area, bullet list, and chart/image area. Do NOT change the preserved user content, color scheme, or base template constraints while creating this recommendation.
+- ASCII Layout may name regions and map existing content, but it must not invent visible slide copy. Do not write new subtitles, key takeaways, slogans, or any visible text unless copied verbatim from 页面标题, 页面文字, or the user's original text.
 - If a page references an image (e.g. "内容可见上传的图片" / "见图" / "见上传图片" / "详见设计图" / "见附图"), preserve that reference VERBATIM inside "页面文字" as one line in the form: "【需上传图片】<原句照抄>". Do NOT rewrite it into a fabricated description of what the image shows.
 - If a page in the outline has NO corresponding description in the original text, output only the unavailable-content marker plus a minimal title-only layout:
   页面标题：[页面标题]
