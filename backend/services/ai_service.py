@@ -7,6 +7,7 @@ TODO: use structured output API
 import os
 import json
 import re
+import hashlib
 import logging
 import requests
 from dataclasses import dataclass
@@ -578,6 +579,7 @@ class AIService:
         additional_ref_images: Optional[List[Union[str, Image.Image]]] = None,
         style_ref_images: Optional[List[Union[str, Image.Image]]] = None,
         content_ref_images: Optional[List[Union[str, Image.Image]]] = None,
+        provider_input_snapshot_out: Optional[Dict] = None,
     ) -> Optional[Image.Image]:
         """
         Generate image using configured image provider
@@ -607,6 +609,73 @@ class AIService:
             logger.debug(
                 f"Config - aspect_ratio: {aspect_ratio}, resolution: {resolution}"
             )
+
+            def snapshot_base(mode: str) -> Dict:
+                return {
+                    "mode": mode,
+                    "provider": type(self.image_provider).__name__,
+                    "model": getattr(self.image_provider, "model", None),
+                    "aspect_ratio": aspect_ratio,
+                    "resolution": resolution,
+                    "text_prompt_sha256": hashlib.sha256(
+                        prompt.encode("utf-8")
+                    ).hexdigest(),
+                    "parts": [
+                        {
+                            "index": 0,
+                            "type": "text",
+                            "role": "main_prompt",
+                            "text_length": len(prompt),
+                            "text_preview": prompt[:500],
+                        }
+                    ],
+                }
+
+            def publish_snapshot(snapshot: Dict):
+                if provider_input_snapshot_out is not None:
+                    provider_input_snapshot_out.clear()
+                    provider_input_snapshot_out.update(snapshot)
+
+            def append_text_snapshot(snapshot: Dict, role: str, text: str):
+                snapshot["parts"].append(
+                    {
+                        "index": len(snapshot["parts"]),
+                        "type": "text",
+                        "role": role,
+                        "text": text,
+                    }
+                )
+
+            def append_image_snapshot(
+                snapshot: Dict,
+                role: str,
+                source,
+                image: Optional[Image.Image],
+                *,
+                resolved_path: Optional[str] = None,
+                loaded: bool = False,
+                error: Optional[str] = None,
+            ):
+                part = {
+                    "index": len(snapshot["parts"]),
+                    "type": "image",
+                    "role": role,
+                    "source": source if isinstance(source, str) else "PIL.Image",
+                    "resolved_path": resolved_path,
+                    "loaded": loaded,
+                }
+                if image is not None:
+                    part.update(
+                        {
+                            "width": getattr(image, "width", None),
+                            "height": getattr(image, "height", None),
+                            "format": image.format,
+                            "mode": image.mode,
+                        }
+                    )
+                if error:
+                    part["error"] = error
+                snapshot["parts"].append(part)
 
             def load_ref_image(ref_img):
                 if isinstance(ref_img, Image.Image):
@@ -674,10 +743,69 @@ class AIService:
                         images.append(loaded)
                 return images
 
+            def describe_ref_source(ref_img, loaded):
+                source = ref_img if isinstance(ref_img, str) else "PIL.Image"
+                resolved_path = None
+                error = None
+                if isinstance(ref_img, Image.Image):
+                    pass
+                elif isinstance(ref_img, str) and os.path.exists(ref_img):
+                    resolved_path = os.path.abspath(ref_img)
+                elif isinstance(ref_img, str) and ref_img.startswith("/files/mineru/"):
+                    resolved_path = self._convert_mineru_path_to_local(ref_img)
+                elif isinstance(ref_img, str) and ref_img.startswith("/files/"):
+                    upload_folder = ""
+                    if has_app_context():
+                        upload_folder = current_app.config.get("UPLOAD_FOLDER", "")
+                    upload_folder = upload_folder or os.environ.get("UPLOAD_FOLDER", "")
+                    if upload_folder:
+                        relative_path = ref_img[len("/files/") :].lstrip("/")
+                        resolved_path = os.path.abspath(
+                            os.path.join(upload_folder, relative_path)
+                        )
+                    else:
+                        error = "upload_folder_not_configured"
+                elif isinstance(ref_img, str) and ref_img.startswith(
+                    ("http://", "https://")
+                ):
+                    resolved_path = None
+
+                if loaded is None and error is None:
+                    error = "not_loaded"
+                return source, resolved_path, error
+
+            def load_refs_with_snapshot(refs, role, snapshot, include_labels: bool = False):
+                images = []
+                for idx, ref_img in enumerate(refs or [], start=1):
+                    loaded = load_ref_image(ref_img)
+                    source, resolved_path, error = describe_ref_source(ref_img, loaded)
+                    if include_labels:
+                        append_text_snapshot(
+                            snapshot,
+                            f"{role}_label",
+                            f"{role.upper()} image {idx}",
+                        )
+                    append_image_snapshot(
+                        snapshot,
+                        role,
+                        source,
+                        loaded,
+                        resolved_path=resolved_path,
+                        loaded=loaded is not None,
+                        error=error,
+                    )
+                    if loaded:
+                        images.append(loaded)
+                return images
+
             grouped_refs_requested = (
                 style_ref_images is not None or content_ref_images is not None
             )
             if grouped_refs_requested:
+                supports_conversation = getattr(
+                    self.image_provider, "supports_conversation_contents", False
+                )
+                snapshot = snapshot_base("conversation" if supports_conversation else "flat")
                 style_ref_inputs = []
                 if ref_image_path:
                     style_ref_inputs.append(ref_image_path)
@@ -686,9 +814,45 @@ class AIService:
                 if additional_ref_images:
                     content_ref_inputs.extend(additional_ref_images)
 
-                style_refs = load_refs(style_ref_inputs)
-                content_refs = load_refs(content_ref_inputs)
-                if getattr(self.image_provider, "supports_conversation_contents", False):
+                if supports_conversation and style_ref_inputs:
+                    append_text_snapshot(
+                        snapshot,
+                        "style_group_marker",
+                        "STYLE_REFERENCE_IMAGES_BEGIN",
+                    )
+                style_refs = load_refs_with_snapshot(
+                    style_ref_inputs,
+                    "style_reference",
+                    snapshot,
+                    include_labels=supports_conversation,
+                )
+                if supports_conversation and style_ref_inputs:
+                    append_text_snapshot(
+                        snapshot,
+                        "style_group_marker",
+                        "STYLE_REFERENCE_IMAGES_END",
+                    )
+                if supports_conversation and content_ref_inputs:
+                    append_text_snapshot(
+                        snapshot,
+                        "content_group_marker",
+                        "CONTENT_REFERENCE_IMAGES_BEGIN",
+                    )
+                content_refs = load_refs_with_snapshot(
+                    content_ref_inputs,
+                    "content_reference",
+                    snapshot,
+                    include_labels=supports_conversation,
+                )
+                if supports_conversation and content_ref_inputs:
+                    append_text_snapshot(
+                        snapshot,
+                        "content_group_marker",
+                        "CONTENT_REFERENCE_IMAGES_END",
+                    )
+                publish_snapshot(snapshot)
+
+                if supports_conversation:
                     parts = [{"text": prompt}]
                     if style_refs:
                         parts.append({"text": "STYLE_REFERENCE_IMAGES_BEGIN"})
@@ -719,6 +883,7 @@ class AIService:
                 )
 
             # 构建参考图片列表
+            snapshot = snapshot_base("flat")
             ref_images = []
             # 添加主参考图片（如果提供了路径）
             if ref_image_path:
@@ -727,14 +892,24 @@ class AIService:
                         f"Reference image not found: {ref_image_path}"
                     )
                 main_ref_image = Image.open(ref_image_path)
+                main_ref_image.load()
                 ref_images.append(main_ref_image)
+                append_image_snapshot(
+                    snapshot,
+                    "reference",
+                    ref_image_path,
+                    main_ref_image,
+                    resolved_path=os.path.abspath(ref_image_path),
+                    loaded=True,
+                )
 
             # 添加额外的参考图片
             if additional_ref_images:
-                for ref_img in additional_ref_images:
-                    loaded = load_ref_image(ref_img)
-                    if loaded:
-                        ref_images.append(loaded)
+                ref_images.extend(
+                    load_refs_with_snapshot(additional_ref_images, "reference", snapshot)
+                )
+
+            publish_snapshot(snapshot)
 
             logger.debug(
                 f"Calling image provider for generation with {len(ref_images)} reference images..."

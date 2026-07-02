@@ -28,6 +28,9 @@ class PageImageVersion(db.Model):
         db.Text, nullable=True
     )  # 生成该版本时的最终 provider prompt
     ref_manifest = db.Column(db.Text, nullable=True)  # JSON: 生成/编辑上下文参考图清单
+    provider_input_snapshot = db.Column(
+        db.Text, nullable=True
+    )  # JSON: provider 实际输入 parts 元数据（不含图片本体）
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
     # Relationships
@@ -59,6 +62,7 @@ class PageImageVersion(db.Model):
             "is_current": self.is_current,
             "prompt_snapshot": self.prompt_snapshot,
             "ref_manifest": self.get_ref_manifest(),
+            "provider_input_snapshot": self.get_provider_input_snapshot(),
             "created_at": created_at_str,
         }
 
@@ -74,6 +78,21 @@ class PageImageVersion(db.Model):
     def set_ref_manifest(self, data):
         """Set ref_manifest as JSON string."""
         self.ref_manifest = json.dumps(data or [], ensure_ascii=False)
+
+    def get_provider_input_snapshot(self):
+        """Parse provider_input_snapshot JSON string."""
+        if self.provider_input_snapshot:
+            try:
+                return json.loads(self.provider_input_snapshot)
+            except json.JSONDecodeError:
+                return None
+        return None
+
+    def set_provider_input_snapshot(self, data):
+        """Set provider_input_snapshot as JSON string."""
+        self.provider_input_snapshot = (
+            json.dumps(data, ensure_ascii=False) if data else None
+        )
 
     def __repr__(self):
         return f"<PageImageVersion {self.id}: page={self.page_id}, version={self.version_number}, current={self.is_current}>"
