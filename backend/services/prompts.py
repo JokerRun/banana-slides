@@ -442,14 +442,18 @@ def get_image_generation_prompt(
     )
 
     if style_contract.kind == "preset":
-        style_prompt_section = (
-            f"# STYLE_PRESET_PROMPT\n"
-            f"selected style preset: {style_contract.style_preset_id}\n"
-            "Term binding: In that prompt, [参考图片] means STYLE_REFERENCE; [文本内容] means TEXT_CONTENT.\n\n"
-            f"{style_contract.preset_prompt_body or '(none)'}"
+        prompt = "\n\n".join(
+            part
+            for part in [
+                (style_contract.preset_prompt_body or "").strip(),
+                (page_desc or "").strip(),
+            ]
+            if part
         )
-    else:
-        style_prompt_section = "# STYLE_PRESET_PROMPT\n(none)"
+        logger.info(f"[get_image_generation_prompt] Final prompt:\n{prompt}")
+        return prompt
+
+    style_prompt_section = "# STYLE_PRESET_PROMPT\n(none)"
 
     user_style_section = ""
     if style_contract.kind == "custom":

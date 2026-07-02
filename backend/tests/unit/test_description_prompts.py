@@ -17,6 +17,7 @@ from services.prompts import (
     get_page_description_prompt,
     resolve_image_generation_style_contract,
 )
+from services.style_preset_service import get_generate_preset_prompt_body
 
 
 def _ctx(description_text: str) -> ProjectContext:
@@ -220,8 +221,33 @@ class TestImageGenerationPrompt:
         assert "BCG" not in prompt
 
     def test_preset_contract_includes_canonical_generate_prompt(self):
+        canonical = get_generate_preset_prompt_body("ddi-standard")
         style_contract = resolve_image_generation_style_contract(
             extra_requirements=None,
+            style_preset_id="ddi-standard",
+            has_template=True,
+        )
+        page_desc = "页面标题：Market Growth\n页面文字：\n- Revenue up 30%"
+        prompt = get_image_generation_prompt(
+            page_desc=page_desc,
+            outline_text="1. Market Growth",
+            current_section="Market Growth",
+            language="en",
+            has_template=True,
+            style_contract=style_contract,
+        )
+
+        assert style_contract.kind == "preset"
+        assert prompt == f"{canonical}\n\n{page_desc}"
+        assert canonical in prompt
+        assert page_desc in prompt
+        assert "资深商业咨询级 PPT 排版与视觉架构师" in prompt
+        assert "零重写内容原则" in prompt
+        assert "PPT Master Template" in prompt
+        assert "DDI compact style brief" not in prompt
+
+    def test_preset_generate_prompt_does_not_use_generic_wrapper_sections(self):
+        style_contract = resolve_image_generation_style_contract(
             style_preset_id="ddi-standard",
             has_template=True,
         )
@@ -234,18 +260,17 @@ class TestImageGenerationPrompt:
             style_contract=style_contract,
         )
 
-        assert style_contract.kind == "preset"
-        assert "selected style preset: ddi-standard" in prompt
-        assert "# Input Mapping" in prompt
-        assert "# Priority Rules" in prompt
-        assert "# STYLE_PRESET_PROMPT" in prompt
-        assert "In that prompt, [参考图片] means STYLE_REFERENCE; [文本内容] means TEXT_CONTENT." in prompt
-        assert "资深商业咨询级 PPT 排版与视觉架构师" in prompt
-        assert "零重写内容原则" in prompt
-        assert "PPT Master Template" in prompt
-        assert "# TEXT_CONTENT" in prompt
-        assert "# OUTLINE_CONTEXT" in prompt
-        assert "DDI compact style brief" not in prompt
+        forbidden_sections = [
+            "# Input Mapping",
+            "# Priority Rules",
+            "# STYLE_PRESET_PROMPT",
+            "# Runtime Input Binding",
+            "# Runtime Non-negotiables",
+            "# TEXT_CONTENT",
+            "# OUTLINE_CONTEXT",
+        ]
+        for section in forbidden_sections:
+            assert section not in prompt
 
     def test_no_style_prompt_has_no_ddi_preset_style_brief(self):
         prompt = get_image_generation_prompt(
@@ -260,6 +285,31 @@ class TestImageGenerationPrompt:
         assert "资深商业咨询级 PPT 排版与视觉架构师" not in prompt
         assert "零重写内容原则" not in prompt
         assert "PPT Master Template" not in prompt
+
+    def test_custom_and_no_style_prompts_do_not_include_ddi_canonical_text(self):
+        canonical = get_generate_preset_prompt_body("ddi-standard")
+        custom_contract = resolve_image_generation_style_contract(
+            extra_requirements="Use a quiet financial dashboard style.",
+            has_template=False,
+        )
+        custom_prompt = get_image_generation_prompt(
+            page_desc="页面标题：Launch\n页面文字：\n- Ship beta",
+            outline_text="1. Launch",
+            current_section="Launch",
+            language="en",
+            has_template=False,
+            style_contract=custom_contract,
+        )
+        no_style_prompt = get_image_generation_prompt(
+            page_desc="页面标题：Launch\n页面文字：\n- Ship beta",
+            outline_text="1. Launch",
+            current_section="Launch",
+            language="en",
+            has_template=False,
+        )
+
+        assert canonical not in custom_prompt
+        assert canonical not in no_style_prompt
 
     def test_treats_ascii_layout_recommendation_as_non_rendered_instruction(self):
         prompt = get_image_generation_prompt(
