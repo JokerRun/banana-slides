@@ -208,7 +208,7 @@ class TestImageGenerationPrompt:
         assert "麦肯锡" not in prompt
         assert "BCG" not in prompt
 
-    def test_preset_contract_does_not_inject_canonical_body(self):
+    def test_preset_contract_includes_canonical_generate_prompt(self):
         style_contract = resolve_image_generation_style_contract(
             extra_requirements=None,
             style_preset_id="ddi-standard",
@@ -225,17 +225,11 @@ class TestImageGenerationPrompt:
 
         assert style_contract.kind == "preset"
         assert "selected style preset: ddi-standard" in prompt
-        assert "DDI compact style brief" in prompt
-        assert "attached DDI base template" in prompt
-        assert "primary style and layout reference" in prompt
-        assert "DDI visual identity" in prompt
-        assert "palette" in prompt
-        assert "hierarchy" in prompt
-        assert "whitespace" in prompt
-        assert "typography" in prompt
-        assert "do not rewrite or change the slide content" in prompt
-        assert "资深商业咨询级 PPT 排版与视觉架构师" not in prompt
-        assert "零重写内容原则" not in prompt
+        assert "Preset generate prompt:" in prompt
+        assert "资深商业咨询级 PPT 排版与视觉架构师" in prompt
+        assert "零重写内容原则" in prompt
+        assert "PPT Master Template" in prompt
+        assert "DDI compact style brief" not in prompt
 
     def test_no_style_prompt_has_no_ddi_preset_style_brief(self):
         prompt = get_image_generation_prompt(
@@ -247,8 +241,9 @@ class TestImageGenerationPrompt:
         )
 
         assert "DDI compact style brief" not in prompt
-        assert "attached DDI base template" not in prompt
-        assert "DDI visual identity" not in prompt
+        assert "资深商业咨询级 PPT 排版与视觉架构师" not in prompt
+        assert "零重写内容原则" not in prompt
+        assert "PPT Master Template" not in prompt
 
     def test_treats_ascii_layout_recommendation_as_non_rendered_instruction(self):
         prompt = get_image_generation_prompt(
