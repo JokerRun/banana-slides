@@ -171,6 +171,14 @@ class TestImageGenerationPrompt:
             "麦肯锡",
             "咨询",
             "BCG",
+            "流程用路线图",
+            "冰山",
+            "dashboard",
+            "装饰性图形",
+            "1:1 映射",
+            "clean neutral",
+            "PPT page information architect",
+            "Core Objective",
             "consulting report",
             "consulting-grade",
             "default DDI palette",
@@ -200,9 +208,9 @@ class TestImageGenerationPrompt:
         assert "麦肯锡" not in prompt
         assert "BCG" not in prompt
 
-    def test_ddi_prompt_appears_only_when_ddi_preset_selected(self):
+    def test_preset_contract_does_not_inject_canonical_body(self):
         style_contract = resolve_image_generation_style_contract(
-            extra_requirements="DDI canonical body",
+            extra_requirements=None,
             style_preset_id="ddi-standard",
             has_template=True,
         )
@@ -217,7 +225,9 @@ class TestImageGenerationPrompt:
 
         assert style_contract.kind == "preset"
         assert "ddi-standard" in prompt
-        assert "DDI canonical body" in prompt
+        assert "selected style preset: ddi-standard" in prompt
+        assert "资深商业咨询级 PPT 排版与视觉架构师" not in prompt
+        assert "零重写内容原则" not in prompt
 
     def test_treats_ascii_layout_recommendation_as_non_rendered_instruction(self):
         prompt = get_image_generation_prompt(
@@ -257,7 +267,7 @@ class TestImageGenerationPrompt:
         )
 
         assert "user-provided color scheme" in prompt
-        assert "only when" in prompt
+        assert "base template constraints" in prompt
 
 
 class TestImageEditPrompt:
