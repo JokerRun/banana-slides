@@ -12,6 +12,7 @@ import requests
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Union
 from textwrap import dedent
+from flask import current_app, has_app_context
 from PIL import Image
 from tenacity import retry, stop_after_attempt, retry_if_exception_type
 from .prompts import (
@@ -635,7 +636,17 @@ class AIService:
                         )
                         return None
                     if ref_img.startswith("/files/"):
-                        upload_folder = os.environ.get("UPLOAD_FOLDER", "")
+                        upload_folder = ""
+                        if has_app_context():
+                            upload_folder = current_app.config.get("UPLOAD_FOLDER", "")
+                        upload_folder = upload_folder or os.environ.get(
+                            "UPLOAD_FOLDER", ""
+                        )
+                        if not upload_folder:
+                            logger.warning(
+                                f"UPLOAD_FOLDER not configured for local file URL: {ref_img}, skipping..."
+                            )
+                            return None
                         relative_path = ref_img[len("/files/") :].lstrip("/")
                         local_path = os.path.abspath(
                             os.path.join(upload_folder, relative_path)

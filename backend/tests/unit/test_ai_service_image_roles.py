@@ -1,5 +1,7 @@
 """Unit tests for role-aware image generation provider inputs."""
 
+import os
+
 from PIL import Image
 
 from services.ai_service import AIService
@@ -79,3 +81,23 @@ def test_legacy_generation_callers_still_use_flat_provider_input():
     assert result.size == (16, 9)
     assert provider.kwargs["prompt"] == "legacy prompt"
     assert provider.kwargs["ref_images"] == [ref_img, extra_img]
+
+
+def test_files_materials_refs_resolve_from_flask_upload_folder(app):
+    provider = _ConversationProvider()
+    service = AIService(text_provider=object(), image_provider=provider)
+    materials_dir = os.path.join(app.config["UPLOAD_FOLDER"], "materials")
+    os.makedirs(materials_dir, exist_ok=True)
+    content_path = os.path.join(materials_dir, "content.png")
+    Image.new("RGB", (12, 12), color="white").save(content_path)
+
+    with app.app_context():
+        result = service.generate_image(
+            prompt="PURE PRESET PROMPT\n\n页面标题：A",
+            content_ref_images=["/files/materials/content.png"],
+        )
+
+    assert result.size == (16, 9)
+    parts = provider.contents[0]["parts"]
+    assert {"text": "CONTENT_REFERENCE_IMAGES_BEGIN"} in parts
+    assert any("image" in part for part in parts)
