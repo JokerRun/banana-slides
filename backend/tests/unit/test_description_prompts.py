@@ -120,6 +120,8 @@ class TestDescriptionSplitPrompt:
         assert "must not modify user-provided content" in prompt
         assert "must not modify user-provided color scheme" in prompt
         assert "must not modify user-provided base template constraints" in prompt
+        assert "must not invent visible slide copy" in prompt
+        assert "Do not write new subtitles, key takeaways, slogans" in prompt
 
 
 class TestPageDescriptionPrompt:
@@ -154,6 +156,8 @@ class TestPageDescriptionPrompt:
         assert "must not modify user-provided content" in prompt
         assert "must not modify user-provided color scheme" in prompt
         assert "must not modify user-provided base template constraints" in prompt
+        assert "不得发明可见 slide copy" in prompt
+        assert "不得写新的副标题、核心结论、口号" in prompt
 
 
 class TestImageGenerationPrompt:
@@ -187,6 +191,12 @@ class TestImageGenerationPrompt:
         ]
         for term in forbidden_terms:
             assert term not in prompt
+        assert "# Input Mapping" in prompt
+        assert "# Priority Rules" in prompt
+        assert "# STYLE_PRESET_PROMPT" in prompt
+        assert "(none)" in prompt
+        assert "# TEXT_CONTENT" in prompt
+        assert "# OUTLINE_CONTEXT" in prompt
 
     def test_custom_style_prompt_uses_only_user_style_contract(self):
         style_contract = resolve_image_generation_style_contract(
@@ -203,6 +213,7 @@ class TestImageGenerationPrompt:
         )
 
         assert style_contract.kind == "custom"
+        assert "# USER_STYLE_REQUIREMENTS" in prompt
         assert "Use a playful neon editorial style." in prompt
         assert "DDI" not in prompt
         assert "麦肯锡" not in prompt
@@ -225,10 +236,15 @@ class TestImageGenerationPrompt:
 
         assert style_contract.kind == "preset"
         assert "selected style preset: ddi-standard" in prompt
-        assert "Preset generate prompt:" in prompt
+        assert "# Input Mapping" in prompt
+        assert "# Priority Rules" in prompt
+        assert "# STYLE_PRESET_PROMPT" in prompt
+        assert "In that prompt, [参考图片] means STYLE_REFERENCE; [文本内容] means TEXT_CONTENT." in prompt
         assert "资深商业咨询级 PPT 排版与视觉架构师" in prompt
         assert "零重写内容原则" in prompt
         assert "PPT Master Template" in prompt
+        assert "# TEXT_CONTENT" in prompt
+        assert "# OUTLINE_CONTEXT" in prompt
         assert "DDI compact style brief" not in prompt
 
     def test_no_style_prompt_has_no_ddi_preset_style_brief(self):
